@@ -67,9 +67,9 @@ API contract templates are located in `docs/api/`.
 | Name | Module(s) |
 |---|---|
 | Keen Potter H. Ngamoy | Vehicle Request |
-| _(teammate)_ | Trip Scheduling |
-| _(teammate)_ | Maintenance Monitoring |
-| _(teammate)_ | Vehicle-Driver Allocation |
+| Erick Justine T. Garcia | Trip Scheduling |
+| Xyrylle M. Molina | Maintenance Monitoring |
+| Evangeline N. Cosep | Vehicle-Driver Allocation |
 
 ## TODO
 
