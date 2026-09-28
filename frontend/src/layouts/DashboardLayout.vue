@@ -154,11 +154,11 @@ function closeSidebar() {
       <header class="sticky top-0 z-20 hidden md:flex h-16 items-center justify-between gap-4 border-b border-line bg-white px-page">
         <div class="ml-auto flex items-center gap-3">
           <div class="text-right">
-            <p class="text-small font-medium leading-tight">{{ auth.user?.first_name }}</p>
+            <p class="text-small font-medium leading-tight">{{ auth.user?.name }}</p>
             <p class="text-small text-ink-muted">{{ ROLE_LABELS[auth.role] ?? auth.role }}</p>
           </div>
           <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 text-small font-semibold text-primary-700">
-            {{ initials(auth.user?.first_name) }}
+            {{ initials(auth.user?.name) }}
           </div>
           <button
             type="button"

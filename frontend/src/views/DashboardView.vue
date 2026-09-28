@@ -59,7 +59,7 @@ const upcoming = computed(() =>
   <div class="flex flex-col gap-page">
     <!-- Greeting -->
     <div>
-      <h1 class="text-page-title">Hello, {{ auth.user?.first_name }}</h1>
+      <h1 class="text-page-title">Hello, {{ auth.user?.name?.split(' ')[0] }}</h1>
       <p class="mt-1 text-small text-ink-muted">
         Signed in as {{ ROLE_LABELS[auth.role] ?? auth.role }}
       </p>
@@ -74,8 +74,15 @@ const upcoming = computed(() =>
 
     <!-- Stats Grid - Mobile First -->
     <div class="responsive-grid">
-      <div v-for="stat in stats" :key="stat.label" class="stat-card">
-        <span class="inline-flex rounded-full px-2 py-0.5 text-small font-medium" :class="tones[stat.tone]">
+      <div
+        v-for="stat in stats"
+        :key="stat.label"
+        class="stat-card"
+      >
+        <span
+          class="inline-flex rounded-full px-2 py-0.5 text-small font-medium"
+          :class="tones[stat.tone]"
+        >
           {{ stat.label }}
         </span>
         <p class="mt-2 text-2xl font-bold">{{ stat.value }}</p>
@@ -85,18 +92,26 @@ const upcoming = computed(() =>
     <!-- Upcoming Trips Card -->
     <BaseCard title="Upcoming trips" subtitle="Pending and approved requests, soonest first">
       <template #actions>
-        <RouterLink :to="{ name: 'requests.index' }" class="text-small font-medium text-primary hover:underline">
+        <RouterLink
+          :to="{ name: 'requests.index' }"
+          class="text-small font-medium text-primary hover:underline"
+        >
           View all
         </RouterLink>
       </template>
 
-      <EmptyState v-if="!loading && !upcoming.length" title="No upcoming trips"
-        message="Requests you create or approve will appear here." />
+      <EmptyState
+        v-if="!loading && !upcoming.length"
+        title="No upcoming trips"
+        message="Requests you create or approve will appear here."
+      />
 
       <ul v-else class="flex flex-col divide-y divide-line">
         <li v-for="request in upcoming" :key="request.id" class="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-          <RouterLink :to="{ name: 'requests.show', params: { id: request.id } }"
-            class="block text-body font-medium text-ink hover:text-primary">
+          <RouterLink
+            :to="{ name: 'requests.show', params: { id: request.id } }"
+            class="block text-body font-medium text-ink hover:text-primary"
+          >
             {{ request.destination }}
           </RouterLink>
           <div class="flex flex-wrap items-center justify-between gap-2">

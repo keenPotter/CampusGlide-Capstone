@@ -25,7 +25,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'User registered successfully',
-            'user' => new UserResource($user),
+            'user' => $user,
         ], 201);
     }
 
@@ -50,7 +50,6 @@ class AuthController extends Controller
         return response()->json([
             'token' => $token,
             'user' => new UserResource($user),
-            'message' => 'Logged in successfully',
         ]);
     }
 
@@ -58,11 +57,22 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Logged out successfully']);
+        return response()->noContent();
     }
 
     public function user(Request $request)
     {
         return new UserResource($request->user());
+    }
+
+    /**
+     * Splits a single "name" field into first/last name for storage,
+     * since the DB schema keeps them as separate columns.
+     */
+    private function splitName(string $name): array
+    {
+        $parts = explode(' ', trim($name), 2);
+
+        return [$parts[0], $parts[1] ?? ''];
     }
 }
