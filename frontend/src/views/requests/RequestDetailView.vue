@@ -34,7 +34,7 @@ const rows = computed(() => {
   const value = request.value
 
   return [
-    { label: 'Requesting official', value: value.requested_by?.name },
+    { label: 'Requesting official', value: value.requested_by?.first_name + ' ' + value.requested_by?.last_name },
     { label: 'Destination', value: value.destination },
     { label: 'Purpose', value: value.purpose },
     { label: 'Date of travel', value: formatDate(value.trip_date) },

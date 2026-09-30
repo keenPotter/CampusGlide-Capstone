@@ -59,7 +59,7 @@ const upcoming = computed(() =>
   <div class="flex flex-col gap-page">
     <!-- Greeting -->
     <div>
-      <h1 class="text-page-title">Hello, {{ auth.user?.name?.split(' ')[0] }}</h1>
+      <h1 class="text-page-title">Hello, {{ auth.user?.first_name}}</h1>
       <p class="mt-1 text-small text-ink-muted">
         Signed in as {{ ROLE_LABELS[auth.role] ?? auth.role }}
       </p>
@@ -120,7 +120,7 @@ const upcoming = computed(() =>
             </p>
             <StatusBadge :status="request.status" />
           </div>
-          <p class="text-small text-ink-muted">{{ request.requested_by?.name }}</p>
+          <p class="text-small text-ink-muted">{{ request.requested_by?.first_name }} {{ request.requested_by?.last_name }}</p>
         </li>
       </ul>
     </BaseCard>

@@ -139,7 +139,7 @@ async function confirmReject() {
         <div class="space-y-1.5 mb-3">
           <div class="flex items-center justify-between">
             <span class="card-row-label">Requested by</span>
-            <span class="text-small text-ink">{{ request.requested_by?.name }}</span>
+            <span class="text-small text-ink">{{ request.requested_by?.first_name }} {{ request.requested_by?.last_name }}</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="card-row-label">Travel date</span>
@@ -209,7 +209,7 @@ async function confirmReject() {
                 </RouterLink>
                 <p class="truncate text-small text-ink-muted">{{ request.purpose }}</p>
               </td>
-              <td class="px-card py-3 text-small">{{ request.requested_by?.name }}</td>
+              <td class="px-card py-3 text-small">{{ request.requested_by?.first_name }} {{ request.requested_by?.last_name }}</td>
               <td class="px-card py-3 text-small">
                 {{ formatDate(request.trip_date) }}
                 <span v-if="request.travel_days > 1" class="text-ink-muted">

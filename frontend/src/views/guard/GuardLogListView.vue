@@ -174,7 +174,7 @@ async function submitReturn() {
                 </span>
               </td>
               <td class="px-card py-3 text-small">{{ formatTime(log.actual_return_time) }}</td>
-              <td class="px-card py-3 text-small">{{ log.guard?.name }}</td>
+              <td class="px-card py-3 text-small">{{ log.guard?.first_name }} {{ log.guard?.last_name }}</td>
               <td class="px-card py-3 text-right">
                 <BaseButton
                   v-if="auth.isGuard && !log.actual_return_date"

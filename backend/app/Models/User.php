@@ -41,15 +41,6 @@ class User extends Authenticatable
         ];
     }
 
-    /**
-     * Convenience "full name" field, since the API contract expects a
-     * single `name` field but the DB stores first_name/last_name separately.
-     */
-    public function getNameAttribute(): string
-    {
-        return trim("{$this->first_name} {$this->last_name}");
-    }
-
     public function hasRole(string ...$roles): bool
     {
         return in_array($this->role, $roles, true);

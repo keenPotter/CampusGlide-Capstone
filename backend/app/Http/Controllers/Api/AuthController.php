@@ -64,15 +64,4 @@ class AuthController extends Controller
     {
         return new UserResource($request->user());
     }
-
-    /**
-     * Splits a single "name" field into first/last name for storage,
-     * since the DB schema keeps them as separate columns.
-     */
-    private function splitName(string $name): array
-    {
-        $parts = explode(' ', trim($name), 2);
-
-        return [$parts[0], $parts[1] ?? ''];
-    }
 }

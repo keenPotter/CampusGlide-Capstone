@@ -16,7 +16,8 @@ class GuardLogResource extends JsonResource
             'vehicle_used' => $this->vehicle_used,
             'guard' => [
                 'id' => $this->guardUser->id,
-                'name' => $this->guardUser->name,
+                'first_name' => $this->guardUser->first_name,
+                'last_name' => $this->guardUser->last_name,
             ],
             'actual_departure_date' => $this->actual_departure_date?->format('Y-m-d'),
             'actual_departure_time' => $this->actual_departure_time,

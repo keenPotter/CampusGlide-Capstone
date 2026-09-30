@@ -22,7 +22,7 @@ async function submit() {
 
   try {
     const user = await auth.login({ ...form })
-    toast.success(`Welcome back, ${user.name}.`)
+    toast.success(`Welcome back, ${user.first_name}.`)
     router.push(route.query.redirect ?? { name: 'dashboard' })
   } catch (error) {
     errors.value = validationErrors(error)

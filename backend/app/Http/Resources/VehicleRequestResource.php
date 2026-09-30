@@ -28,7 +28,8 @@ class VehicleRequestResource extends JsonResource
             'approved_date' => $this->approved_date?->toIso8601String(),
             'requested_by' => [
                 'id' => $this->requester->id,
-                'name' => $this->requester->name,
+                'first_name' => $this->requester->first_name,
+                'last_name' => $this->requester->last_name,
             ],
             'created_at' => $this->created_at?->toIso8601String(),
         ];
