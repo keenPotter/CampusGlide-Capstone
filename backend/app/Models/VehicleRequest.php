@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class VehicleRequest extends Model
 {
+    protected $table = 'vehicle_requests';
     use HasFactory;
 
     protected $fillable = [
@@ -29,6 +30,11 @@ class VehicleRequest extends Model
         'approved_date',
     ];
 
+    public function trip()
+    {
+        return $this->hasOne(Trip::class, 'vehicle_request_id');
+    }
+  
     protected function casts(): array
     {
         return [
