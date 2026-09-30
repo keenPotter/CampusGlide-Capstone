@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Models\VehicleRequest;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,11 +16,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $roles = ['administrator', 'driver', 'faculty', 'guard'];
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        foreach ($roles as $role) {
+            User::factory()->create([
+                'first_name' => ucfirst($role),
+                'last_name' => 'Test',
+                'email' => "{$role}@nvsu.edu.ph",
+                'role' => $role,
+            ]);
+        }
+
+        VehicleRequest::factory(10)->create();
     }
 }

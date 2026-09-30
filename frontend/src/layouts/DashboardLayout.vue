@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { initials, ROLE_LABELS } from '@/lib/format'
@@ -11,13 +11,36 @@ const router = useRouter()
 const toast = useToast()
 const sidebarOpen = ref(false)
 
-const navigation = [
-  { name: 'Dashboard', to: { name: 'dashboard' }, icon: 'grid' },
-  { name: 'Vehicle Requests', to: { name: 'requests.index' }, icon: 'list' },
-  { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'list' },
-  { name: 'Gate Logs', to: { name: 'guardLogs.index' }, icon: 'shield' },
-]
+const navigation = computed(() => {
+  const items = [{ name: 'Dashboard', to: { name: 'dashboard' }, icon: 'grid' }]
 
+  if (auth.isFaculty) {
+    items.push(
+      { name: 'My Requests', to: { name: 'requests.index' }, icon: 'list' },
+      { name: 'New Request', to: { name: 'requests.create' }, icon: 'plus' },
+    )
+  }
+
+  if (auth.isAdministrator) {
+    items.push(
+      { name: 'Vehicle Requests', to: { name: 'requests.index' }, icon: 'list' },
+      { name: 'Gate Logs', to: { name: 'guardLogs.index' }, icon: 'shield' },
+    )
+  }
+
+  if (auth.isGuard) {
+    items.push(
+      { name: 'Approved Trips', to: { name: 'requests.index' }, icon: 'list' },
+      { name: 'Gate Logs', to: { name: 'guardLogs.index' }, icon: 'shield' },
+    )
+  }
+
+  if (auth.isDriver) {
+    items.push({ name: 'Trip Schedule', to: { name: 'requests.index' }, icon: 'list' })
+  }
+
+  return items
+})
 
 const icons = {
   grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
@@ -131,11 +154,11 @@ function closeSidebar() {
       <header class="sticky top-0 z-20 hidden md:flex h-16 items-center justify-between gap-4 border-b border-line bg-white px-page">
         <div class="ml-auto flex items-center gap-3">
           <div class="text-right">
-            <p class="text-small font-medium leading-tight">{{ auth.user?.name }}</p>
+            <p class="text-small font-medium leading-tight">{{ auth.user?.first_name }}</p>
             <p class="text-small text-ink-muted">{{ ROLE_LABELS[auth.role] ?? auth.role }}</p>
           </div>
           <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 text-small font-semibold text-primary-700">
-            {{ initials(auth.user?.name) }}
+            {{ initials(auth.user?.first_name) }}
           </div>
           <button
             type="button"
