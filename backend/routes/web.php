@@ -1,4 +1,6 @@
 <?php
+use Illuminate\Support\Facades\Route;
+Route::view('/', 'app');
 
 use Illuminate\Support\Facades\Route;
 

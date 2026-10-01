@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Trip extends Model
 {
+    protected $table = 'trips';
+    protected $guarded = [];
     protected $fillable = [
         'vehicle_request_id',
         'vehicle_id',
