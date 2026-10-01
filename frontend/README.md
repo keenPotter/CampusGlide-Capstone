@@ -1,9 +1,5 @@
-# Vehicle Maintenance (frontend)
+# Vue 3 + Vite
 
-Vue 3 + Vite frontend for the Maintenance Monitoring API, styled after the CampusGlide frontend.
+This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
 
-    npm install
-    npm run dev
-
-The API address is `API_URL` at the top of `src/App.vue` (default `http://127.0.0.1:8000/api`).
-Start the Laravel backend first: `php artisan serve`.
+Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
