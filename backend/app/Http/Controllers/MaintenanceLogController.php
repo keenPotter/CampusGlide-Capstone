@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Vehicle;
 use App\Models\VehicleMaintenance;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class MaintenanceLogController extends Controller
 {
+    private const STATUSES = ['scheduled', 'in_progress', 'completed', 'cancelled'];
+
+    private const VEHICLE_COLUMNS = 'vehicle:id,plate_number,vehicle_model,mileage';
+
     /**
      * GET /api/maintenance-logs
      * Query params: ?vehicle_id=3, ?type=repair
@@ -19,7 +22,7 @@ class MaintenanceLogController extends Controller
      */
     public function index(Request $request)
     {
-        $query = VehicleMaintenance::query()->with('vehicle:id,plate_number,vehicle_model');
+        $query = VehicleMaintenance::query()->with(self::VEHICLE_COLUMNS);
 
         if ($request->filled('vehicle_id')) {
             $query->where('vehicle_id', $request->query('vehicle_id'));
@@ -32,16 +35,7 @@ class MaintenanceLogController extends Controller
         $logs = $query->orderByDesc('maintenance_date')->get();
 
         return response()->json([
-            'data' => $logs->map(fn (VehicleMaintenance $log) => [
-                'id' => $log->id,
-                'vehicle' => [
-                    'id' => $log->vehicle->id,
-                    'plate_number' => $log->vehicle->plate_number,
-                ],
-                'type' => $log->maintenance_type,
-                'date_performed' => $log->maintenance_date?->format('Y-m-d'),
-                'next_due_date' => $log->next_due_date?->format('Y-m-d'),
-            ]),
+            'data' => $logs->map(fn (VehicleMaintenance $log) => $this->format($log)),
         ]);
     }
 
@@ -57,6 +51,7 @@ class MaintenanceLogController extends Controller
             'date_performed' => ['required', 'date'],
             'cost' => ['nullable', 'numeric', 'min:0'],
             'next_due_date' => ['nullable', 'date', 'after_or_equal:date_performed'],
+            'status' => ['sometimes', Rule::in(self::STATUSES)],
         ]);
 
         $log = VehicleMaintenance::create([
@@ -66,8 +61,9 @@ class MaintenanceLogController extends Controller
             'maintenance_date' => $validated['date_performed'],
             'cost' => $validated['cost'] ?? null,
             'next_due_date' => $validated['next_due_date'] ?? null,
+            'status' => $validated['status'] ?? 'scheduled',
         ]);
-        $log->load('vehicle:id,plate_number,vehicle_model');
+        $log->load(self::VEHICLE_COLUMNS);
 
         // Keep the vehicle's own maintenance-date fields in sync.
         $log->vehicle->update([
@@ -75,7 +71,7 @@ class MaintenanceLogController extends Controller
             'next_maintenance_date' => $log->next_due_date,
         ]);
 
-        return response()->json($this->formatFull($log), 201);
+        return response()->json($this->format($log->fresh(self::VEHICLE_COLUMNS)), 201);
     }
 
     /**
@@ -90,6 +86,7 @@ class MaintenanceLogController extends Controller
             'date_performed' => ['sometimes', 'date'],
             'cost' => ['nullable', 'numeric', 'min:0'],
             'next_due_date' => ['nullable', 'date', 'after_or_equal:date_performed'],
+            'status' => ['sometimes', Rule::in(self::STATUSES)],
         ]);
 
         $mapped = [];
@@ -111,9 +108,12 @@ class MaintenanceLogController extends Controller
         if (array_key_exists('next_due_date', $validated)) {
             $mapped['next_due_date'] = $validated['next_due_date'];
         }
+        if (array_key_exists('status', $validated)) {
+            $mapped['status'] = $validated['status'];
+        }
 
         $maintenanceLog->update($mapped);
-        $maintenanceLog->load('vehicle:id,plate_number,vehicle_model');
+        $maintenanceLog->load(self::VEHICLE_COLUMNS);
 
         // Re-sync the vehicle's cached dates if this is still its latest log.
         $latest = $maintenanceLog->vehicle->latestMaintenanceLog;
@@ -124,10 +124,10 @@ class MaintenanceLogController extends Controller
             ]);
         }
 
-        return response()->json($this->formatFull($maintenanceLog));
+        return response()->json($this->format($maintenanceLog));
     }
 
-    private function formatFull(VehicleMaintenance $log): array
+    private function format(VehicleMaintenance $log): array
     {
         return [
             'id' => $log->id,
@@ -135,9 +135,11 @@ class MaintenanceLogController extends Controller
                 'id' => $log->vehicle->id,
                 'plate_number' => $log->vehicle->plate_number,
                 'model' => $log->vehicle->vehicle_model,
+                'mileage' => $log->vehicle->mileage,
             ],
             'type' => $log->maintenance_type,
             'description' => $log->description,
+            'status' => $log->status,
             'date_performed' => $log->maintenance_date?->format('Y-m-d'),
             'cost' => $log->cost !== null ? (float) $log->cost : null,
             'next_due_date' => $log->next_due_date?->format('Y-m-d'),

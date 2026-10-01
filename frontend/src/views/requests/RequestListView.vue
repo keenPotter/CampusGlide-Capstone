@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
@@ -31,7 +31,9 @@ const rejectReason = ref('')
 const rejectError = ref('')
 const submitting = ref(false)
 
-onMounted(() => store.fetch({ page: 1 }))
+// Reset the status filter too, because the store is shared with other pages
+// (for example the gate log page leaves it on "approved").
+onMounted(() => store.fetch({ status: '', page: 1 }))
 
 function changeTab(status) {
   store.fetch({ status, page: 1 })
@@ -182,8 +184,11 @@ async function confirmReject() {
       </div>
     </div>
 
-    <!-- Desktop Table View -->
-    <div class="hidden md:block overflow-hidden rounded-card border border-line bg-white shadow-card">
+    <!-- Desktop Table View (only when there is something to show) -->
+    <div
+      v-if="!store.loading && store.items.length"
+      class="hidden md:block overflow-hidden rounded-card border border-line bg-white shadow-card"
+    >
       <div class="overflow-x-auto">
         <table class="w-full min-w-[820px] border-collapse">
           <thead class="table-head">

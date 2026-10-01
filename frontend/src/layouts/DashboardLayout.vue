@@ -24,7 +24,9 @@ const navigation = computed(() => {
   if (auth.isAdministrator) {
     items.push(
       { name: 'Vehicle Requests', to: { name: 'requests.index' }, icon: 'list' },
+      { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
       { name: 'Gate Logs', to: { name: 'guardLogs.index' }, icon: 'shield' },
+      { name: 'Maintenance', to: { name: 'maintenance' }, icon: 'wrench' },
     )
   }
 
@@ -36,7 +38,10 @@ const navigation = computed(() => {
   }
 
   if (auth.isDriver) {
-    items.push({ name: 'Trip Schedule', to: { name: 'requests.index' }, icon: 'list' })
+    items.push(
+      { name: 'Trip Schedule', to: { name: 'requests.index' }, icon: 'list' },
+      { name: 'Maintenance', to: { name: 'maintenance' }, icon: 'wrench' },
+    )
   }
 
   return items
@@ -47,6 +52,8 @@ const icons = {
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   plus: 'M12 5v14M5 12h14',
   shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
+  calendar: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+  wrench: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z',
 }
 
 function isActive(item) {
@@ -96,7 +103,7 @@ function closeSidebar() {
       </button>
     </header>
 
-    <!-- Mobile Sidebar Overlay & Menu -->
+    <!-- Mobile Sidebar Overlay -->
     <Transition
       enter-active-class="transition duration-200"
       enter-from-class="opacity-0"
@@ -112,8 +119,8 @@ function closeSidebar() {
 
     <!-- Sidebar -->
     <aside
-      class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-line bg-white transition-transform md:translate-x-0"
-      :class="{ 'translate-x-0': sidebarOpen }"
+      class="fixed inset-y-0 left-0 z-40 w-64 border-r border-line bg-white transition-transform"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
     >
       <div class="flex h-16 items-center gap-2 border-b border-line px-card">
         <div class="flex h-8 w-8 items-center justify-center rounded-card bg-primary text-white">

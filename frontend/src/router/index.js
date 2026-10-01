@@ -2,13 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
-  { path: '/', redirect: { name: 'tripSchedule' } },
-  {
-    path: '/trip-schedule',
-    name: 'tripSchedule',
-    component: () => import('@/views/TripScheduleView.vue'),
-  },
-  { path: '/', redirect: '/dashboard' },
+  { path: '/', redirect: { name: 'dashboard' } },
   {
     path: '/login',
     name: 'login',
@@ -56,6 +50,18 @@ const routes = [
     name: 'guardLogs.index',
     component: () => import('@/views/guard/GuardLogListView.vue'),
     meta: { requiresAuth: true, roles: ['guard', 'administrator'] },
+  },
+  {
+    path: '/trip-schedule',
+    name: 'tripSchedule',
+    component: () => import('@/views/TripScheduleView.vue'),
+    meta: { requiresAuth: true, roles: ['administrator'] },
+  },
+  {
+    path: '/maintenance',
+    name: 'maintenance',
+    component: () => import('@/views/MaintenanceView.vue'),
+    meta: { requiresAuth: true, roles: ['administrator', 'driver'] },
   },
   {
     path: '/:pathMatch(.*)*',

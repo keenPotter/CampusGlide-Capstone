@@ -10,16 +10,8 @@ return new class extends Migration
     {
         Schema::create('post_travel_reports', function (Blueprint $table) {
             $table->id();
-            $table->integer('vehicle_id');
-            $table->foreign('vehicle_id')
-                ->references('id')
-                ->on('vehicles')
-                ->restrictOnDelete();
-            $table->integer('trip_id')->nullable();
-            $table->foreign('trip_id')
-                ->references('id')
-                ->on('trips')
-                ->nullOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->foreignId('trip_id')->nullable()->constrained('trips')->nullOnDelete();
             $table->date('travel_date_from');
             $table->date('travel_date_to')->nullable();
             $table->string('places_of_travel', 500);
@@ -31,7 +23,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['vehicle_id', 'travel_date_from']);
-            $table->index('trip_id');
         });
     }
 

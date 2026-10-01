@@ -10,16 +10,8 @@ return new class extends Migration
     {
         Schema::create('fuel_usage_records', function (Blueprint $table) {
             $table->id();
-            $table->integer('vehicle_id');
-            $table->foreign('vehicle_id')
-                ->references('id')
-                ->on('vehicles')
-                ->restrictOnDelete();
-            $table->integer('trip_id')->nullable();
-            $table->foreign('trip_id')
-                ->references('id')
-                ->on('trips')
-                ->nullOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
+            $table->foreignId('trip_id')->nullable()->constrained('trips')->nullOnDelete();
             $table->date('record_date');
             $table->decimal('balance_in_tank', 10, 2)->default(0);
             $table->decimal('issuance_from_stock', 10, 2)->default(0);
@@ -40,7 +32,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['vehicle_id', 'record_date']);
-            $table->index('trip_id');
         });
     }
 

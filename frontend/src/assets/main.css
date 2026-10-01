@@ -35,6 +35,9 @@
   --spacing-card: 12px;
   --spacing-control: 44px;
 
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.06);
+  --shadow-pop: 0 12px 30px rgb(31 41 51 / 0.18);
+
   --text-page-title: 24px;
   --text-page-title--line-height: 32px;
   --text-page-title--font-weight: 700;
@@ -60,9 +63,10 @@
     @apply outline-none ring-2 ring-primary-400 ring-offset-2 ring-offset-white;
   }
 
-  /* Mobile-first breakpoint adjustments */
+  /* Larger spacing and text on tablets and up.
+     @theme can't be nested, so the variables are overridden on :root instead. */
   @media (min-width: 768px) {
-    @theme {
+    :root {
       --spacing-page: 20px;
       --spacing-card: 16px;
       --text-page-title: 28px;

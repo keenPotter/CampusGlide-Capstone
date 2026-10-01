@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
 import { useGuardLogStore } from '@/stores/guardLogs'
@@ -11,6 +11,7 @@ import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
 const auth = useAuthStore()
+const router = useRouter()
 const requests = useVehicleRequestStore()
 const guardLogs = useGuardLogStore()
 const loading = ref(true)
@@ -59,7 +60,7 @@ const upcoming = computed(() =>
   <div class="flex flex-col gap-page">
     <!-- Greeting -->
     <div>
-      <h1 class="text-page-title">Hello, {{ auth.user?.first_name}}</h1>
+      <h1 class="text-page-title">Hello, {{ auth.user?.first_name }}</h1>
       <p class="mt-1 text-small text-ink-muted">
         Signed in as {{ ROLE_LABELS[auth.role] ?? auth.role }}
       </p>
@@ -67,12 +68,12 @@ const upcoming = computed(() =>
 
     <!-- Quick Action Button (Mobile) -->
     <div v-if="auth.isFaculty" class="md:hidden">
-      <BaseButton :is="RouterLink" :to="{ name: 'requests.create' }" block>
+      <BaseButton block @click="router.push({ name: 'requests.create' })">
         New request
       </BaseButton>
     </div>
 
-    <!-- Stats Grid - Mobile First -->
+    <!-- Stats Grid -->
     <div class="responsive-grid">
       <div
         v-for="stat in stats"

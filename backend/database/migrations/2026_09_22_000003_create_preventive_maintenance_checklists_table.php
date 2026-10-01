@@ -10,11 +10,7 @@ return new class extends Migration
     {
         Schema::create('preventive_maintenance_checklists', function (Blueprint $table) {
             $table->id();
-            $table->integer('vehicle_id');
-            $table->foreign('vehicle_id')
-                ->references('id')
-                ->on('vehicles')
-                ->restrictOnDelete();
+            $table->foreignId('vehicle_id')->constrained('vehicles')->restrictOnDelete();
             $table->string('pmuv_no', 100)->nullable();
             $table->date('inspection_date');
             $table->string('inspector_mechanic', 255)->nullable();
@@ -44,8 +40,8 @@ return new class extends Migration
             $table->text('remarks')->nullable();
             $table->text('supervisor_recommendation')->nullable();
             $table->timestamps();
+
             $table->index(['vehicle_id', 'inspection_date'], 'pm_vehicle_date_idx');
-           
         });
     }
 
