@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CancelVehicleRequestRequest;
@@ -21,11 +21,6 @@ class VehicleRequestController extends Controller
 
         if ($user->hasRole('faculty')) {
             $query->where('requester_id', $user->id);
-        }
-
-        // Guards and drivers only need trips that were actually approved
-        if ($user->hasRole('guard', 'driver')) {
-            $query->where('status', 'approved');
         }
 
         if ($status = $request->query('status')) {

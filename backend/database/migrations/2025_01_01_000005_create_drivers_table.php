@@ -10,7 +10,8 @@ return new class extends Migration
     {
         Schema::create('drivers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->string('first_name', 100);
+            $table->string('last_name', 100);
             $table->string('license_number', 50)->unique();
             $table->date('license_expiry_date');
             $table->string('contact_number', 20)->nullable();

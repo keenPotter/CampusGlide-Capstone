@@ -1017,7 +1017,7 @@ function vehicleName(trip) {
 }
 
 function driverLabel(driver) {
-  return fullName(driver?.user) || '—'
+  return fullName(driver) || '—'
 }
 
 function driverName(trip) {

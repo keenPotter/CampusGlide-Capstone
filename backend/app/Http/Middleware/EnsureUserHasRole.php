@@ -11,7 +11,7 @@ class EnsureUserHasRole
     /**
      * Usage in routes:
      *   ->middleware('role:administrator')
-     *   ->middleware('role:administrator,guard')   // multiple roles allowed
+     *   ->middleware('role:administrator,faculty')   // multiple roles allowed
      */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {

@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
-import { useGuardLogStore } from '@/stores/guardLogs'
 import { formatDate, formatTime, ROLE_LABELS } from '@/lib/format'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -13,32 +12,21 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 const auth = useAuthStore()
 const router = useRouter()
 const requests = useVehicleRequestStore()
-const guardLogs = useGuardLogStore()
 const loading = ref(true)
 
 onMounted(async () => {
-  const tasks = [requests.fetch({ status: '', page: 1 })]
-  if (auth.isGuard || auth.isAdministrator) {
-    tasks.push(guardLogs.fetch(1))
-  }
-  await Promise.allSettled(tasks)
+  await Promise.allSettled([requests.fetch({ status: '', page: 1 })])
   loading.value = false
 })
 
 const stats = computed(() => {
   const counts = requests.countByStatus
-  const base = [
+  return [
     { label: 'Pending', value: counts.pending ?? 0, tone: 'secondary' },
     { label: 'Approved', value: counts.approved ?? 0, tone: 'primary' },
     { label: 'Rejected', value: counts.rejected ?? 0, tone: 'danger' },
     { label: 'Cancelled', value: counts.cancelled ?? 0, tone: 'neutral' },
   ]
-
-  if (auth.isGuard) {
-    base.push({ label: 'On trip', value: guardLogs.onTrip.length, tone: 'primary' })
-  }
-
-  return base
 })
 
 const tones = {

@@ -13,9 +13,7 @@ class User extends Authenticatable
 
     // Keep these in sync with the `role` enum on the users table
     public const ROLE_ADMINISTRATOR = 'administrator';
-    public const ROLE_DRIVER = 'driver';
     public const ROLE_FACULTY = 'faculty';
-    public const ROLE_GUARD = 'guard';
 
     protected $fillable = [
         'email',

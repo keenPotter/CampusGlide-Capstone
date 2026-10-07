@@ -25,22 +25,8 @@ const navigation = computed(() => {
     items.push(
       { name: 'Vehicle Requests', to: { name: 'requests.index' }, icon: 'list' },
       { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
-      { name: 'Gate Logs', to: { name: 'guardLogs.index' }, icon: 'shield' },
       { name: 'Maintenance', to: { name: 'maintenance' }, icon: 'wrench' },
-    )
-  }
-
-  if (auth.isGuard) {
-    items.push(
-      { name: 'Approved Trips', to: { name: 'requests.index' }, icon: 'list' },
-      { name: 'Gate Logs', to: { name: 'guardLogs.index' }, icon: 'shield' },
-    )
-  }
-
-  if (auth.isDriver) {
-    items.push(
-      { name: 'Trip Schedule', to: { name: 'requests.index' }, icon: 'list' },
-      { name: 'Maintenance', to: { name: 'maintenance' }, icon: 'wrench' },
+      { name: 'Create User', to: { name: 'users.create' }, icon: 'user-plus' },
     )
   }
 
@@ -51,9 +37,9 @@ const icons = {
   grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   plus: 'M12 5v14M5 12h14',
-  shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
   calendar: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
   wrench: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z',
+  'user-plus': 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6',
 }
 
 function isActive(item) {

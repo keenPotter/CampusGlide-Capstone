@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * IDs: 1-2 administrator | 3-6 driver | 7-8 guard | 9-15 faculty
+ * IDs: 1-2 administrator | 9-15 faculty
+ * (IDs 3-8 are left unused on purpose so the vehicle request seeder keeps working.)
  * All passwords = "password"
  */
 class UserSeeder extends Seeder
@@ -25,12 +26,6 @@ class UserSeeder extends Seeder
         $users = [
             [1,  'maria.santos@nvsu.edu.ph',        'Maria',      'Santos',     'Motor Pool Head',        '09171234501', 'administrator', true],
             [2,  'roberto.delacruz@nvsu.edu.ph',    'Roberto',    'Dela Cruz',  'Administrative Officer', '09171234502', 'administrator', true],
-            [3,  'juan.reyes@nvsu.edu.ph',          'Juan',       'Reyes',      'Driver I',               '09181234503', 'driver',        true],
-            [4,  'pedro.bautista@nvsu.edu.ph',      'Pedro',      'Bautista',   'Driver I',               '09181234504', 'driver',        true],
-            [5,  'carlos.mendoza@nvsu.edu.ph',      'Carlos',     'Mendoza',    'Driver II',              '09181234505', 'driver',        true],
-            [6,  'ernesto.villanueva@nvsu.edu.ph',  'Ernesto',    'Villanueva', 'Driver II',              '09181234506', 'driver',        true],
-            [7,  'antonio.ramos@nvsu.edu.ph',       'Antonio',    'Ramos',      'Security Guard',         '09191234507', 'guard',         true],
-            [8,  'felipe.aquino@nvsu.edu.ph',       'Felipe',     'Aquino',     'Security Guard',         '09191234508', 'guard',         true],
             [9,  'elena.garcia@nvsu.edu.ph',        'Elena',      'Garcia',     'Professor',              '09201234509', 'faculty',       true],
             [10, 'ricardo.torres@nvsu.edu.ph',      'Ricardo',    'Torres',     'Associate Professor',    '09201234510', 'faculty',       true],
             [11, 'luzviminda.castillo@nvsu.edu.ph', 'Luzviminda', 'Castillo',   'Assistant Professor',    '09201234511', 'faculty',       true],
