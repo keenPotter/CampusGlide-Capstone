@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('last_name', 100);
             $table->string('position')->nullable();
             $table->string('phone_number', 20)->nullable();
-            $table->enum('role', ['administrator', 'driver', 'faculty', 'guard']);
+            $table->enum('role', ['administrator', 'faculty']);
             $table->boolean('is_active')->default(true);
             $table->rememberToken();
             $table->timestamps();

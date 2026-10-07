@@ -11,7 +11,7 @@ class TripController extends Controller
     public function index()
     {
         return Trip::with([
-            'driver.user',
+            'driver',
             'vehicle',
             'vehicleRequest.requester',
         ])->get();
@@ -20,7 +20,7 @@ class TripController extends Controller
     public function show($id)
     {
         $trip = Trip::with([
-            'driver.user',
+            'driver',
             'vehicle',
             'vehicleRequest.requester',
         ])->find($id);
@@ -54,7 +54,7 @@ class TripController extends Controller
             $trip->update(['trip_status' => 'cancelled']);
 
             return response()->json($trip->fresh([
-                'driver.user',
+                'driver',
                 'vehicle',
                 'vehicleRequest.requester',
             ]));
@@ -84,7 +84,7 @@ class TripController extends Controller
         ]);
 
         return response()->json($trip->fresh([
-            'driver.user',
+            'driver',
             'vehicle',
             'vehicleRequest.requester',
         ]));
@@ -156,7 +156,7 @@ class TripController extends Controller
         ]);
 
         return response()->json($trip->load([
-            'driver.user',
+            'driver',
             'vehicle',
             'vehicleRequest.requester',
         ]), 201);
