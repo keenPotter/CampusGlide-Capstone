@@ -44,9 +44,7 @@ export function initials(name = '') {
 
 export const ROLE_LABELS = {
   administrator: 'Administrator',
-  driver: 'Driver',
   faculty: 'Faculty',
-  guard: 'Guard',
 }
 
 export const STATUS_LABELS = {

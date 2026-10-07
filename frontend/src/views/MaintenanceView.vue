@@ -1,104 +1,7 @@
 <template>
   <div class="maint">
-    <!-- ============ DRIVER (view only) ============ -->
-    <main v-if="isDriverPage" class="page">
-      <div class="page-heading">
-        <div class="heading-icon driver-icon">
-          <svg viewBox="0 0 24 24"><path d="M5 17h14l-1-6H6l-1 6zM7 11l1.5-4h7L17 11M7 17v2M17 17v2M8 14h.01M16 14h.01" /></svg>
-        </div>
-        <div>
-          <h1>Driver Dashboard</h1>
-          <p>View your vehicle maintenance schedule and upcoming service dates</p>
-        </div>
-      </div>
-
-      <section class="driver-welcome">
-        <div>
-          <span class="eyebrow">NVSU Motorpool</span>
-          <h2>Welcome, {{ auth.user?.first_name || 'Driver' }}</h2>
-          <p>Use this page to check maintenance history and upcoming service dates. Maintenance actions are view-only for drivers.</p>
-        </div>
-        <div class="driver-badge">
-          <span class="driver-badge-icon">D</span>
-          <span><strong>Driver access</strong><small>View only</small></span>
-        </div>
-      </section>
-
-      <section class="stats driver-stats">
-        <div class="stat">
-          <div class="stat-top"><span class="stat-icon wrench"><svg viewBox="0 0 24 24"><path :d="ICONS.wrench" /></svg></span></div>
-          <strong>{{ driverRows.length }}</strong>
-          <span class="stat-label">Maintenance records</span>
-        </div>
-        <div class="stat">
-          <div class="stat-top"><span class="stat-icon calendar"><svg viewBox="0 0 24 24"><path :d="ICONS.calendar" /></svg></span></div>
-          <strong>{{ driverRows.filter(l => l.display === 'upcoming').length }}</strong>
-          <span class="stat-label">Upcoming service</span>
-        </div>
-        <div class="stat">
-          <div class="stat-top"><span class="stat-icon alert"><svg viewBox="0 0 24 24"><path :d="ICONS.alert" /></svg></span></div>
-          <strong>{{ driverRows.filter(l => l.display === 'overdue').length }}</strong>
-          <span class="stat-label">Overdue service</span>
-        </div>
-      </section>
-
-      <section class="control-card driver-controls">
-        <div class="toolbar">
-          <label class="search">
-            <svg viewBox="0 0 24 24"><path d="M21 21l-4.3-4.3M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" /></svg>
-            <input v-model="driverSearch" type="search" placeholder="Search maintenance schedule..." aria-label="Search maintenance schedule" />
-          </label>
-          <button class="secondary-button" type="button" :disabled="loading" @click="loadAll">
-            {{ loading ? 'Refreshing...' : 'Refresh schedule' }}
-          </button>
-        </div>
-      </section>
-
-      <div v-if="loadError" class="load-error">
-        <p>{{ loadError }}</p>
-        <button @click="loadAll">Try again</button>
-      </div>
-
-      <section class="records-card">
-        <div class="records-header">
-          <div>
-            <h2>Maintenance schedule</h2>
-            <p>Upcoming and previous maintenance dates for the motorpool vehicles</p>
-          </div>
-        </div>
-
-        <p v-if="loading" class="empty">Loading maintenance schedule…</p>
-        <p v-else-if="!driverFiltered.length" class="empty">
-          <span class="empty-icon"><svg viewBox="0 0 24 24"><path :d="ICONS.calendar" /></svg></span>
-          <strong>No maintenance schedule found</strong>
-          <span>There are no maintenance records matching your search.</span>
-        </p>
-
-        <div v-else class="schedule-list">
-          <article v-for="log in driverFiltered" :key="log.id" class="schedule-row">
-            <div class="schedule-date" :class="log.display">
-              <strong>{{ log.next_due_date ? scheduleDay(log.next_due_date) : '—' }}</strong>
-              <span>{{ log.next_due_date ? scheduleMonth(log.next_due_date) : 'DATE' }}</span>
-            </div>
-            <div class="schedule-main">
-              <div class="schedule-title">
-                <strong>{{ log.vehicle.plate_number }}</strong>
-                <span>{{ log.vehicle.model || 'Vehicle' }}</span>
-              </div>
-              <p>{{ log.description || typeLabel(log.type) }}</p>
-              <div class="schedule-meta">
-                <span><b>Last serviced:</b> {{ formatDate(log.date_performed) }}</span>
-                <span><b>Next due:</b> {{ log.next_due_date ? formatDate(log.next_due_date) : 'Not scheduled' }}</span>
-              </div>
-            </div>
-            <span class="status" :class="log.display">{{ driverStatusLabel(log) }}</span>
-          </article>
-        </div>
-      </section>
-    </main>
-
     <!-- ============ ADMINISTRATOR ============ -->
-    <main v-else class="page">
+    <main class="page">
       <div class="page-heading">
         <div class="heading-icon">
           <svg viewBox="0 0 24 24"><path d="M14.7 6.3a5.5 5.5 0 0 0-7.4 7.4L3.8 17.2a2.1 2.1 0 1 0 3 3l3.5-3.5a5.5 5.5 0 0 0 7.4-7.4l-3.3 3.3-3-3 3.3-3.3z" /></svg>
@@ -304,7 +207,6 @@ const ICONS = {
 /* ================= STATE ================= */
 
 const isAdmin = computed(() => auth.isAdministrator)
-const isDriverPage = computed(() => auth.isDriver)
 
 const logs = ref([])
 const vehicles = ref([])
@@ -312,7 +214,6 @@ const loading = ref(true)
 const loadError = ref('')
 
 const search = ref('')
-const driverSearch = ref('')
 const showFilters = ref(true)
 const fStatus = ref('')
 const fVehicle = ref('')
@@ -392,47 +293,6 @@ function displayStatus(log) {
 
 const rows = computed(() => logs.value.map(log => ({ ...log, display: displayStatus(log) })))
 
-const driverRows = computed(() => {
-  return [...rows.value].sort((a, b) => {
-    const aDate = a.next_due_date || '9999-12-31'
-    const bDate = b.next_due_date || '9999-12-31'
-    return aDate.localeCompare(bDate)
-  })
-})
-
-const driverFiltered = computed(() => {
-  const q = driverSearch.value.trim().toLowerCase()
-  if (!q) return driverRows.value
-  return driverRows.value.filter(log => {
-    const text = [
-      log.vehicle?.plate_number,
-      log.vehicle?.model,
-      log.description,
-      typeLabel(log.type),
-      log.next_due_date
-    ].join(' ').toLowerCase()
-    return text.includes(q)
-  })
-})
-
-function driverStatusLabel(log) {
-  if (log.display === 'overdue') return 'Overdue'
-  if (log.display === 'in_progress') return 'In progress'
-  if (log.display === 'cancelled') return 'Cancelled'
-  if (log.display === 'completed') return 'Completed'
-  return 'Upcoming'
-}
-
-function scheduleDay(value) {
-  if (!value) return '—'
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { day: '2-digit' })
-}
-
-function scheduleMonth(value) {
-  if (!value) return ''
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
-}
-
 const stats = computed(() => [
   { label: 'Total Maintenance', value: rows.value.length, path: ICONS.wrench, tone: 'wrench' },
   {
@@ -480,7 +340,7 @@ const visiblePages = computed(() => {
   return Array.from({ length: end - start + 1 }, (_, i) => start + i)
 })
 
-watch([search, fStatus, fVehicle, fType, fTime, driverSearch], () => { page.value = 1 })
+watch([search, fStatus, fVehicle, fType, fTime], () => { page.value = 1 })
 
 /* ================= ACTIONS ================= */
 
@@ -630,43 +490,9 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .page-heading { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
 .heading-icon { width: 58px; height: 58px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 14px; background: var(--primary-100); color: var(--primary-dark); }
 .heading-icon svg { width: 30px; height: 30px; }
-.driver-icon { background: #e4f7e7; }
 .page-heading h1 { margin: 0; font-size: 28px; line-height: 1.2; font-weight: 700; color: #182333; }
 .page-heading p { margin: 5px 0 0; color: var(--muted); font-size: 15px; }
 .heading-action { margin-left: auto; }
-
-/* Driver dashboard */
-.driver-welcome { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 20px; padding: 22px 24px; background: #fff; border: 1px solid #e1e7ed; border-radius: 12px; }
-.driver-welcome .eyebrow { color: var(--primary-dark); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-.driver-welcome h2 { margin: 4px 0 3px; color: #182333; font-size: 21px; }
-.driver-welcome p { margin: 0; color: var(--muted); font-size: 14px; }
-.driver-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.driver-badge { display: inline-flex; align-items: center; gap: 10px; flex: 0 0 auto; padding: 10px 13px; border: 1px solid #dcebdd; border-radius: 10px; background: #f5fbf6; }
-.driver-badge-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--primary); color: #fff; font-weight: 800; }
-.driver-badge strong, .driver-badge small { display: block; }
-.driver-badge strong { color: #24422a; font-size: 13px; }
-.driver-badge small { margin-top: 2px; color: #718276; font-size: 11px; }
-.driver-controls { margin-bottom: 18px; }
-.secondary-button { min-height: 40px; padding: 0 14px; border: 1px solid #d7dee7; border-radius: 8px; background: #fff; color: #334155; font-size: 13px; font-weight: 700; }
-.secondary-button:hover:not(:disabled) { background: #f7f9fb; }
-.secondary-button:disabled { opacity: .6; cursor: not-allowed; }
-
-.schedule-list { display: flex; flex-direction: column; }
-.schedule-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 18px 20px; border-bottom: 1px solid #eef1f4; }
-.schedule-row:last-child { border-bottom: 0; }
-.schedule-date { width: 58px; height: 62px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 11px; background: var(--primary-50); color: var(--primary-dark); }
-.schedule-date strong { font-size: 21px; line-height: 1; }
-.schedule-date span { margin-top: 4px; font-size: 10px; font-weight: 800; letter-spacing: .05em; }
-.schedule-date.overdue { background: #fff0f0; color: #b3261e; }
-.schedule-date.in_progress { background: #edf5ff; color: #155a9c; }
-.schedule-date.completed { background: #f0f2f4; color: #687482; }
-.schedule-main { min-width: 0; }
-.schedule-title { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
-.schedule-title strong { color: #1c2c42; font-size: 15px; }
-.schedule-title span { color: #667487; font-size: 13px; }
-.schedule-main p { margin: 4px 0 8px; color: #526174; font-size: 13px; }
-.schedule-meta { display: flex; gap: 18px; flex-wrap: wrap; color: #7b8795; font-size: 12px; }
-.schedule-meta b { color: #526174; font-weight: 600; }
 
 /* Stats */
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
@@ -772,9 +598,6 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   .page-heading h1 { font-size: 23px; }
   .page-heading p { font-size: 13px; }
   .heading-action { display: none; }
-  .driver-welcome { flex-direction: column; align-items: flex-start; padding: 18px; }
-  .driver-badge { width: 100%; }
-  .driver-stats { grid-template-columns: 1fr; }
   .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
   .stat { min-height: 126px; padding: 13px; }
   .stat strong { font-size: 23px; }
@@ -786,9 +609,6 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
   .records-header { padding: 15px; }
   .m-card { padding: 15px; }
   .m-top { flex-direction: column; }
-  .schedule-row { grid-template-columns: 54px minmax(0, 1fr); gap: 12px; align-items: start; padding: 15px; }
-  .schedule-date { width: 52px; height: 56px; }
-  .schedule-row > .status { grid-column: 2; justify-self: start; margin-top: -5px; }
   .m-side { justify-content: space-between; }
   .m-meta { gap: 8px; }
   .modal-overlay { align-items: flex-end; padding: 0; }
