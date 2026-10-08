@@ -2,6 +2,15 @@ import { defineStore } from 'pinia'
 import api, { unwrap } from '@/lib/api'
 import { useNotificationStore } from '@/stores/notifications'
 
+function normalizeRequest(item) {
+  const status = String(item.status ?? '').trim().toLowerCase()
+  return {
+    ...item,
+    status: ['cancelled', 'rejected'].includes(status) ? 'disapproved' : status,
+    rejection_reason: item.rejection_reason ?? item.disapproval_reason ?? item.cancellation_remarks ?? null,
+  }
+}
+
 export const useVehicleRequestStore = defineStore('vehicleRequests', {
   state: () => ({
     items: [],
@@ -37,7 +46,7 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
           },
         })
 
-        let items = data.data ?? []
+        let items = (data.data ?? []).map(normalizeRequest)
 
         // Safety net: if the backend ignores trip_type, filter the current page here.
         if (this.filters.trip_type) {
@@ -58,7 +67,7 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
       this.loading = true
       try {
         const response = await api.get(`/vehicle-requests/${id}`)
-        this.current = unwrap(response)
+        this.current = normalizeRequest(unwrap(response))
         return this.current
       } finally {
         this.loading = false

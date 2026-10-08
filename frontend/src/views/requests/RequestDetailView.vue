@@ -86,10 +86,10 @@ async function confirmReject() {
 
   try {
     await store.updateStatus(request.value.id, {
-      status: 'rejected',
+      status: 'disapproved',
       remarks: rejectReason.value,
     })
-    toast.success('Request rejected.')
+    toast.success('Request disapproved.')
     rejectOpen.value = false
     await load()
   } catch (error) {
@@ -144,14 +144,6 @@ async function confirmCancel() {
     >
       <p class="font-medium">Disapproved</p>
       <p class="mt-1">{{ request.rejection_reason }}</p>
-    </div>
-
-    <div
-      v-if="request.cancellation_remarks"
-      class="rounded-card border border-line bg-neutral-100 p-card text-small text-ink-muted"
-    >
-      <p class="font-medium text-ink">Cancelled</p>
-      <p class="mt-1">{{ request.cancellation_remarks }}</p>
     </div>
 
     <BaseCard title="Request for use of vehicle" :padded="false">

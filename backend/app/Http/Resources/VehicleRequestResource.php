@@ -11,7 +11,9 @@ class VehicleRequestResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'status' => $this->status,
+            'status' => in_array(strtolower((string) $this->status), ['cancelled', 'rejected'], true)
+                ? 'disapproved'
+                : $this->status,
             'destination' => $this->destination,
             'purpose' => $this->purpose,
             'trip_date' => $this->trip_date?->format('Y-m-d'),
@@ -23,6 +25,9 @@ class VehicleRequestResource extends JsonResource
             'passengers' => $this->passengers,
             'number_of_passengers' => $this->number_of_passengers,
             'disapproval_reason' => $this->disapproval_reason,
+            'rejection_reason' => $this->disapproval_reason
+                ?? $this->getAttribute('rejection_reason')
+                ?? $this->getAttribute('cancellation_remarks'),
             'approved_by' => $this->approved_by,
             'approved_date' => $this->approved_date?->toIso8601String(),
             'requested_by' => [

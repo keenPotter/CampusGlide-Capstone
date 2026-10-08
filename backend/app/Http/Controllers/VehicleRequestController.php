@@ -22,7 +22,11 @@ class VehicleRequestController extends Controller
         }
 
         if ($status = $request->query('status')) {
-            $query->where('status', $status);
+            if ($status === 'disapproved') {
+                $query->whereIn('status', ['cancelled', 'disapproved', 'rejected']);
+            } else {
+                $query->where('status', $status);
+            }
         }
 
         return VehicleRequestResource::collection($query->paginate(20));

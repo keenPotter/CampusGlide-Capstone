@@ -127,9 +127,12 @@ class AllocationController extends Controller
                     ? trim(($r->requester->first_name ?? '') . ' ' . ($r->requester->last_name ?? ''))
                     : null,
                 'trip_date' => Carbon::parse($r->trip_date)->toDateString(),
+                'trip_end_date' => $r->trip_end_date?->toDateString(),
+                'trip_type' => $r->trip_type,
                 'departure_time' => $r->departure_time,
                 'estimated_return_time' => $r->estimated_return_time,
-                'passengers' => $r->getAttributes()['number_of_passengers'] ?? null,
+                'passengers' => $r->passengers,
+                'number_of_passengers' => $r->number_of_passengers,
             ])
             ->values();
 
@@ -256,29 +259,6 @@ class AllocationController extends Controller
         $allocation->load(self::WITH);
 
         return (new AllocationResource($allocation))->response();
-    }
-
-    /**
-     * Cancel (soft): trip -> cancelled, vehicle/driver balik sa available. Admin lang.
-     * Kapag cancelled/completed na, wala nang gagawin.
-     */
-    public function destroy(Request $request, Allocation $allocation): JsonResponse
-    {
-        abort_unless(AllocationService::isAdmin($request->user()), 403, 'Admin only.');
-
-        $trip = $allocation->trip;
-
-        if (! in_array($trip->trip_status, AllocationService::ACTIVE, true)) {
-            return response()->json(['message' => "Trip is already {$trip->trip_status}."], 422);
-        }
-
-        DB::transaction(function () use ($allocation, $trip) {
-            Trip::where('id', $trip->id)->update(['trip_status' => 'cancelled']);
-            Vehicle::where('id', $allocation->vehicle_id)->update(['status' => 'available']);
-            Driver::where('id', $allocation->driver_id)->update(['is_available' => true]);
-        });
-
-        return response()->json(['message' => 'Allocation cancelled.']);
     }
 
     /** End user: sariling request lang ang makikita (siya ang requester ng trip). */
