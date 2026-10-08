@@ -36,20 +36,19 @@ async function submit() {
 </script>
 
 <template>
-  <form
-    class="flex flex-col gap-4 rounded-card border border-line bg-white p-card shadow-card"
-    @submit.prevent="submit"
-  >
-    <div>
-      <h2 class="text-section-title">Sign in</h2>
-      <p class="mt-0.5 text-small text-ink-muted">Use your NVSU account credentials.</p>
+  <form class="flex flex-col gap-4" @submit.prevent="submit">
+    <div class="text-center">
+      <h2 class="text-page-title font-bold">Welcome back!</h2>
+      <p class="mt-1 text-small text-ink-muted">
+        Sign in with your NVSU account to continue.
+      </p>
     </div>
 
     <BaseInput
       v-model="form.email"
-      label="Email"
+      label="University Email"
       type="email"
-      placeholder="Email"
+      placeholder="name@nvsu.edu.ph"
       :error="errors.email"
       required
     />
@@ -63,7 +62,14 @@ async function submit() {
       required
     />
 
-    <BaseButton type="submit" :loading="loading" block>Sign in</BaseButton>
+    <BaseButton
+      type="submit"
+      :loading="loading"
+      block
+      class="mt-2 bg-primary-800! font-bold hover:bg-primary-900! active:bg-primary-900!"
+    >
+      Sign in
+    </BaseButton>
 
     <p class="text-center text-small text-ink-muted">
       Need an account? Contact an administrator.
