@@ -50,6 +50,5 @@ export const ROLE_LABELS = {
 export const STATUS_LABELS = {
   pending: 'Pending',
   approved: 'Approved',
-  rejected: 'Rejected',
-  cancelled: 'Cancelled',
+  disapproved: 'Disapproved',
 }

@@ -15,8 +15,8 @@ const requests = useVehicleRequestStore()
 const loading = ref(true)
 
 onMounted(async () => {
-  await Promise.allSettled([requests.fetch({ status: '', page: 1 })])
-  loading.value = false
+  await Promise.allSettled([requests.fetch({ status: '', trip_type: '', page: 1 })]),
+    loading.value = false
 })
 
 const stats = computed(() => {
@@ -24,8 +24,7 @@ const stats = computed(() => {
   return [
     { label: 'Pending', value: counts.pending ?? 0, tone: 'secondary' },
     { label: 'Approved', value: counts.approved ?? 0, tone: 'primary' },
-    { label: 'Rejected', value: counts.rejected ?? 0, tone: 'danger' },
-    { label: 'Cancelled', value: counts.cancelled ?? 0, tone: 'neutral' },
+    { label: 'Disapproved', value: counts.disapproved ?? 0, tone: 'danger' },
   ]
 })
 

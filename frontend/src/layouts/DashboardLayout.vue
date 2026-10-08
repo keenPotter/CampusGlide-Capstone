@@ -1,11 +1,13 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notifications'
 import { initials, ROLE_LABELS } from '@/lib/format'
 import { useToast } from '@/composables/useToast'
 
 const auth = useAuthStore()
+const notifications = useNotificationStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -23,9 +25,19 @@ const navigation = computed(() => {
 
   if (auth.isAdministrator) {
     items.push(
-      { name: 'Vehicle Requests', to: { name: 'requests.index' }, icon: 'list' },
+      {
+        name: 'Vehicle Requests',
+        to: { name: 'requests.index' },
+        icon: 'list',
+        badge: notifications.pendingRequests,
+      },
       { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
-      { name: 'Maintenance', to: { name: 'maintenance' }, icon: 'wrench' },
+      {
+        name: 'Maintenance',
+        to: { name: 'maintenance' },
+        icon: 'wrench',
+        badge: notifications.openMaintenance,
+      },
       { name: 'Create User', to: { name: 'users.create' }, icon: 'user-plus' },
     )
   }
@@ -46,8 +58,23 @@ function isActive(item) {
   return route.name === item.to.name
 }
 
+function badgeLabel(count) {
+  return count > 99 ? '99+' : String(count)
+}
+
+// Only administrators see the numbers. Refresh when the page loads and on every page change.
+function refreshBadges() {
+  if (auth.isAdministrator) {
+    notifications.refresh()
+  }
+}
+
+onMounted(refreshBadges)
+watch(() => route.fullPath, refreshBadges)
+
 async function handleLogout() {
   await auth.logout()
+  notifications.reset()
   toast.success('Signed out successfully.')
   router.push({ name: 'login' })
 }
@@ -63,12 +90,17 @@ function closeSidebar() {
     <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-line bg-white px-page lg:hidden">
       <button
         type="button"
-        class="rounded-card p-2 text-ink-muted hover:bg-neutral-100"
+        class="relative rounded-card p-2 text-ink-muted hover:bg-neutral-100"
         @click="sidebarOpen = !sidebarOpen"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 6h16M4 12h16M4 18h16" />
         </svg>
+        <!-- Dot: something needs attention inside the menu -->
+        <span
+          v-if="notifications.total > 0"
+          class="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-secondary ring-2 ring-white"
+        />
       </button>
 
       <div class="flex h-8 w-8 items-center justify-center rounded-card bg-primary text-white text-small font-semibold">
@@ -137,6 +169,14 @@ function closeSidebar() {
             <path :d="icons[item.icon]" />
           </svg>
           {{ item.name }}
+
+          <span
+            v-if="item.badge > 0"
+            class="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-secondary px-1.5 text-xs font-semibold text-white"
+            :aria-label="`${item.badge} need attention`"
+          >
+            {{ badgeLabel(item.badge) }}
+          </span>
         </RouterLink>
       </nav>
     </aside>

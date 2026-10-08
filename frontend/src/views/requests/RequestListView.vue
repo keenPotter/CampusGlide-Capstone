@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
@@ -19,23 +19,31 @@ const router = useRouter()
 const toast = useToast()
 
 const tabs = [
-  { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: '', label: 'All', field: 'status' },
+  { value: 'pending', label: 'Pending', field: 'status' },
+  { value: 'approved', label: 'Approved', field: 'status' },
+  { value: 'disapproved', label: 'Disapproved', field: 'status' },
+  { value: 'inclusive', label: 'Inclusive', field: 'trip_type' },
+  { value: 'exclusive', label: 'Exclusive', field: 'trip_type' },
 ]
 
-const rejecting = ref(null)
-const rejectReason = ref('')
-const rejectError = ref('')
+// Only one filter is active at a time: either a status or a trip type.
+const activeTab = computed(() => store.filters.trip_type || store.filters.status)
+
+const disapproving = ref(null)
+const disapproveReason = ref('')
+const disapproveError = ref('')
 const submitting = ref(false)
 
-// Reset the status filter too, because the store is shared with other pages.
-onMounted(() => store.fetch({ status: '', page: 1 }))
+// Reset the filters too, because the store is shared with other pages.
+onMounted(() => store.fetch({ status: '', trip_type: '', page: 1 }))
 
-function changeTab(status) {
-  store.fetch({ status, page: 1 })
+function changeTab(tab) {
+  store.fetch({
+    status: tab.field === 'status' ? tab.value : '',
+    trip_type: tab.field === 'trip_type' ? tab.value : '',
+    page: 1,
+  })
 }
 
 async function approve(request) {
@@ -51,21 +59,21 @@ async function approve(request) {
   }
 }
 
-async function confirmReject() {
+async function confirmDisapprove() {
   submitting.value = true
-  rejectError.value = ''
+  disapproveError.value = ''
 
   try {
-    await store.updateStatus(rejecting.value.id, {
-      status: 'rejected',
-      remarks: rejectReason.value,
+    await store.updateStatus(disapproving.value.id, {
+      status: 'disapproved',
+      remarks: disapproveReason.value,
     })
-    toast.success(`Request #${rejecting.value.id} rejected.`)
-    rejecting.value = null
-    rejectReason.value = ''
+    toast.success(`Request #${disapproving.value.id} disapproved.`)
+    disapproving.value = null
+    disapproveReason.value = ''
     await store.fetch()
   } catch (error) {
-    rejectError.value = validationErrors(error).remarks ?? errorMessage(error)
+    disapproveError.value = validationErrors(error).remarks ?? errorMessage(error)
   } finally {
     submitting.value = false
   }
@@ -88,13 +96,20 @@ async function confirmReject() {
       </BaseButton>
     </div>
 
-    <!-- Tab Filter - Horizontal Scroll on Mobile -->
+       <!-- Tab Filter - Horizontal Scroll on Mobile -->
     <div class="flex gap-2 overflow-x-auto pb-2 -mx-page px-page md:flex-wrap md:pb-0 md:mx-0 md:px-0">
-      <button v-for="tab in tabs" :key="tab.value" type="button"
-        class="flex-shrink-0 h-9 rounded-card px-3 text-small font-medium transition whitespace-nowrap" :class="store.filters.status === tab.value
+      <button
+        v-for="tab in tabs"
+        :key="tab.label"
+        type="button"
+        class="flex-shrink-0 h-9 rounded-card px-3 text-small font-medium transition whitespace-nowrap"
+        :class="
+          activeTab === tab.value
             ? 'bg-primary text-white'
             : 'border border-line bg-white text-ink-muted hover:bg-neutral-50'
-          " @click="changeTab(tab.value)">
+        "
+        @click="changeTab(tab)"
+      >
         {{ tab.label }}
       </button>
     </div>
@@ -110,7 +125,6 @@ async function confirmReject() {
     <!-- Mobile + Tablet Card View (1 column on mobile, 2 columns on tablet) -->
     <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:hidden">
       <div v-for="request in store.items" :key="request.id" class="card-row !mb-0 flex flex-col">
-        
         <div class="card-row-header">
           <div class="flex-1 min-w-0">
             <RouterLink :to="{ name: 'requests.show', params: { id: request.id } }"
@@ -148,9 +162,9 @@ async function confirmReject() {
             <BaseButton size="sm" :disabled="submitting" @click="approve(request)" class="flex-1">
               Approve
             </BaseButton>
-            <BaseButton size="sm" variant="outline" @click="((rejecting = request), (rejectReason = ''))"
-              class="flex-1">
-              Reject
+            <BaseButton size="sm" variant="outline"
+              @click="((disapproving = request), (disapproveReason = ''), (disapproveError = ''))" class="flex-1">
+              Disapprove
             </BaseButton>
           </template>
 
@@ -209,8 +223,9 @@ async function confirmReject() {
                   <BaseButton size="sm" :disabled="submitting" @click="approve(request)">
                     Approve
                   </BaseButton>
-                  <BaseButton size="sm" variant="outline" @click="((rejecting = request), (rejectReason = ''))">
-                    Reject
+                  <BaseButton size="sm" variant="outline"
+                    @click="((disapproving = request), (disapproveReason = ''), (disapproveError = ''))">
+                    Disapprove
                   </BaseButton>
                 </template>
 
@@ -233,16 +248,17 @@ async function confirmReject() {
       <PaginationBar :meta="store.meta" @change="(page) => store.fetch({ page })" />
     </div>
 
-    <!-- Reject Modal -->
-    <BaseModal :open="Boolean(rejecting)" title="Reject request"
-      :subtitle="rejecting ? `Request #${rejecting.id} — ${rejecting.destination}` : ''" @close="rejecting = null">
-      <BaseTextarea v-model="rejectReason" label="Reason for disapproval"
-        placeholder="e.g. Vehicle already assigned for that date." :error="rejectError" required />
+    <!-- Disapprove Modal -->
+    <BaseModal :open="Boolean(disapproving)" title="Disapprove request"
+      :subtitle="disapproving ? `Request #${disapproving.id} — ${disapproving.destination}` : ''"
+      @close="disapproving = null">
+      <BaseTextarea v-model="disapproveReason" label="Reason for disapproval"
+        placeholder="e.g. Vehicle already assigned for that date." :error="disapproveError" required />
 
       <template #footer>
-        <BaseButton variant="outline" @click="rejecting = null">Cancel</BaseButton>
-        <BaseButton variant="danger" :loading="submitting" @click="confirmReject">
-          Reject request
+        <BaseButton variant="outline" @click="disapproving = null">Cancel</BaseButton>
+        <BaseButton variant="danger" :loading="submitting" @click="confirmDisapprove">
+          Disapprove request
         </BaseButton>
       </template>
     </BaseModal>

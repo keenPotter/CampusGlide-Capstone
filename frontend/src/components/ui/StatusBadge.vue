@@ -9,12 +9,13 @@ const props = defineProps({
 const styles = {
   pending: 'bg-secondary-50 text-secondary-700 ring-secondary-200',
   approved: 'bg-primary-50 text-primary-700 ring-primary-200',
-  rejected: 'bg-red-50 text-red-700 ring-red-200',
-  cancelled: 'bg-neutral-100 text-ink-muted ring-line',
+  disapproved: 'bg-red-50 text-red-700 ring-red-200',
 }
 
+const fallback = 'bg-neutral-100 text-ink-muted ring-line'
+
 const label = computed(() => STATUS_LABELS[props.status] ?? props.status)
-const classes = computed(() => styles[props.status] ?? styles.cancelled)
+const classes = computed(() => styles[props.status] ?? fallback)
 </script>
 
 <template>
