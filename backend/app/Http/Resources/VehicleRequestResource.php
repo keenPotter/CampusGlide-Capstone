@@ -22,8 +22,7 @@ class VehicleRequestResource extends JsonResource
             'return_time' => $this->estimated_return_time,
             'passengers' => $this->passengers,
             'number_of_passengers' => $this->number_of_passengers,
-            'rejection_reason' => $this->rejection_reason,
-            'cancellation_remarks' => $this->cancellation_remarks,
+            'disapproval_reason' => $this->disapproval_reason,
             'approved_by' => $this->approved_by,
             'approved_date' => $this->approved_date?->toIso8601String(),
             'requested_by' => [

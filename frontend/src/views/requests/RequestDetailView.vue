@@ -24,6 +24,9 @@ const submitting = ref(false)
 const cancelOpen = ref(false)
 const cancelRemarks = ref('')
 const cancelError = ref('')
+const rejectOpen = ref(false)
+const rejectReason = ref('')
+const rejectError = ref('')
 
 const canEdit = computed(
   () => auth.isFaculty && ['pending', 'approved'].includes(request.value?.status),
@@ -64,14 +67,33 @@ async function load() {
   }
 }
 
-async function updateStatus(status) {
+async function approve() {
   submitting.value = true
   try {
-    await store.updateStatus(request.value.id, { status })
-    toast.success(`Request ${status}.`)
+    await store.updateStatus(request.value.id, { status: 'approved' })
+    toast.success('Request approved.')
     await load()
   } catch (error) {
     toast.error(errorMessage(error, 'Unable to update this request.'))
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function confirmReject() {
+  submitting.value = true
+  rejectError.value = ''
+
+  try {
+    await store.updateStatus(request.value.id, {
+      status: 'rejected',
+      remarks: rejectReason.value,
+    })
+    toast.success('Request rejected.')
+    rejectOpen.value = false
+    await load()
+  } catch (error) {
+    rejectError.value = validationErrors(error).remarks ?? errorMessage(error)
   } finally {
     submitting.value = false
   }
@@ -132,12 +154,12 @@ async function confirmCancel() {
       <p class="mt-1">{{ request.cancellation_remarks }}</p>
     </div>
 
-    <BaseCard title="Request for use of vehicle" padded="false">
+    <BaseCard title="Request for use of vehicle" :padded="false">
       <dl class="divide-y divide-line">
         <div
           v-for="row in rows"
           :key="row.label"
-          class="grid grid-cols-1 gap-1 py-3 sm:grid-cols-3 sm:gap-4"
+          class="grid grid-cols-1 gap-1 px-card py-3 sm:grid-cols-3 sm:gap-4"
         >
           <dt class="text-small text-ink-muted">{{ row.label }}</dt>
           <dd class="text-body sm:col-span-2 sm:capitalize">{{ row.value || '—' }}</dd>
@@ -147,10 +169,10 @@ async function confirmCancel() {
 
     <div class="flex flex-wrap justify-end gap-3">
       <template v-if="auth.isAdministrator && request.status === 'pending'">
-        <BaseButton variant="outline" :loading="submitting" @click="updateStatus('rejected')">
+        <BaseButton variant="outline" :disabled="submitting" @click="((rejectOpen = true), (rejectReason = ''), (rejectError = ''))">
           Disapprove
         </BaseButton>
-        <BaseButton :loading="submitting" @click="updateStatus('approved')">Approve</BaseButton>
+        <BaseButton :loading="submitting" @click="approve">Approve</BaseButton>
       </template>
 
       <template v-if="canEdit">
@@ -166,6 +188,30 @@ async function confirmCancel() {
       </template>
     </div>
 
+    <!-- Disapprove -->
+    <BaseModal
+      :open="rejectOpen"
+      title="Disapprove request"
+      :subtitle="`Request #${request.id} — ${request.destination}`"
+      @close="rejectOpen = false"
+    >
+      <BaseTextarea
+        v-model="rejectReason"
+        label="Reason for disapproval"
+        placeholder="e.g. Vehicle already assigned for that date."
+        :error="rejectError"
+        required
+      />
+
+      <template #footer>
+        <BaseButton variant="outline" @click="rejectOpen = false">Cancel</BaseButton>
+        <BaseButton variant="danger" :loading="submitting" @click="confirmReject">
+          Disapprove request
+        </BaseButton>
+      </template>
+    </BaseModal>
+
+    <!-- Cancel -->
     <BaseModal
       :open="cancelOpen"
       title="Cancel request"

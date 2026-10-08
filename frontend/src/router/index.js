@@ -2,23 +2,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
-  { path: '/', redirect: { name: 'tripSchedule' } },
-  {
-    path: '/trip-schedule',
-    name: 'tripSchedule',
-    component: () => import('@/views/TripScheduleView.vue'),
-  },
-  { path: '/', redirect: '/dashboard' },
+  { path: '/', redirect: { name: 'dashboard' } },
   {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { guestOnly: true },
-  },
-  {
-    path: '/register',
-    name: 'register',
-    component: () => import('@/views/RegisterView.vue'),
     meta: { guestOnly: true },
   },
   {
@@ -52,10 +40,22 @@ const routes = [
     meta: { requiresAuth: true, roles: ['faculty'] },
   },
   {
-    path: '/guard-logs',
-    name: 'guardLogs.index',
-    component: () => import('@/views/guard/GuardLogListView.vue'),
-    meta: { requiresAuth: true, roles: ['guard', 'administrator'] },
+    path: '/trip-schedule',
+    name: 'tripSchedule',
+    component: () => import('@/views/TripScheduleView.vue'),
+    meta: { requiresAuth: true, roles: ['administrator'] },
+  },
+  {
+    path: '/maintenance',
+    name: 'maintenance',
+    component: () => import('@/views/MaintenanceView.vue'),
+    meta: { requiresAuth: true, roles: ['administrator'] },
+  },
+  {
+    path: '/users/new',
+    name: 'users.create',
+    component: () => import('@/views/users/CreateUserView.vue'),
+    meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {
     path: '/:pathMatch(.*)*',
@@ -85,6 +85,7 @@ router.beforeEach(async (to) => {
     return { name: 'dashboard' }
   }
 
+  // Wrong role (for example, faculty typing /users/new): send back to the dashboard.
   if (to.meta.roles && !to.meta.roles.includes(auth.role)) {
     return { name: 'dashboard' }
   }

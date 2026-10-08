@@ -18,8 +18,8 @@ class UpdateVehicleRequestStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', 'in:approved,rejected'],
-            'remarks' => ['nullable', 'required_if:status,rejected', 'string', 'max:500'],
+            'status' => ['required', 'in:approved,disapproved'],
+            'remarks' => ['nullable', 'required_if:status,disapproved', 'string', 'max:500'],
         ];
     }
 

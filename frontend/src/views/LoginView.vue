@@ -1,6 +1,6 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { errorMessage, validationErrors } from '@/lib/api'
 import { useToast } from '@/composables/useToast'
@@ -66,10 +66,7 @@ async function submit() {
     <BaseButton type="submit" :loading="loading" block>Sign in</BaseButton>
 
     <p class="text-center text-small text-ink-muted">
-      No account yet?
-      <RouterLink :to="{ name: 'register' }" class="font-medium text-primary hover:underline">
-        Create one
-      </RouterLink>
+      Need an account? Contact an administrator.
     </p>
   </form>
 </template>

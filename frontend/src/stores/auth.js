@@ -13,8 +13,6 @@ export const useAuthStore = defineStore('auth', {
     role: (state) => state.user?.role ?? null,
     isAdministrator: (state) => state.user?.role === 'administrator',
     isFaculty: (state) => state.user?.role === 'faculty',
-    isGuard: (state) => state.user?.role === 'guard',
-    isDriver: (state) => state.user?.role === 'driver',
   },
 
   actions: {
@@ -33,11 +31,6 @@ export const useAuthStore = defineStore('auth', {
       this.user = data.user
       this.ready = true
       return this.user
-    },
-
-    async register(payload) {
-      const { data } = await api.post('/register', payload)
-      return data.user
     },
 
     async fetchUser() {

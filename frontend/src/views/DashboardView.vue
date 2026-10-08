@@ -1,9 +1,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
-import { useGuardLogStore } from '@/stores/guardLogs'
 import { formatDate, formatTime, ROLE_LABELS } from '@/lib/format'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -11,33 +10,22 @@ import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
 const auth = useAuthStore()
+const router = useRouter()
 const requests = useVehicleRequestStore()
-const guardLogs = useGuardLogStore()
 const loading = ref(true)
 
 onMounted(async () => {
-  const tasks = [requests.fetch({ status: '', page: 1 })]
-  if (auth.isGuard || auth.isAdministrator) {
-    tasks.push(guardLogs.fetch(1))
-  }
-  await Promise.allSettled(tasks)
-  loading.value = false
+  await Promise.allSettled([requests.fetch({ status: '', trip_type: '', page: 1 })]),
+    loading.value = false
 })
 
 const stats = computed(() => {
   const counts = requests.countByStatus
-  const base = [
+  return [
     { label: 'Pending', value: counts.pending ?? 0, tone: 'secondary' },
     { label: 'Approved', value: counts.approved ?? 0, tone: 'primary' },
-    { label: 'Rejected', value: counts.rejected ?? 0, tone: 'danger' },
-    { label: 'Cancelled', value: counts.cancelled ?? 0, tone: 'neutral' },
+    { label: 'Disapproved', value: counts.disapproved ?? 0, tone: 'danger' },
   ]
-
-  if (auth.isGuard) {
-    base.push({ label: 'On trip', value: guardLogs.onTrip.length, tone: 'primary' })
-  }
-
-  return base
 })
 
 const tones = {
@@ -59,7 +47,7 @@ const upcoming = computed(() =>
   <div class="flex flex-col gap-page">
     <!-- Greeting -->
     <div>
-      <h1 class="text-page-title">Hello, {{ auth.user?.first_name}}</h1>
+      <h1 class="text-page-title">Hello, {{ auth.user?.first_name }}</h1>
       <p class="mt-1 text-small text-ink-muted">
         Signed in as {{ ROLE_LABELS[auth.role] ?? auth.role }}
       </p>
@@ -67,12 +55,12 @@ const upcoming = computed(() =>
 
     <!-- Quick Action Button (Mobile) -->
     <div v-if="auth.isFaculty" class="md:hidden">
-      <BaseButton :is="RouterLink" :to="{ name: 'requests.create' }" block>
+      <BaseButton block @click="router.push({ name: 'requests.create' })">
         New request
       </BaseButton>
     </div>
 
-    <!-- Stats Grid - Mobile First -->
+    <!-- Stats Grid -->
     <div class="responsive-grid">
       <div
         v-for="stat in stats"
