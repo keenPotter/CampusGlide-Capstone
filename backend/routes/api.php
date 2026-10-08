@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VehicleRequestController;
+use App\Http\Controllers\VehicleRequestPrintController;
 use App\Http\Controllers\FuelUsageRecordController;
 use App\Http\Controllers\MaintenanceLogController;
 use App\Http\Controllers\PostTravelReportController;
@@ -99,9 +100,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/vehicle-requests/{vehicleRequest}/edit', [VehicleRequestController::class, 'edit']);
     });
 
-    // Only administrators can update the status of requests
+    // Only administrators can update the status of requests and print the form
     Route::middleware('role:administrator')->group(function () {
         Route::patch('/vehicle-requests/{vehicleRequest}/status', [VehicleRequestController::class, 'updateStatus']);
+        Route::get('/vehicle-requests/{vehicleRequest}/print', [VehicleRequestPrintController::class, 'show'])
+            ->whereNumber('vehicleRequest');
         Route::post('/register', [AuthController::class, 'register']);
     });
 });

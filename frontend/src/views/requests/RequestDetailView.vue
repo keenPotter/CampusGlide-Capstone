@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
 import { errorMessage, validationErrors } from '@/lib/api'
 import { formatDate, formatDateTime, formatTime } from '@/lib/format'
+import { printRequest } from '@/lib/printRequest'
 import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -21,6 +22,7 @@ const toast = useToast()
 const request = ref(null)
 const loading = ref(true)
 const submitting = ref(false)
+const printing = ref(false)
 const cancelOpen = ref(false)
 const cancelRemarks = ref('')
 const cancelError = ref('')
@@ -31,6 +33,9 @@ const rejectError = ref('')
 const canEdit = computed(
   () => auth.isFaculty && ['pending', 'approved'].includes(request.value?.status),
 )
+
+// Printing is for administrators only, and only after the request is approved.
+const canPrint = computed(() => auth.isAdministrator && request.value?.status === 'approved')
 
 const rows = computed(() => {
   if (!request.value) return []
@@ -64,6 +69,17 @@ async function load() {
     router.push({ name: 'requests.index' })
   } finally {
     loading.value = false
+  }
+}
+
+async function print() {
+  printing.value = true
+  try {
+    await printRequest(request.value)
+  } catch (error) {
+    toast.error(errorMessage(error, 'Unable to print this request.'))
+  } finally {
+    printing.value = false
   }
 }
 
@@ -126,7 +142,7 @@ async function confirmCancel() {
       <div>
         <button
           type="button"
-          class="mb-1 text-small text-ink-muted hover:text-ink"
+          class="mb-1 text-medium text-ink-muted hover:text-ink"
           @click="router.push({ name: 'requests.index' })"
         >
           ← Back to requests
@@ -135,7 +151,10 @@ async function confirmCancel() {
         <p class="mt-0.5 text-small text-ink-muted">{{ request.destination }}</p>
       </div>
 
-      <StatusBadge :status="request.status" />
+      <!-- Status, with the Print button below it (approved requests only) -->
+      <div class="flex flex-col items-end gap-2">
+        <StatusBadge :status="request.status" />
+      </div>
     </div>
 
     <div
@@ -175,15 +194,17 @@ async function confirmCancel() {
         <BaseButton :loading="submitting" @click="approve">Approve</BaseButton>
       </template>
 
+      <!-- Print is for administrators only, and only after the request is approved -->
+      <BaseButton v-if="canPrint" :loading="printing" @click="print">
+        Print
+      </BaseButton>
+
       <template v-if="canEdit">
         <BaseButton
           variant="outline"
           @click="router.push({ name: 'requests.edit', params: { id: request.id } })"
         >
           Edit
-        </BaseButton>
-        <BaseButton variant="danger" @click="((cancelOpen = true), (cancelRemarks = ''))">
-          Cancel request
         </BaseButton>
       </template>
     </div>

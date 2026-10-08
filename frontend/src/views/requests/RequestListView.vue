@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
 import { errorMessage, validationErrors } from '@/lib/api'
 import { formatDate, formatTime } from '@/lib/format'
+import { printRequest } from '@/lib/printRequest'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
@@ -44,6 +45,21 @@ function changeTab(tab) {
     trip_type: tab.field === 'trip_type' ? tab.value : '',
     page: 1,
   })
+}
+
+// True when the row already shows a button besides "View"
+// (Approve/Disapprove for pending requests, Print for approved requests).
+// Both of these are for administrators only.
+function hasOtherActions(request) {
+  return auth.isAdministrator && (request.status === 'approved' || request.status === 'pending')
+}
+
+async function print(request) {
+  try {
+    await printRequest(request)
+  } catch (error) {
+    toast.error(errorMessage(error, 'Unable to print this request.'))
+  }
 }
 
 async function approve(request) {
@@ -96,20 +112,13 @@ async function confirmDisapprove() {
       </BaseButton>
     </div>
 
-       <!-- Tab Filter - Horizontal Scroll on Mobile -->
+    <!-- Tab Filter - Horizontal Scroll on Mobile -->
     <div class="flex gap-2 overflow-x-auto pb-2 -mx-page px-page md:flex-wrap md:pb-0 md:mx-0 md:px-0">
-      <button
-        v-for="tab in tabs"
-        :key="tab.label"
-        type="button"
-        class="flex-shrink-0 h-9 rounded-card px-3 text-small font-medium transition whitespace-nowrap"
-        :class="
-          activeTab === tab.value
+      <button v-for="tab in tabs" :key="tab.label" type="button"
+        class="flex-shrink-0 h-9 rounded-card px-3 text-small font-medium transition whitespace-nowrap" :class="activeTab === tab.value
             ? 'bg-primary text-white'
             : 'border border-line bg-white text-ink-muted hover:bg-neutral-50'
-        "
-        @click="changeTab(tab)"
-      >
+          " @click="changeTab(tab)">
         {{ tab.label }}
       </button>
     </div>
@@ -168,9 +177,15 @@ async function confirmDisapprove() {
             </BaseButton>
           </template>
 
+          <!-- Print is for administrators only, and only after the request is approved -->
+          <BaseButton v-if="auth.isAdministrator && request.status === 'approved'" size="sm" variant="outline"
+            @click="print(request)" class="flex-1">
+            Print
+          </BaseButton>
+
           <BaseButton size="sm" variant="ghost"
             @click="router.push({ name: 'requests.show', params: { id: request.id } })"
-            :class="auth.isAdministrator && request.status === 'pending' ? '' : 'w-full'">
+            :class="hasOtherActions(request) ? '' : 'w-full'">
             View
           </BaseButton>
         </div>
@@ -228,6 +243,12 @@ async function confirmDisapprove() {
                     Disapprove
                   </BaseButton>
                 </template>
+
+                <!-- Print is for administrators only, and only after the request is approved -->
+                <BaseButton v-if="auth.isAdministrator && request.status === 'approved'" size="sm"
+                  @click="print(request)">
+                  Print
+                </BaseButton>
 
                 <BaseButton size="sm" variant="ghost"
                   @click="router.push({ name: 'requests.show', params: { id: request.id } })">
