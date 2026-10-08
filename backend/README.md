@@ -1,3 +1,48 @@
+# CampusGlide Sprint 3 — Laravel + Vue
+
+A standalone Sprint 3 maintenance monitoring project using Laravel 12, Vue 3, Vite, Axios, and the supplied CampusGlide MySQL schema.
+
+## Run with Laravel Herd + XAMPP MySQL
+1. Put/link this project in your Herd directory.
+2. In XAMPP, start **MySQL only**. Apache is not needed.
+3. Import `database/campusglide_db.sql` into MySQL/phpMyAdmin if `campusglide_db` is not already imported.
+4. In the project terminal:
+
+```powershell
+composer install
+npm install
+copy .env.example .env
+php artisan key:generate
+php artisan config:clear
+php artisan migrate
+npm run dev
+```
+
+`.env` database values:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=campusglide_db
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+Do **not** run `php artisan migrate:fresh` on the existing CampusGlide database.
+
+Herd serves the Laravel page at the Herd `.test` domain assigned to the project. Vite serves the development assets while `npm run dev` is running.
+
+## API
+- GET `/api/maintenance-logs`
+- POST `/api/maintenance-logs`
+- PATCH `/api/maintenance-logs/{maintenanceLog}`
+- GET `/api/vehicles/{vehicle}/status`
+- GET `/api/vehicles`
+
+The supplied database's `vehicle_maintenance` table does not initially include `next_due_date`; the included migration adds it.
+
+This standalone Sprint 3 package leaves authentication middleware off the maintenance routes so the Vue UI can be tested immediately. When integrating into the complete CampusGlide application, restore your existing Sanctum/administrator middleware group.
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
@@ -23,24 +68,23 @@ Laravel is accessible, powerful, and provides tools required for large, robust a
 
 ## Learning Laravel
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
 
-## Laravel Sponsors
+You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Agentic Development
 
-### Premium Partners
+Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+composer require laravel/boost --dev
+
+php artisan boost:install
+```
+
+Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
 
 ## Contributing
 
