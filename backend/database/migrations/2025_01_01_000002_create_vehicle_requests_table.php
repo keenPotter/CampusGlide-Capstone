@@ -20,9 +20,8 @@ return new class extends Migration {
             $table->time(column: 'estimated_return_time');
             $table->string(column: 'passengers');
             $table->integer(column: 'number_of_passengers');
-            $table->enum(column: 'status', allowed: ['pending', 'approved', 'rejected', 'cancelled'])->default(value: 'pending');
-            $table->string(column: 'rejection_reason', length: 500)->nullable();
-            $table->string(column: 'cancellation_remarks', length: 500)->nullable();
+            $table->enum(column: 'status', allowed: ['pending', 'approved', 'disapproved'])->default(value: 'pending');
+            $table->string(column: 'disapproval_reason', length: 500)->nullable();
             $table->foreignId(column: 'approved_by')->nullable()->constrained(table: 'users')->nullOnDelete();
             $table->dateTime(column: 'approved_date')->nullable();
             $table->timestamps();

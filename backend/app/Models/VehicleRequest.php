@@ -24,8 +24,7 @@ class VehicleRequest extends Model
         'passengers',
         'number_of_passengers',
         'status',
-        'rejection_reason',
-        'cancellation_remarks',
+        'disapproval_reason',
         'approved_by',
         'approved_date',
     ];

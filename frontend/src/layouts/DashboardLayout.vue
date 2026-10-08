@@ -1,11 +1,13 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationStore } from '@/stores/notifications'
 import { initials, ROLE_LABELS } from '@/lib/format'
 import { useToast } from '@/composables/useToast'
 
 const auth = useAuthStore()
+const notifications = useNotificationStore()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -23,9 +25,19 @@ const navigation = computed(() => {
 
   if (auth.isAdministrator) {
     items.push(
-      { name: 'Vehicle Requests', to: { name: 'requests.index' }, icon: 'list' },
+      {
+        name: 'Vehicle Requests',
+        to: { name: 'requests.index' },
+        icon: 'list',
+        badge: notifications.pendingRequests,
+      },
       { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
-      { name: 'Maintenance', to: { name: 'maintenance' }, icon: 'wrench' },
+      {
+        name: 'Maintenance',
+        to: { name: 'maintenance' },
+        icon: 'wrench',
+        badge: notifications.openMaintenance,
+      },
       { name: 'Create User', to: { name: 'users.create' }, icon: 'user-plus' },
     )
   }
@@ -46,8 +58,23 @@ function isActive(item) {
   return route.name === item.to.name
 }
 
+function badgeLabel(count) {
+  return count > 99 ? '99+' : String(count)
+}
+
+// Only administrators see the numbers. Refresh when the page loads and on every page change.
+function refreshBadges() {
+  if (auth.isAdministrator) {
+    notifications.refresh()
+  }
+}
+
+onMounted(refreshBadges)
+watch(() => route.fullPath, refreshBadges)
+
 async function handleLogout() {
   await auth.logout()
+  notifications.reset()
   toast.success('Signed out successfully.')
   router.push({ name: 'login' })
 }
@@ -59,16 +86,21 @@ function closeSidebar() {
 
 <template>
   <div class="min-h-screen bg-surface">
-    <!-- Mobile Header -->
-    <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-line bg-white px-page md:hidden">
+    <!-- Mobile + Tablet Header (hamburger) -->
+    <header class="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-line bg-white px-page lg:hidden">
       <button
         type="button"
-        class="rounded-card p-2 text-ink-muted hover:bg-neutral-100"
+        class="relative rounded-card p-2 text-ink-muted hover:bg-neutral-100"
         @click="sidebarOpen = !sidebarOpen"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 6h16M4 12h16M4 18h16" />
         </svg>
+        <!-- Dot: something needs attention inside the menu -->
+        <span
+          v-if="notifications.total > 0"
+          class="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-secondary ring-2 ring-white"
+        />
       </button>
 
       <div class="flex h-8 w-8 items-center justify-center rounded-card bg-primary text-white text-small font-semibold">
@@ -89,7 +121,7 @@ function closeSidebar() {
       </button>
     </header>
 
-    <!-- Mobile Sidebar Overlay -->
+    <!-- Mobile + Tablet Sidebar Overlay -->
     <Transition
       enter-active-class="transition duration-200"
       enter-from-class="opacity-0"
@@ -98,15 +130,15 @@ function closeSidebar() {
     >
       <div
         v-if="sidebarOpen"
-        class="fixed inset-0 z-30 bg-ink/40 md:hidden"
+        class="fixed inset-0 z-30 bg-ink/40 lg:hidden"
         @click="closeSidebar"
       />
     </Transition>
 
-    <!-- Sidebar -->
+    <!-- Sidebar (always visible on laptop and up) -->
     <aside
       class="fixed inset-y-0 left-0 z-40 w-64 border-r border-line bg-white transition-transform"
-      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
+      :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
     >
       <div class="flex h-16 items-center gap-2 border-b border-line px-card">
         <div class="flex h-8 w-8 items-center justify-center rounded-card bg-primary text-white">
@@ -137,14 +169,22 @@ function closeSidebar() {
             <path :d="icons[item.icon]" />
           </svg>
           {{ item.name }}
+
+          <span
+            v-if="item.badge > 0"
+            class="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-secondary px-1.5 text-xs font-semibold text-white"
+            :aria-label="`${item.badge} need attention`"
+          >
+            {{ badgeLabel(item.badge) }}
+          </span>
         </RouterLink>
       </nav>
     </aside>
 
     <!-- Main Content -->
-    <div class="md:pl-64">
+    <div class="lg:pl-64">
       <!-- Desktop Header -->
-      <header class="sticky top-0 z-20 hidden md:flex h-16 items-center justify-between gap-4 border-b border-line bg-white px-page">
+      <header class="sticky top-0 z-20 hidden lg:flex h-16 items-center justify-between gap-4 border-b border-line bg-white px-page">
         <div class="ml-auto flex items-center gap-3">
           <div class="text-right">
             <p class="text-small font-medium leading-tight">{{ auth.user?.first_name }}</p>
@@ -166,7 +206,7 @@ function closeSidebar() {
         </div>
       </header>
 
-      <main class="p-page pb-20 md:pb-page">
+      <main class="p-page pb-20 lg:pb-page">
         <slot />
       </main>
     </div>

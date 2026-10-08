@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\CancelVehicleRequestRequest;
 use App\Http\Requests\EditVehicleRequestRequest;
 use App\Http\Requests\StoreVehicleRequestRequest;
 use App\Http\Requests\UpdateVehicleRequestStatusRequest;
@@ -67,7 +65,7 @@ class VehicleRequestController extends Controller
 
         $vehicleRequest->update([
             'status' => $request->status,
-            'rejection_reason' => $isApproved ? null : $request->remarks,
+            'disapproval_reason' => $isApproved ? null : $request->remarks,
             'approved_by' => $request->user()->id,
             'approved_date' => $isApproved ? now() : null,
         ]);
@@ -89,21 +87,6 @@ class VehicleRequestController extends Controller
 
         return response()->json([
             'message' => 'Vehicle request updated successfully.',
-            'data' => new VehicleRequestResource($vehicleRequest->fresh(['requester', 'approver'])),
-        ]);
-    }
-
-    public function cancel(CancelVehicleRequestRequest $request, VehicleRequest $vehicleRequest)
-    {
-        $vehicleRequest->update([
-            'status' => 'cancelled',
-            'cancellation_remarks' => $request->cancellation_remarks,
-            'approved_by' => null,
-            'approved_date' => null,
-        ]);
-
-        return response()->json([
-            'message' => 'Vehicle request cancelled successfully.',
             'data' => new VehicleRequestResource($vehicleRequest->fresh(['requester', 'approver'])),
         ]);
     }

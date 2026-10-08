@@ -6,7 +6,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * One trip per approved request, plus one cancelled trip (request 14).
+ * One trip per approved request.
  */
 class TripSeeder extends Seeder
 {
@@ -30,7 +30,6 @@ class TripSeeder extends Seeder
             [8,  8,  1, 1, '2026-10-08', '06:00:00', '18:00:00', 'Vigan City, Ilocos Sur',                    'Educational tour for students',                  'scheduled',   null,       null,       null, 'Two-day trip, overnight stay in Vigan.',                 '2026-10-01 10:30:00', '2026-10-01 10:30:00'],
             [9,  9,  2, 2, '2026-10-02', '07:00:00', '17:00:00', 'Ilagan City, Isabela',                      'Inter-campus sports coordination meeting',       'in_progress', '07:10:00', null,       null, null,                                                         '2026-09-28 09:30:00', '2026-10-02 07:10:00'],
             [10, 10, 6, 4, '2026-10-02', '07:30:00', '15:00:00', 'Bambang, Nueva Vizcaya',                    'Delivery of instructional materials',            'in_progress', '07:25:00', null,       null, null,                                                         '2026-09-29 10:30:00', '2026-10-02 07:25:00'],
-            [11, 14, 5, 3, '2026-09-22', '07:00:00', '17:00:00', 'Roxas, Isabela',                            'Benchmarking visit to partner school',           'cancelled',   null,       null,       null, 'Cancelled by requester; event postponed.',               '2026-09-14 09:30:00', '2026-09-18 08:00:00'],
         ];
 
         DB::table('trips')->insert(

@@ -6,21 +6,10 @@
         <p>View and manage scheduled trips</p>
       </div>
 
-      <!-- Primary action -->
-      <button class="add-trip-button" @click="openAddTripModal">
-        <span class="icon">+</span> Add Trip
-      </button>
-
       <!-- View switcher -->
       <div class="view-buttons" role="tablist">
-        <button
-          v-for="view in views"
-          :key="view"
-          role="tab"
-          :aria-selected="currentView === view"
-          :class="{ active: currentView === view }"
-          @click="currentView = view"
-        >
+        <button v-for="view in views" :key="view" role="tab" :aria-selected="currentView === view"
+          :class="{ active: currentView === view }" @click="currentView = view">
           {{ view.charAt(0).toUpperCase() + view.slice(1) }}
         </button>
       </div>
@@ -48,22 +37,12 @@
           </div>
 
           <div class="calendar-grid">
-            <div
-              v-for="blank in firstDayOfMonth"
-              :key="'blank-' + blank"
-              class="calendar-day empty"
-            ></div>
+            <div v-for="blank in firstDayOfMonth" :key="'blank-' + blank" class="calendar-day empty"></div>
 
-            <button
-              v-for="day in daysInMonth"
-              :key="day"
-              class="calendar-day"
-              :class="{
-                scheduled: isScheduled(day),
-                today: isToday(day)
-              }"
-              @click="selectedDate = day"
-            >
+            <button v-for="day in daysInMonth" :key="day" class="calendar-day" :class="{
+              scheduled: isScheduled(day),
+              today: isToday(day)
+            }" @click="selectedDate = day">
               <span class="day-number">{{ day }}</span>
               <span v-if="isScheduled(day)" class="event-dot"></span>
             </button>
@@ -105,12 +84,7 @@
           </div>
 
           <div v-if="monthTrips.length" class="approved-list">
-            <button
-              v-for="trip in monthTrips"
-              :key="trip.id"
-              class="approved-trip"
-              @click="openTripModal(trip)"
-            >
+            <button v-for="trip in monthTrips" :key="trip.id" class="approved-trip" @click="openTripModal(trip)">
               <div class="approved-main">
                 <div class="approved-title-row">
                   <strong>{{ trip.request_code || `TRIP-${trip.id}` }}</strong>
@@ -157,22 +131,15 @@
 
           <div class="week-calendar">
             <div v-for="day in weekDays" :key="day.date" class="week-day">
-              <button
-                class="week-day-header"
-                :class="{ active: selectedWeekDate === day.date }"
-                @click="selectedWeekDate = day.date"
-              >
+              <button class="week-day-header" :class="{ active: selectedWeekDate === day.date }"
+                @click="selectedWeekDate = day.date">
                 <span>{{ day.name }}</span>
                 <strong>{{ day.number }}</strong>
               </button>
 
               <div class="week-events">
-                <button
-                  v-for="trip in getTripsForDate(day.date)"
-                  :key="trip.id"
-                  class="week-event"
-                  @click="openTripModal(trip)"
-                >
+                <button v-for="trip in getTripsForDate(day.date)" :key="trip.id" class="week-event"
+                  @click="openTripModal(trip)">
                   <strong>{{ formatTime(trip.departure_time) }}</strong>
                   <span>{{ trip.destination }}</span>
                 </button>
@@ -218,12 +185,7 @@
         </div>
 
         <div v-if="scheduledTripList.length" class="trip-list">
-          <button
-            v-for="trip in scheduledTripList"
-            :key="trip.id"
-            class="list-trip-card"
-            @click="openTripModal(trip)"
-          >
+          <button v-for="trip in scheduledTripList" :key="trip.id" class="list-trip-card" @click="openTripModal(trip)">
             <div class="list-trip-date">
               <strong>{{ dayNumber(trip.trip_date) }}</strong>
               <span>{{ shortMonth(trip.trip_date) }}</span>
@@ -282,21 +244,12 @@
           </div>
         </div>
 
-        <div v-if="isScheduledTrip(activeTrip)" class="modal-actions">
-          <button class="secondary-button" @click="startEditTrip">Edit</button>
-          <button class="danger-button" @click="cancelTrip">Cancel trip</button>
-        </div>
-
         <button class="primary-button" @click="closeTripModal">Close</button>
       </div>
     </div>
 
     <!-- ============ EDIT TRIP MODAL ============ -->
-    <div
-      v-if="editingTrip"
-      class="modal-overlay"
-      @click.self="closeEditTrip"
-    >
+    <div v-if="editingTrip" class="modal-overlay" @click.self="closeEditTrip">
       <div class="modal-card">
         <div class="sheet-handle"></div>
 
@@ -322,12 +275,8 @@
             Vehicle
             <select v-model="editingTrip.vehicle_id">
               <option value="">Select vehicle</option>
-              <option
-                v-for="vehicle in vehicles"
-                :key="vehicle.id"
-                :value="vehicle.id"
-                :disabled="isVehicleUnavailable(vehicle.id, editingTrip)"
-              >
+              <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id"
+                :disabled="isVehicleUnavailable(vehicle.id, editingTrip)">
                 {{ vehicleOptionLabel(vehicle, editingTrip) }}
               </option>
             </select>
@@ -337,12 +286,8 @@
             Driver
             <select v-model="editingTrip.driver_id">
               <option value="">Select driver</option>
-              <option
-                v-for="driver in drivers"
-                :key="driver.id"
-                :value="driver.id"
-                :disabled="isDriverUnavailable(driver.id, editingTrip)"
-              >
+              <option v-for="driver in drivers" :key="driver.id" :value="driver.id"
+                :disabled="isDriverUnavailable(driver.id, editingTrip)">
                 {{ driverOptionLabel(driver, editingTrip) }}
               </option>
             </select>
@@ -358,11 +303,7 @@
     </div>
 
     <!-- ============ ADD TRIP MODAL ============ -->
-    <div
-      v-if="showAddTripModal"
-      class="modal-overlay"
-      @click.self="showAddTripModal = false"
-    >
+    <div v-if="showAddTripModal" class="modal-overlay" @click.self="showAddTripModal = false">
       <div class="modal-card">
         <div class="sheet-handle"></div>
 
@@ -371,32 +312,22 @@
             <span class="small-label">Trip schedule</span>
             <h2>Add trip</h2>
           </div>
-          <button
-            class="icon-button"
-            aria-label="Close"
-            @click="showAddTripModal = false"
-          >
+          <button class="icon-button" aria-label="Close" @click="showAddTripModal = false">
             ×
           </button>
         </div>
 
         <p class="modal-note">
-          Select an approved vehicle request. The request details are read-only because they were submitted by the requester.
+          Select an approved vehicle request. The request details are read-only because they were submitted by the
+          requester.
         </p>
 
         <div class="form-group">
           <label class="form-label">
             Approved Vehicle Request
-            <select
-              v-model="newTrip.vehicle_request_id"
-              @change="selectApprovedRequest(newTrip.vehicle_request_id)"
-            >
+            <select v-model="newTrip.vehicle_request_id" @change="selectApprovedRequest(newTrip.vehicle_request_id)">
               <option value="">Select approved request</option>
-              <option
-                v-for="request in approvedRequests"
-                :key="request.id"
-                :value="request.id"
-              >
+              <option v-for="request in approvedRequests" :key="request.id" :value="request.id">
                 #{{ request.id }} · {{ request.requester_name || requesterName(request) }} · {{ request.destination }}
               </option>
             </select>
@@ -434,12 +365,8 @@
             Vehicle
             <select v-model="newTrip.vehicle_id">
               <option value="">Select vehicle</option>
-              <option
-                v-for="vehicle in vehicles"
-                :key="vehicle.id"
-                :value="vehicle.id"
-                :disabled="isVehicleUnavailable(vehicle.id, newTrip)"
-              >
+              <option v-for="vehicle in vehicles" :key="vehicle.id" :value="vehicle.id"
+                :disabled="isVehicleUnavailable(vehicle.id, newTrip)">
                 {{ vehicleOptionLabel(vehicle, newTrip) }}
               </option>
             </select>
@@ -449,12 +376,8 @@
             Driver
             <select v-model="newTrip.driver_id">
               <option value="">Select driver</option>
-              <option
-                v-for="driver in drivers"
-                :key="driver.id"
-                :value="driver.id"
-                :disabled="isDriverUnavailable(driver.id, newTrip)"
-              >
+              <option v-for="driver in drivers" :key="driver.id" :value="driver.id"
+                :disabled="isDriverUnavailable(driver.id, newTrip)">
                 {{ driverOptionLabel(driver, newTrip) }}
               </option>
             </select>
@@ -814,138 +737,6 @@ function driverOptionLabel(driver, candidate) {
   return `${driverLabel(driver)} · ${driverAvailabilityLabel(driver, candidate)}`
 }
 
-async function saveEditTrip() {
-  editTripError.value = ''
-
-  if (!editingTrip.value?.vehicle_id || !editingTrip.value?.driver_id) {
-    editTripError.value = 'Please select a vehicle and driver.'
-    return
-  }
-
-  if (isVehicleUnavailable(editingTrip.value.vehicle_id, editingTrip.value)) {
-    editTripError.value = 'The selected vehicle is unavailable for this trip time.'
-    return
-  }
-
-  if (isDriverUnavailable(editingTrip.value.driver_id, editingTrip.value)) {
-    editTripError.value = 'The selected driver is unavailable for this trip time.'
-    return
-  }
-
-  savingEdit.value = true
-
-  try {
-    const response = await fetch(`${API_URL}/trips/${editingTrip.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({
-        vehicle_id: Number(editingTrip.value.vehicle_id),
-        driver_id: Number(editingTrip.value.driver_id)
-      })
-    })
-
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.message || 'Failed to update trip.')
-
-    editingTrip.value = null
-    await fetchTrips()
-  } catch (error) {
-    console.error(error)
-    editTripError.value = error.message
-  } finally {
-    savingEdit.value = false
-  }
-}
-
-async function cancelTrip() {
-  if (!activeTrip.value) return
-
-  const confirmed = window.confirm(
-    `Cancel the trip to ${activeTrip.value.destination} on ${formatDate(activeTrip.value.trip_date)}?`
-  )
-
-  if (!confirmed) return
-
-  try {
-    const response = await fetch(`${API_URL}/trips/${activeTrip.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({ trip_status: 'cancelled' })
-    })
-
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.message || 'Failed to cancel trip.')
-
-    closeTripModal()
-    await fetchTrips()
-  } catch (error) {
-    console.error(error)
-    window.alert(error.message)
-  }
-}
-
-/* ================= ADD TRIP ================= */
-
-async function addTrip() {
-  addTripError.value = ''
-
-  if (!newTrip.value.vehicle_request_id) {
-    addTripError.value = 'Please select an approved vehicle request.'
-    return
-  }
-
-  if (!newTrip.value.vehicle_id || !newTrip.value.driver_id) {
-    addTripError.value = 'Please select a vehicle and driver.'
-    return
-  }
-
-  if (isVehicleUnavailable(newTrip.value.vehicle_id, newTrip.value)) {
-    addTripError.value = 'The selected vehicle is unavailable for this trip time.'
-    return
-  }
-
-  if (isDriverUnavailable(newTrip.value.driver_id, newTrip.value)) {
-    addTripError.value = 'The selected driver is unavailable for this trip time.'
-    return
-  }
-
-  savingTrip.value = true
-
-  try {
-    const response = await fetch(`${API_URL}/trips`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({
-        vehicle_request_id: Number(newTrip.value.vehicle_request_id),
-        vehicle_id: Number(newTrip.value.vehicle_id),
-        driver_id: Number(newTrip.value.driver_id)
-      })
-    })
-
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.message || 'Failed to save trip.')
-
-    showAddTripModal.value = false
-    newTrip.value = emptyTrip()
-    await loadApprovedRequests()
-    await fetchTrips()
-  } catch (error) {
-    console.error(error)
-    addTripError.value = error.message
-  } finally {
-    savingTrip.value = false
-  }
-}
-
 /* ================= HELPERS ================= */
 
 function toDateString(date) {
@@ -1048,15 +839,21 @@ function requesterName(trip) {
 
 :root {
   --primary: #27af30;
-  --primary-dark: #1d8725;   /* pressed / header bar, same hue */
-  --primary-tint: #e9f7ea;   /* 10% primary, for chips and fills */
+  --primary-dark: #1d8725;
+  /* pressed / header bar, same hue */
+  --primary-tint: #e9f7ea;
+  /* 10% primary, for chips and fills */
   --secondary: #ffa500;
   --secondary-tint: #fff4e0;
 
-  --grey: #dbdbdb;           /* borders and dividers */
-  --grey-bg: #f6f6f6;        /* page background */
-  --text: #1a1a1a;           /* normal text */
-  --text-muted: #6b6b6b;     /* small / supporting text */
+  --grey: #dbdbdb;
+  /* borders and dividers */
+  --grey-bg: #f6f6f6;
+  /* page background */
+  --text: #1a1a1a;
+  /* normal text */
+  --text-muted: #6b6b6b;
+  /* small / supporting text */
 
   --text-page: 24px;
   --text-section: 20px;
@@ -1127,6 +924,7 @@ button {
   margin: 6px 0 0;
   font-size: var(--text-small);
   color: var(--text);
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
 }
 
 
@@ -1140,29 +938,8 @@ button {
 
 /* ================= BUTTONS ================= */
 
-.add-trip-button,
-.primary-button {
-  width: 100%;
-  height: var(--control);
-  border: none;
-  border-radius: var(--radius);
-  background: var(--primary);
-  color: #fff;
-  font-size: var(--text-normal);
-  font-weight: 700;
-}
-
-.add-trip-button {
-  margin: 16px 0 14px;
-}
-
 .primary-button {
   margin-top: 18px;
-}
-
-.add-trip-button:active,
-.primary-button:active:not(:disabled) {
-  background: var(--primary-dark);
 }
 
 .primary-button:disabled {
@@ -1755,7 +1532,8 @@ button {
   outline: none;
   background: #fff;
   color: var(--text);
-  font-size: var(--text-normal); /* 16px also stops iOS zoom on focus */
+  font-size: var(--text-normal);
+  /* 16px also stops iOS zoom on focus */
   font-weight: 400;
 }
 
@@ -1770,13 +1548,6 @@ button {
 .form-label textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(39, 175, 48, 0.18);
-}
-
-.modal-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 18px;
 }
 
 .secondary-button,

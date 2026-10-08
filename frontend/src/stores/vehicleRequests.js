@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api, { unwrap } from '@/lib/api'
+import { useNotificationStore } from '@/stores/notifications'
 
 export const useVehicleRequestStore = defineStore('vehicleRequests', {
   state: () => ({
@@ -9,6 +10,7 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
     loading: false,
     filters: {
       status: '',
+      trip_type: '',
       page: 1,
     },
   }),
@@ -30,10 +32,21 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
         const { data } = await api.get('/vehicle-requests', {
           params: {
             status: this.filters.status || undefined,
+            trip_type: this.filters.trip_type || undefined,
             page: this.filters.page,
           },
         })
-        this.items = data.data ?? []
+
+        let items = data.data ?? []
+
+        // Safety net: if the backend ignores trip_type, filter the current page here.
+        if (this.filters.trip_type) {
+          items = items.filter(
+            (item) => String(item.trip_type).toLowerCase() === this.filters.trip_type,
+          )
+        }
+
+        this.items = items
         this.meta = data.meta ?? null
         return this.items
       } finally {
@@ -62,16 +75,12 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
       return data.data
     },
 
+    // status is 'approved' or 'disapproved'. 'remarks' is required when disapproving.
     async updateStatus(id, payload) {
       const response = await api.patch(`/vehicle-requests/${id}/status`, payload)
+      // Update the sidebar numbers right after a decision.
+      useNotificationStore().refresh()
       return unwrap(response)
-    },
-
-    async cancel(id, cancellationRemarks) {
-      const { data } = await api.patch(`/vehicle-requests/${id}/cancel`, {
-        cancellation_remarks: cancellationRemarks,
-      })
-      return data.data
     },
   },
 })

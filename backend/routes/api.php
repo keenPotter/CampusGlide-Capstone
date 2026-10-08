@@ -97,7 +97,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:faculty')->group(function () {
         Route::post('/vehicle-requests', [VehicleRequestController::class, 'store']);
         Route::put('/vehicle-requests/{vehicleRequest}/edit', [VehicleRequestController::class, 'edit']);
-        Route::patch('/vehicle-requests/{vehicleRequest}/cancel', [VehicleRequestController::class, 'cancel']);
     });
 
     // Only administrators can update the status of requests
