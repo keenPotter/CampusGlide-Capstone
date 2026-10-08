@@ -18,7 +18,7 @@ return new class extends Migration
             $table->time('estimated_return_time')->nullable();
             $table->string('destination');
             $table->string('purpose');
-            $table->enum('trip_status', ['scheduled', 'in_progress', 'completed', 'cancelled'])->default('scheduled');
+            $table->enum('trip_status', ['scheduled', 'in_progress', 'completed'])->default('scheduled');
             $table->time('actual_departure_time')->nullable();
             $table->time('actual_return_time')->nullable();
             $table->integer('actual_mileage')->nullable();

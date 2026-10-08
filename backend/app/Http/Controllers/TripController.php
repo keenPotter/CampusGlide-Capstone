@@ -47,18 +47,8 @@ class TripController extends Controller
         $validated = $request->validate([
             'vehicle_id' => 'sometimes|integer|exists:vehicles,id',
             'driver_id' => 'sometimes|integer|exists:drivers,id',
-            'trip_status' => 'sometimes|in:scheduled,in_progress,completed,cancelled',
+            'trip_status' => 'sometimes|in:scheduled,in_progress,completed',
         ]);
-
-        if (isset($validated['trip_status']) && $validated['trip_status'] === 'cancelled') {
-            $trip->update(['trip_status' => 'cancelled']);
-
-            return response()->json($trip->fresh([
-                'driver',
-                'vehicle',
-                'vehicleRequest.requester',
-            ]));
-        }
 
         $vehicleId = $validated['vehicle_id'] ?? $trip->vehicle_id;
         $driverId = $validated['driver_id'] ?? $trip->driver_id;
@@ -81,6 +71,7 @@ class TripController extends Controller
         $trip->update([
             'vehicle_id' => $vehicleId,
             'driver_id' => $driverId,
+            'trip_status' => $validated['trip_status'] ?? $trip->trip_status,
         ]);
 
         return response()->json($trip->fresh([

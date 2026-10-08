@@ -24,7 +24,7 @@ class VehicleRequestFactory extends Factory
             'estimated_return_time' => fake()->time('H:i'),
             'passengers' => fake()->name(),
             'number_of_passengers' => fake()->numberBetween(1, 10),
-            'status' => fake()->randomElement(['pending', 'approved', 'rejected', 'cancelled']),
+            'status' => fake()->randomElement(['pending', 'approved', 'disapproved']),
         ];
     }
 }
