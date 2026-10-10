@@ -47,7 +47,9 @@ const schedule = useTripSchedule()
           :first-day-of-month="schedule.firstDayOfMonth.value"
           :days-in-month="schedule.daysInMonth.value"
           :is-scheduled="schedule.isScheduled"
+          :get-trip-count-for-date="schedule.getTripCountForDate"
           :is-today="schedule.isToday"
+          :is-selected-date="schedule.isSelectedDate"
           :has-trip-type-on-date="schedule.hasTripTypeOnDate"
           :has-new-trip-on-date="schedule.hasNewTripOnDate"
           @change-month="schedule.changeMonth"
@@ -106,10 +108,15 @@ const schedule = useTripSchedule()
 
     <TripDetailsModal
       :trip="schedule.activeTrip.value"
+      :trips="schedule.activeTrips.value"
+      :date-label="schedule.activeDateLabel.value"
       :rows="schedule.tripDetailRows.value"
       :is-new-trip="schedule.isNewTrip"
       :trip-type-class="schedule.tripTypeClass"
       :trip-type-label="schedule.tripTypeLabel"
+      :vehicle-name="schedule.vehicleName"
+      :driver-name="schedule.driverName"
+      @select-trip="schedule.selectModalTrip"
       @close="schedule.closeTripModal"
     />
   </div>

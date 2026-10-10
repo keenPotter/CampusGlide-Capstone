@@ -10,9 +10,12 @@ const VIEWED_KEY = 'campusglide_trip_schedule_viewed'
 const currentView = ref('month')
 const currentTripType = ref('inclusive')
 const currentDate = ref(new Date())
+const selectedDate = ref('')
 const weekStart = ref(getSunday(new Date()))
 const scheduledTrips = ref([])
 const activeTrip = ref(null)
+const activeTrips = ref([])
+const activeDateLabel = ref('')
 const loadError = ref('')
 
 const currentTripTypeLabel = computed(() =>
@@ -40,7 +43,31 @@ async function fetchTrips() {
   try {
     const response = await fetch(`${API_URL}/trips`, { headers: { Accept: 'application/json' } })
     if (!response.ok) throw new Error('Unable to load scheduled trips.')
-    scheduledTrips.value = await response.json()
+
+    const payload = await response.json()
+    const rows = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.trips)
+          ? payload.trips
+          : null
+
+    if (!rows) throw new Error('The trips API returned an unexpected response format.')
+
+    scheduledTrips.value = rows.map(trip => ({
+      ...trip,
+      // Laravel serializes vehicleRequest as vehicle_request by default.
+      vehicle_request: trip?.vehicle_request || trip?.vehicleRequest || null,
+    }))
+
+    const invalidTypeTrips = scheduledTrips.value.filter(trip => !tripType(trip))
+    if (invalidTypeTrips.length) {
+      console.warn(
+        'Trip Schedule: trips excluded because their vehicle request has no valid trip_type:',
+        invalidTypeTrips.map(trip => trip.id)
+      )
+    }
   } catch (error) {
     console.error(error)
     loadError.value = error.message || 'Unable to load scheduled trips.'
@@ -57,9 +84,10 @@ onMounted(async () => {
 })
 
 const filteredTrips = computed(() =>
-  scheduledTrips.value.filter(trip =>
-    isScheduledTrip(trip) && tripType(trip) === currentTripType.value
-  )
+  scheduledTrips.value.filter(trip => {
+    const type = tripType(trip)
+    return isScheduledTrip(trip) && type !== null && type === currentTripType.value
+  })
 )
 
 const scheduledTripList = computed(() =>
@@ -108,6 +136,10 @@ function isToday(day) {
   return dateForDay(day) === toDateString(new Date())
 }
 
+function isSelectedDate(day) {
+  return dateForDay(day) === selectedDate.value
+}
+
 function getTripsForDate(date) {
   return filteredTrips.value.filter(trip => dateIsWithinTrip(date, trip))
 }
@@ -127,15 +159,27 @@ function hasNewTripOnDate(day) {
 }
 
 function openDateTrips(day) {
-  const trips = getTripsForDate(dateForDay(day))
-  if (!trips.length) return
-  openTripModal(trips[0])
+  const date = dateForDay(day)
+  openTripsForDate(date)
 }
 
 function openDateString(date) {
+  openTripsForDate(date)
+}
+
+function openTripsForDate(date) {
   const trips = getTripsForDate(date)
   if (!trips.length) return
-  openTripModal(trips[0])
+  activeTrips.value = trips
+  activeTrip.value = trips[0]
+  activeDateLabel.value = formatDate(date)
+  selectedDate.value = date
+  // Opening a date means the user has seen every trip listed for that date.
+  trips.forEach(markTripViewed)
+}
+
+function getTripCountForDate(day) {
+  return getTripsForDate(dateForDay(day)).length
 }
 
 const monthTrips = computed(() =>
@@ -180,14 +224,22 @@ function changeWeek(offset) {
 
 function openTripModal(trip) {
   if (!trip) return
-  // Open the modal first so the notification belongs to this specific trip.
+  activeTrips.value = [trip]
   activeTrip.value = trip
-  // Mark only this trip as viewed; other trips keep their indicators.
+  activeDateLabel.value = formatDateRange(trip)
+  markTripViewed(trip)
+}
+
+function selectModalTrip(trip) {
+  if (!trip) return
+  activeTrip.value = trip
   markTripViewed(trip)
 }
 
 function closeTripModal() {
   activeTrip.value = null
+  activeTrips.value = []
+  activeDateLabel.value = ''
 }
 
 const tripDetailRows = computed(() => {
@@ -212,21 +264,36 @@ const tripDetailRows = computed(() => {
 /* ================= TRIP DATA HELPERS ================= */
 
 function isScheduledTrip(trip) {
-  return ['scheduled', 'in_progress'].includes(String(trip?.trip_status || '').toLowerCase())
+  const activeStatus = ['scheduled', 'in_progress'].includes(
+    String(trip?.trip_status || '').toLowerCase()
+  )
+  if (!activeStatus) return false
+
+  // Trip Schedule is for allocated trips attached to approved requests only.
+  const request = trip?.vehicle_request || trip?.vehicleRequest
+  return Boolean(request && String(request.status || '').toLowerCase() === 'approved')
 }
 
 function tripType(trip) {
-  return String(trip?.trip_type || trip?.vehicle_request?.trip_type || '').toLowerCase() === 'exclusive'
-    ? 'exclusive'
-    : 'inclusive'
+  const type = String(
+    trip?.trip_type ||
+    trip?.vehicle_request?.trip_type ||
+    trip?.vehicleRequest?.trip_type ||
+    ''
+  ).trim().toLowerCase()
+
+  // Never silently classify missing/invalid database values as Inclusive.
+  return ['inclusive', 'exclusive'].includes(type) ? type : null
 }
 
 function tripTypeLabel(trip) {
-  return tripType(trip) === 'exclusive' ? 'Exclusive' : 'Inclusive'
+  const type = tripType(trip)
+  return type === 'exclusive' ? 'Exclusive' : type === 'inclusive' ? 'Inclusive' : 'Unknown type'
 }
 
 function tripTypeClass(trip) {
-  return tripType(trip) === 'exclusive' ? 'exclusive' : 'inclusive'
+  const type = tripType(trip)
+  return type === 'exclusive' ? 'exclusive' : type === 'inclusive' ? 'inclusive' : ''
 }
 
 function getTripStartDate(trip) {
@@ -237,6 +304,7 @@ function getTripEndDate(trip) {
   return String(
     trip?.trip_end_date ||
     trip?.vehicle_request?.trip_end_date ||
+    trip?.vehicleRequest?.trip_end_date ||
     getTripStartDate(trip)
   ).slice(0, 10)
 }
@@ -341,6 +409,8 @@ return {
   currentDate,
   scheduledTrips,
   activeTrip,
+  activeTrips,
+  activeDateLabel,
   loadError,
   currentTripTypeLabel,
   filteredTrips,
@@ -359,13 +429,16 @@ return {
   changeMonth,
   changeWeek,
   isToday,
+  isSelectedDate,
   isScheduled,
+  getTripCountForDate,
   hasTripTypeOnDate,
   hasNewTripOnDate,
   openDateTrips,
   openDateString,
   getTripsForDate,
   openTripModal,
+  selectModalTrip,
   closeTripModal,
   isNewTrip,
   tripTypeClass,
