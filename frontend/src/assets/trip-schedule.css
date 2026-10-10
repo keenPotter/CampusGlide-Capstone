@@ -43,6 +43,7 @@ button:disabled { cursor: default; }
 .type-dot, .legend-dot { display: inline-block; border-radius: 50%; flex: 0 0 auto; }
 .type-dot { width: 9px; height: 9px; }
 .legend-dot { width: 8px; height: 8px; margin-right: 5px; }
+.unviewed-legend-dot { background: #d93025; }
 .inclusive-dot { background: var(--primary); }
 .exclusive-dot { background: var(--secondary); }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 2px 14px; color: var(--text-muted); font-size: var(--text-small); }
@@ -56,13 +57,13 @@ button:disabled { cursor: default; }
 .summary-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .summary-heading h2 { margin: 2px 0 0; font-size: var(--text-section); color: #000; }
 .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
-.summary-item { padding: 10px; border-radius: 8px; background: var(--grey-bg); text-align: center; }
-.summary-item strong { display: block; font-size: 20px; }
+.summary-item { min-width: 0; min-height: 100px; padding: 10px 8px; border-radius: 8px; background: var(--grey-bg); text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+.summary-icon { width: 20px; height: 20px; flex: 0 0 20px; color: var(--primary-dark); }
+.summary-item strong { display: block; font-size: 20px; line-height: 1.2; }
 .summary-item span { display: block; margin-top: 2px; color: var(--text-muted); font-size: 12px; }
 .new-summary-indicator, .new-indicator { display: inline-block; width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: #d93025; }
 .new-summary-indicator { width: 11px; height: 11px; flex-basis: 11px; }
 .new-summary-indicator.large { width: 10px; height: 10px; flex-basis: 10px; margin-right: 4px; }
-.new-summary-item { display: flex; align-items: center; gap: 7px; }
 .new-indicator.small { width: 7px; height: 7px; flex-basis: 7px; }
 
 .schedule-section { display: flex; flex-direction: column; gap: 16px; }
@@ -95,12 +96,26 @@ button:disabled { cursor: default; }
 .calendar-day:not(:disabled):hover { background: var(--grey-bg); }
 .calendar-day.empty { pointer-events: none; }
 .calendar-day:disabled { opacity: .55; }
-.calendar-day.today { box-shadow: inset 0 0 0 2px var(--secondary); font-weight: 700; }
+.calendar-day.selected { box-shadow: inset 0 0 0 2px #64748b; }
+.calendar-day.today { border-color: var(--primary-dark) !important; box-shadow: inset 0 0 0 1px var(--primary-dark); font-weight: 800; }
+.calendar-day.today.selected { box-shadow: inset 0 0 0 2px #64748b, inset 0 0 0 4px #fff; }
+.calendar-day.today:disabled { opacity: 1; }
 .calendar-day.inclusive.scheduled { background: #edf5ee; color: #28712e; border-color: #c7dcc9; }
 .calendar-day.exclusive.scheduled { background: #f8f1e7; color: #795d2f; border-color: #e4d2b5; }
 .day-number { font-size: var(--text-normal); }
-.event-dot { position: absolute; bottom: 6px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.calendar-trip-count { position: absolute; bottom: 4px; right: 4px; min-width: 18px; height: 18px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: rgba(255,255,255,.88); color: #334155; font-size: 10px; line-height: 1; font-weight: 800; }
 .new-dot { position: absolute; top: 5px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: #d93025; }
+.date-trip-list { display: flex; flex-direction: column; gap: 7px; margin: 16px 0; max-height: 220px; overflow-y: auto; }
+.date-trip-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px; border: 1px solid var(--grey); border-radius: 10px; background: #fff; color: var(--text); text-align: left; }
+.date-trip-item.selected { border-color: var(--primary); background: var(--primary-tint); }
+.date-trip-main { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
+.date-trip-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.date-trip-main small, .modal-subtitle { color: var(--text-muted); font-size: 11px; }
+.date-trip-chevron { color: var(--text-muted); font-size: 22px; }
+.modal-new-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: #d93025; }
+.selected-trip-details { border-top: 1px solid var(--grey); margin-top: 12px; padding-top: 12px; }
+.selected-trip-title { margin: 8px 0 0; font-size: 17px; color: #111827; }
+.trip-modal-card { width: min(100%, 650px); }
 
 .badge-row { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 5px; }
 .type-badge { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }

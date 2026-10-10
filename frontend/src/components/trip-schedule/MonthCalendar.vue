@@ -8,7 +8,9 @@ defineProps({
   firstDayOfMonth: { type: Number, required: true },
   daysInMonth: { type: Number, required: true },
   isScheduled: { type: Function, required: true },
+  getTripCountForDate: { type: Function, required: true },
   isToday: { type: Function, required: true },
+  isSelectedDate: { type: Function, required: true },
   hasTripTypeOnDate: { type: Function, required: true },
   hasNewTripOnDate: { type: Function, required: true },
 })
@@ -45,6 +47,7 @@ const emit = defineEmits(['change-month', 'open-day'])
         :class="{
           scheduled: isScheduled(day),
           today: isToday(day),
+          selected: isSelectedDate(day),
           inclusive: hasTripTypeOnDate(day, 'inclusive'),
           exclusive: hasTripTypeOnDate(day, 'exclusive'),
           new: hasNewTripOnDate(day)
@@ -53,7 +56,7 @@ const emit = defineEmits(['change-month', 'open-day'])
         @click="emit('open-day', day)"
       >
         <span class="day-number">{{ day }}</span>
-        <span v-if="isScheduled(day)" class="event-dot"></span>
+        <span v-if="isScheduled(day)" class="calendar-trip-count" :aria-label="`${getTripCountForDate(day)} scheduled trips`">{{ getTripCountForDate(day) }}</span>
         <span v-if="hasNewTripOnDate(day)" class="new-dot" title="New scheduled trip" aria-label="New scheduled trip"></span>
       </button>
     </div>
