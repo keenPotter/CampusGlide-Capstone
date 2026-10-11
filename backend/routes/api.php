@@ -107,4 +107,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('vehicleRequest');
         Route::post('/register', [AuthController::class, 'register']);
     });
+
+    // Faculty-only endpoint for viewing their own scheduled trips.
+    // Sanctum verifies the logged-in user, and the faculty role middleware
+    // restricts access to faculty accounts. Trip ownership is filtered in TripController.
+    Route::get('/my-trips', [TripController::class, 'myTrips'])
+        ->middleware('role:faculty');
 });

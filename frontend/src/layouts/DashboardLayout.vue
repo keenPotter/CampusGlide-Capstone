@@ -20,9 +20,13 @@ const navigation = computed(() => {
     items.push(
       { name: 'My Requests', to: { name: 'requests.index' }, icon: 'list' },
       { name: 'New Request', to: { name: 'requests.create' }, icon: 'plus' },
+      {
+        name: 'My Trip Schedule',
+        to: { name: 'facultyTripSchedule' },
+        icon: 'calendar',
+      },
     )
   }
-
   if (auth.isAdministrator) {
     items.push(
       {
