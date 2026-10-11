@@ -104,5 +104,5 @@ class FuelUsageRecordController extends Controller
 
         'drivers' => ['nullable', 'string', 'max:500'],
     ]);
-    }
+    }   
 }
