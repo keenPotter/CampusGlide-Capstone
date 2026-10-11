@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ApiError, auth, isAdmin, isLoggedIn, request, UnauthorizedError } from './api'
+import { ApiError, auth, isAdmin, isLoggedIn, logout, request, UnauthorizedError } from './api'
 import './styles/allocation.css'
 import AllocationCard from './components/AllocationCard.vue'
 import AllocationModal from './components/AllocationModal.vue'
@@ -17,7 +17,6 @@ import RescheduleRequestCard from './components/RescheduleRequestCard.vue'
 import SearchBar from './components/SearchBar.vue'
 import StatCard from './components/StatCard.vue'
 import StatusBadge from './components/StatusBadge.vue'
-import { groupByLocality } from './locality'
 import { formatDate, formatTime } from './format'
 
 const allocations = ref([])
@@ -52,6 +51,7 @@ const rescheduleTarget = ref(null)
 const pageConflict = ref(null) 
 const toast = ref('')
 const vehicleRequests = ref([])
+const disapprovedVehicleRequests = ref([])
 const disapprovedVehicleRequestCount = ref(0)
 const vehicleRequestsError = ref('')
 const vehicleRequestsLoading = ref(false)
@@ -62,7 +62,7 @@ const vehicleDisapprovalReason = ref('')
 const disapprovingVehicleRequest = ref(null)
 const vehicleNotificationsOpen = ref(false)
 const vehicleRequestTypeFilter = ref('')
-const selectedFacultyLocality = ref('local')
+const facultyAllocationTripTypeFilter = ref('')
 const vehicleRequestsLoaded = ref(false)
 const dashboardLoading = ref(false)
 const waitingError = ref('')
@@ -82,32 +82,97 @@ const vehicleRequestForm = ref({
   passengers: '',
   number_of_passengers: 1,
 })
+const vehicleRequestFormTripType = computed(() =>
+  getDestinationTripType(vehicleRequestForm.value.destination),
+)
 
 const pendingRequests = computed(() => changeRequests.value.filter((r) => r.status === 'pending'))
 const pendingVehicleRequestCount = computed(() =>
   vehicleRequests.value.filter((item) => item.status === 'pending').length,
 )
+const NUEVA_VIZCAYA_MUNICIPALITIES = [
+  'Alfonso Castañeda', 'Ambaguio', 'Aritao', 'Bagabag', 'Bambang', 'Bayombong',
+  'Diadi', 'Dupax del Norte', 'Dupax del Sur', 'Kasibu', 'Kayapa', 'Quezon',
+  'Santa Fe', 'Solano', 'Villaverde',
+]
+function normalizeDestination(destination) {
+  return String(destination ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+function getDestinationTripType(destination, fallback = '') {
+  const normalized = normalizeDestination(destination)
+  if (!normalized) return fallback
+  if (/(^|[^a-z])nueva\s+vizcaya($|[^a-z])/.test(normalized)) return 'inclusive'
+  if (/(^|[^a-z])quezon\s+city($|[^a-z])/.test(normalized)) return 'exclusive'
+  const isNuevaVizcayaMunicipality = NUEVA_VIZCAYA_MUNICIPALITIES.some((municipality) => {
+    const name = normalizeDestination(municipality).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`(^|[^a-z])${name}($|[^a-z])`).test(normalized)
+  })
+  return isNuevaVizcayaMunicipality ? 'inclusive' : 'exclusive'
+}
+function normalizeVehicleRequestStatus(status) {
+  const normalized = String(status ?? '').trim().toLowerCase()
+  return ['cancelled', 'rejected'].includes(normalized) ? 'disapproved' : normalized
+}
+function isVehicleRequestDisapproved(item) {
+  return normalizeVehicleRequestStatus(item.status) === 'disapproved'
+}
+function getVehicleRequestDisapprovalReason(item) {
+  const reason = [
+    item.disapproval_reason,
+    item.rejection_reason,
+    item.disapproval_remarks,
+    item.disapproved_reason,
+    item.cancellation_remarks,
+    item.cancellation_reason,
+    item.remarks,
+    item.reason,
+  ].find((value) => typeof value === 'string' && value.trim())?.trim()
+  if (reason) return reason
+  return isVehicleRequestDisapproved(item) ? 'Due to walang available driver.' : ''
+}
+function getDisapprovedRequestForAllocation(allocation) {
+  const requestId = allocation.vehicle_request?.id
+  if (requestId === null || requestId === undefined) return null
+  return disapprovedVehicleRequests.value.find((item) => String(item.id) === String(requestId)) ?? null
+}
+function isAllocationDisapproved(allocation) {
+  return ['cancelled', 'disapproved', 'rejected'].includes(String(allocation.status ?? '').trim().toLowerCase())
+}
+function normalizeVehicleRequest(item) {
+  return {
+    ...item,
+    status: normalizeVehicleRequestStatus(item.status),
+    disapproval_reason: getVehicleRequestDisapprovalReason(item),
+  }
+}
 const filteredVehicleRequests = computed(() => vehicleRequests.value.filter((item) =>
-  !vehicleRequestTypeFilter.value || item.trip_type === vehicleRequestTypeFilter.value,
+  !vehicleRequestTypeFilter.value
+  || getDestinationTripType(item.destination, item.trip_type) === vehicleRequestTypeFilter.value,
 ))
-const facultyVehicleRequestLocalityGroups = computed(() =>
-  groupByLocality(filteredVehicleRequests.value, (item) => item.destination),
-)
-const facultyAllocationLocalityGroups = computed(() =>
-  groupByLocality(filtered.value, (allocation) => allocation.trip?.destination),
-)
 const vehicleRequestTypeCounts = computed(() => ({
   all: vehicleRequests.value.length,
-  inclusive: vehicleRequests.value.filter((item) => item.trip_type === 'inclusive').length,
-  exclusive: vehicleRequests.value.filter((item) => item.trip_type === 'exclusive').length,
+  inclusive: vehicleRequests.value.filter((item) => getDestinationTripType(item.destination, item.trip_type) === 'inclusive').length,
+  exclusive: vehicleRequests.value.filter((item) => getDestinationTripType(item.destination, item.trip_type) === 'exclusive').length,
+}))
+const filteredFacultyAllocations = computed(() => filtered.value.filter((allocation) =>
+  !facultyAllocationTripTypeFilter.value
+  || getAllocationTripType(allocation) === facultyAllocationTripTypeFilter.value,
+))
+const facultyAllocationTypeCounts = computed(() => ({
+  all: filtered.value.length,
+  inclusive: filtered.value.filter((allocation) => getAllocationTripType(allocation) === 'inclusive').length,
+  exclusive: filtered.value.filter((allocation) => getAllocationTripType(allocation) === 'exclusive').length,
 }))
 const vehicleRequestNotice = computed(() => {
   if (isAdmin.value) return ''
   if (vehicleRequests.value.some((item) => item.status === 'pending')) {
     return 'Your vehicle request is waiting for Admin approval.'
   }
-  if (vehicleRequests.value.some((item) => item.status === 'disapproved')) {
-    return 'One or more vehicle requests were disapproved. Open their details to see the reasons.'
+  if (vehicleRequests.value.some(isVehicleRequestDisapproved)) {
+    return 'One or more vehicle requests were disapproved. See the reason shown on each request.'
   }
 
   const approvedAwaitingAllocation = vehicleRequests.value.some((item) =>
@@ -140,13 +205,7 @@ const filtered = computed(() => {
   )
 })
 
-const groupedWaiting = computed(() =>
-  groupByLocality(waiting.value, (item) => item.destination),
-)
-const groupedVehicleRequests = computed(() =>
-  groupByLocality(vehicleRequests.value, (item) => item.destination),
-)
-const selectedSummaryLocality = ref('local')
+const selectedSummaryTripType = ref('')
 
 // ---------- Admin dashboard (Vehicle-Driver Allocation overview) ----------
 const ACTIVE = ['scheduled', 'in_progress']
@@ -220,6 +279,9 @@ const summaryRows = computed(() => {
     ...waiting.value
       .filter((r) => !q || [r.destination, r.requester].join(' ').toLowerCase().includes(q))
       .map((r) => ({ key: `r${r.id}`, kind: 'waiting', request: r, date: r.trip_date, time: r.departure_time })),
+    ...disapprovedVehicleRequests.value
+      .filter((r) => !q || [r.destination, r.requester, getVehicleRequestDisapprovalReason(r)].join(' ').toLowerCase().includes(q))
+      .map((r) => ({ key: `d${r.id}`, kind: 'disapproved', request: r, date: r.trip_date, time: r.departure_time })),
     ...inboxShares.value.map((share) => ({
       key: `s${share.id}`,
       kind: 'received',
@@ -230,12 +292,24 @@ const summaryRows = computed(() => {
   ]
   return rows.sort((x, y) => `${x.date ?? ''} ${x.time ?? ''}`.localeCompare(`${y.date ?? ''} ${y.time ?? ''}`))
 })
-const summaryLocalityGroups = computed(() => groupByLocality(summaryRows.value, (row) => {
-  if (row.kind === 'allocation') return row.allocation.trip?.destination
-  if (row.kind === 'waiting') return row.request.destination
-  return row.share.allocation.trip?.destination
+function getAllocationTripType(allocation) {
+  return getDestinationTripType(allocation.trip?.destination, allocation.vehicle_request?.trip_type)
+}
+function getSummaryRowTripType(row) {
+  if (row.kind === 'allocation') return getAllocationTripType(row.allocation)
+  if (row.kind === 'waiting' || row.kind === 'disapproved') {
+    return getDestinationTripType(row.request.destination, row.request.trip_type)
+  }
+  return getAllocationTripType(row.share.allocation)
+}
+const summaryTripTypeCounts = computed(() => ({
+  all: summaryRows.value.length,
+  inclusive: summaryRows.value.filter((row) => getSummaryRowTripType(row) === 'inclusive').length,
+  exclusive: summaryRows.value.filter((row) => getSummaryRowTripType(row) === 'exclusive').length,
 }))
-const selectedSummaryRows = computed(() => summaryLocalityGroups.value[selectedSummaryLocality.value])
+const selectedSummaryRows = computed(() => summaryRows.value.filter((row) =>
+  !selectedSummaryTripType.value || getSummaryRowTripType(row) === selectedSummaryTripType.value,
+))
 function whenText(date, time) {
   return `${date ? formatDate(date) : '—'}${time ? ' · ' + formatTime(time) : ''}`
 }
@@ -299,7 +373,7 @@ async function loadVehicleRequests() {
       request(isAdmin.value ? '/vehicle-requests?status=pending' : '/vehicle-requests'),
       isAdmin.value ? request('/vehicle-requests?status=disapproved') : Promise.resolve(null),
     ])
-    const nextRequests = data.data || []
+    const nextRequests = (data.data || []).map(normalizeVehicleRequest)
     if (isAdmin.value && vehicleRequestsLoaded.value) {
       const knownIds = new Set(vehicleRequests.value.map((item) => item.id))
       const newRequests = nextRequests.filter((item) => !knownIds.has(item.id))
@@ -309,7 +383,13 @@ async function loadVehicleRequests() {
       }
     }
     vehicleRequests.value = nextRequests
-    if (disapprovedData) disapprovedVehicleRequestCount.value = (disapprovedData.data || []).length
+    if (disapprovedData) {
+      disapprovedVehicleRequests.value = (disapprovedData.data || []).map(normalizeVehicleRequest)
+      disapprovedVehicleRequestCount.value = disapprovedVehicleRequests.value.length
+    } else {
+      disapprovedVehicleRequests.value = []
+      disapprovedVehicleRequestCount.value = 0
+    }
     vehicleRequestsLoaded.value = true
   } catch (e) {
     if (!(e instanceof UnauthorizedError)) {
@@ -325,7 +405,13 @@ async function submitVehicleRequest() {
   vehicleRequestsError.value = ''
   vehicleRequestSaving.value = true
   try {
-    await request('/vehicle-requests', { method: 'POST', body: vehicleRequestForm.value })
+    await request('/vehicle-requests', {
+      method: 'POST',
+      body: {
+        ...vehicleRequestForm.value,
+        trip_type: getDestinationTripType(vehicleRequestForm.value.destination, vehicleRequestForm.value.trip_type),
+      },
+    })
     vehicleRequestForm.value = {
       trip_date: '',
       trip_end_date: '',
@@ -504,6 +590,7 @@ watch(
     allocations.value = []
     waiting.value = []
     vehicleRequests.value = []
+    disapprovedVehicleRequests.value = []
     vehicleRequestsLoaded.value = false
     stopAdminRefresh()
     changeRequests.value = []
@@ -628,7 +715,17 @@ onUnmounted(stopAdminRefresh)
     </main>
 
     <template v-else>
-      <div class="cg-header-menu">
+      <div class="cg-shell">
+        <button
+          v-if="panelOpen"
+          type="button"
+          class="cg-sidebar-backdrop"
+          aria-label="Close account sidebar"
+          @click="panelOpen = false"
+        ></button>
+        <AuthPanel :open="panelOpen" menu @login="onLoggedIn" />
+        <div class="cg-main-content">
+          <div class="cg-header-menu">
         <AppHeader
           title="Vehicle-Driver Allocation"
           :badge="isAdmin ? pendingVehicleRequestCount : vehicleRequests.length"
@@ -636,8 +733,8 @@ onUnmounted(stopAdminRefresh)
           :menu-open="panelOpen"
           @toggle-panel="panelOpen = !panelOpen"
           @bell="showWaiting"
+          @logout="logout()"
         />
-        <AuthPanel :open="panelOpen" menu @login="onLoggedIn" />
         <aside v-if="isAdmin && vehicleNotificationsOpen" class="cg-notifications-panel" aria-label="Pending vehicle request notifications">
           <div class="cg-notifications-panel__head">
             <h2 class="cg-section-title">Vehicle requests ({{ pendingVehicleRequestCount }} pending)</h2>
@@ -674,7 +771,7 @@ onUnmounted(stopAdminRefresh)
                 </div>
                 <StatusBadge :status="item.status" />
               </div>
-              <p class="cg-muted">{{ item.trip_type }} trip</p>
+              <p class="cg-muted">{{ getDestinationTripType(item.destination, item.trip_type) }} trip</p>
               <p class="cg-muted">{{ item.purpose }}</p>
               <p class="cg-meta"><Icon name="users" /> {{ item.number_of_passengers }} passengers · {{ item.passengers }}</p>
               <div class="cg-notification-item__actions">
@@ -693,7 +790,7 @@ onUnmounted(stopAdminRefresh)
       <main class="cg-container cg-main">
 
         <!-- ============ ADMIN DASHBOARD (Vehicle-Driver Allocation overview) ============ -->
-        <section v-if="isAdmin" class="cg-dash">
+        <section v-if="isAdmin" id="dashboard" class="cg-dash">
           <div class="cg-dash__head">
             <div>
               <p class="cg-dash__sub">Assign vehicles and drivers to approved trip requests. The system will flag scheduling conflicts automatically.</p>
@@ -749,6 +846,13 @@ onUnmounted(stopAdminRefresh)
             <span><i class="cg-state cg-state--red"></i> Conflict</span>
           </p>
 
+          <div class="cg-stats">
+            <StatCard label="Scheduled" tone="neutral" :value="counts.scheduled" />
+            <StatCard label="Ongoing" tone="orange" :value="counts.in_progress" />
+            <StatCard label="Done" tone="green" :value="counts.completed" />
+            <StatCard label="Disapproved" tone="red" :value="disapprovedVehicleRequestCount" />
+          </div>
+
           <div class="cg-card cg-summary">
             <h3 class="cg-summary__title">Allocation Summary</h3>
             <div class="cg-summary__counts" aria-label="Allocation summary totals">
@@ -756,20 +860,21 @@ onUnmounted(stopAdminRefresh)
               <p><strong>{{ waiting.length }}</strong> Needs allocation</p>
               <p><strong>{{ allocations.length }}</strong> Allocations</p>
             </div>
-            <div class="cg-summary__tabs" role="tablist" aria-label="Filter allocation summary by locality">
+            <div class="cg-request-type-filters" role="tablist" aria-label="Filter allocation summary by trip type">
               <button
-                v-for="group in [
-                  { key: 'local', label: 'Local', items: summaryLocalityGroups.local },
-                  { key: 'nonLocal', label: 'Non-local', items: summaryLocalityGroups.nonLocal },
+                v-for="filter in [
+                  { key: '', label: 'All', count: summaryTripTypeCounts.all },
+                  { key: 'inclusive', label: 'Inclusive', count: summaryTripTypeCounts.inclusive },
+                  { key: 'exclusive', label: 'Exclusive', count: summaryTripTypeCounts.exclusive },
                 ]"
-                :key="group.key"
+                :key="filter.key || 'all'"
                 type="button"
                 role="tab"
-                :aria-selected="selectedSummaryLocality === group.key"
-                :class="['cg-summary__tab', { 'cg-summary__tab--active': selectedSummaryLocality === group.key }]"
-                @click="selectedSummaryLocality = group.key"
+                :aria-selected="selectedSummaryTripType === filter.key"
+                :class="['cg-request-type-filter', { 'cg-request-type-filter--active': selectedSummaryTripType === filter.key }]"
+                @click="selectedSummaryTripType = filter.key"
               >
-                {{ group.label }} <span>{{ group.items.length }}</span>
+                {{ filter.label }} <span>{{ filter.count }}</span>
               </button>
             </div>
             <div class="cg-table-wrap">
@@ -782,7 +887,7 @@ onUnmounted(stopAdminRefresh)
                   <tr v-else-if="waitingError"><td colspan="7" class="cg-error-text">{{ waitingError }}</td></tr>
                   <tr v-else-if="inboxError"><td colspan="7" class="cg-error-text">{{ inboxError }}</td></tr>
                   <tr v-else-if="dashboardLoading"><td colspan="7" class="cg-empty">Loading allocation summary...</td></tr>
-                  <tr v-else-if="!selectedSummaryRows.length"><td colspan="7" class="cg-empty">No {{ selectedSummaryLocality === 'local' ? 'local' : 'non-local' }} requests found.</td></tr>
+                  <tr v-else-if="!selectedSummaryRows.length"><td colspan="7" class="cg-empty">No {{ selectedSummaryTripType || 'trip' }} requests found.</td></tr>
                   <template v-for="row in selectedSummaryRows" :key="row.key">
                     <tr v-if="row.kind === 'allocation'">
                       <td>
@@ -797,16 +902,19 @@ onUnmounted(stopAdminRefresh)
                         <p v-if="pendingByAllocation[row.allocation.id]" class="cg-table__sub cg-table__sub--warn">Date change requested: {{ pendingByAllocation[row.allocation.id].new_date }}</p>
                       </td>
                       <td>
-                        <span v-if="conflictMap[row.allocation.id]" class="cg-flag cg-flag--conflict">⚠ Conflict</span>
-                        <span v-else class="cg-flag cg-flag--ok">✓ None</span>
+                        <span v-if="isAllocationDisapproved(row.allocation)" class="cg-flag cg-flag--conflict cg-summary-disapproval-reason">
+                          Due to conflict schedule
+                        </span>
+                        <template v-else>
+                          <span v-if="conflictMap[row.allocation.id]" class="cg-flag cg-flag--conflict">⚠ Conflict</span>
+                          <span v-else class="cg-flag cg-flag--ok">✓ None</span>
+                        </template>
                       </td>
                       <td>
                         <div class="cg-table__actions">
-                          <button v-if="conflictMap[row.allocation.id]" type="button" class="cg-pill-btn cg-pill-btn--danger" @click="resolveConflict(row.allocation)">Resolve</button>
-                          <button v-if="ACTIVE.includes(row.allocation.status)" type="button" class="cg-pill-btn" @click="openEdit(row.allocation)">Reassign</button>
-                          <button v-if="row.allocation.status === 'scheduled'" type="button" class="cg-pill-btn" @click="rescheduleTarget = row.allocation">Change date</button>
-                          <button v-if="row.allocation.status !== 'cancelled'" type="button" class="cg-pill-btn" @click="openPrint(row.allocation)">Print</button>
-                          <button v-if="row.allocation.status !== 'cancelled'" type="button" class="cg-pill-btn" @click="openPrint(row.allocation, '', true)">Send to admin</button>
+                          <AppButton v-if="ACTIVE.includes(row.allocation.status)" variant="secondary" @click="openEdit(row.allocation)">Reassign</AppButton>
+                          <AppButton v-if="row.allocation.status !== 'cancelled'" variant="secondary" @click="openPrint(row.allocation)">View</AppButton>
+                          <AppButton v-if="row.allocation.status === 'scheduled'" variant="secondary" @click="rescheduleTarget = row.allocation">Change Date</AppButton>
                         </div>
                       </td>
                     </tr>
@@ -820,9 +928,21 @@ onUnmounted(stopAdminRefresh)
                       <td class="cg-table__none">Not yet assigned</td>
                       <td>{{ whenText(row.request.trip_date, row.request.departure_time) }}</td>
                       <td>—</td>
-                      <td><div class="cg-table__actions"><button type="button" class="cg-pill-btn cg-pill-btn--primary" @click="openNew(row.request.id)">Assign</button></div></td>
+                      <td><div class="cg-table__actions"><AppButton @click="openNew(row.request.id)">Assign</AppButton></div></td>
                     </tr>
-                    <tr v-else>
+                    <tr v-else-if="row.kind === 'disapproved'">
+                      <td>
+                        <p class="cg-table__main">REQ-{{ String(row.request.id).padStart(3, '0') }} · {{ row.request.destination ?? '—' }}</p>
+                        <p class="cg-table__sub">{{ row.request.requester ?? '—' }} · <StatusBadge status="disapproved" /></p>
+                      </td>
+                      <td>Disapproved</td>
+                      <td class="cg-table__none">Not assigned</td>
+                      <td class="cg-table__none">Not assigned</td>
+                      <td>{{ whenText(row.request.trip_date, row.request.departure_time) }}</td>
+                      <td><span class="cg-flag cg-flag--conflict cg-summary-disapproval-reason">Reason: {{ getVehicleRequestDisapprovalReason(row.request) || 'No reason provided' }}</span></td>
+                      <td>—</td>
+                    </tr>
+                    <tr v-else-if="row.kind === 'received'">
                       <td>
                         <p class="cg-table__main">{{ row.share.allocation.trip?.destination ?? 'Trip request' }}</p>
                         <p class="cg-table__sub">Sent by {{ row.share.sender.name }}</p>
@@ -837,7 +957,7 @@ onUnmounted(stopAdminRefresh)
                       </td>
                       <td>
                         <div class="cg-table__actions">
-                          <button type="button" class="cg-pill-btn" @click="openPrint({ id: row.share.allocation.id })">View / Print</button>
+                          <AppButton variant="secondary" @click="openPrint({ id: row.share.allocation.id })">View</AppButton>
                         </div>
                       </td>
                     </tr>
@@ -881,11 +1001,10 @@ onUnmounted(stopAdminRefresh)
                 <input id="vehicle-request-end-date" v-model="vehicleRequestForm.trip_end_date" type="date" class="cg-input" :min="vehicleRequestForm.trip_date || minimumTripDate" required />
               </div>
               <div class="cg-field">
-                <label class="cg-label" for="vehicle-request-type">Trip type</label>
-                <select id="vehicle-request-type" v-model="vehicleRequestForm.trip_type" class="cg-input" required>
-                  <option value="inclusive">Inclusive (vehicle stays with the group)</option>
-                  <option value="exclusive">Exclusive (vehicle returns between trips)</option>
-                </select>
+                <p class="cg-label">Trip type (based on destination)</p>
+                <p class="cg-input cg-request-trip-type">
+                  {{ vehicleRequestFormTripType ? `${vehicleRequestFormTripType} — ${vehicleRequestForm.destination}` : 'Enter a destination to determine trip type.' }}
+                </p>
               </div>
               <div class="cg-field">
                 <label class="cg-label" for="vehicle-request-departure">Departure time</label>
@@ -935,28 +1054,12 @@ onUnmounted(stopAdminRefresh)
                 {{ filter.label }} <span>{{ filter.count }}</span>
               </button>
             </div>
-            <div v-if="!vehicleRequestsError && !vehicleRequestsLoading" class="cg-summary__tabs cg-faculty-locality-tabs" role="tablist" aria-label="Filter my vehicle requests by locality">
-              <button
-                v-for="group in [
-                  { key: 'local', label: 'Local', items: facultyVehicleRequestLocalityGroups.local },
-                  { key: 'nonLocal', label: 'Non-local', items: facultyVehicleRequestLocalityGroups.nonLocal },
-                ]"
-                :key="group.key"
-                type="button"
-                role="tab"
-                :aria-selected="selectedFacultyLocality === group.key"
-                :class="['cg-summary__tab', { 'cg-summary__tab--active': selectedFacultyLocality === group.key }]"
-                @click="selectedFacultyLocality = group.key"
-              >
-                {{ group.label }} <span>{{ group.items.length }}</span>
-              </button>
-            </div>
-            <div v-if="!vehicleRequestsError && !vehicleRequestsLoading && facultyVehicleRequestLocalityGroups[selectedFacultyLocality].length" class="cg-grid">
-              <article v-for="item in facultyVehicleRequestLocalityGroups[selectedFacultyLocality]" :key="item.id" class="cg-card cg-request-compact">
+            <div v-if="!vehicleRequestsError && !vehicleRequestsLoading && filteredVehicleRequests.length" class="cg-grid">
+              <article v-for="item in filteredVehicleRequests" :key="item.id" class="cg-card cg-request-compact">
                 <div class="cg-request-compact__summary">
                   <div class="cg-request-compact__main">
                     <p class="cg-card__title">{{ item.destination }}</p>
-                    <p class="cg-muted">{{ item.trip_date }}{{ item.trip_end_date && item.trip_end_date !== item.trip_date ? ` – ${item.trip_end_date}` : '' }} · {{ item.trip_type }} · <StatusBadge :status="item.status" /></p>
+                    <p class="cg-muted">{{ item.trip_date }}{{ item.trip_end_date && item.trip_end_date !== item.trip_date ? ` – ${item.trip_end_date}` : '' }} · {{ getDestinationTripType(item.destination, item.trip_type) }} · <StatusBadge :status="normalizeVehicleRequestStatus(item.status)" /></p>
                   </div>
                   <div class="cg-request-compact__controls">
                     <button
@@ -971,31 +1074,22 @@ onUnmounted(stopAdminRefresh)
                     </button>
                   </div>
                 </div>
+                <p v-if="isVehicleRequestDisapproved(item)" class="cg-alert cg-request-disapproval-reason">
+                  <strong>Disapproved</strong>
+                  <span>Reason: {{ getVehicleRequestDisapprovalReason(item) || 'No reason was provided.' }}</span>
+                </p>
                 <div v-if="expandedVehicleRequestIds.has(item.id)" :id="`vehicle-request-details-${item.id}`" class="cg-request-compact__details">
                   <p class="cg-muted">{{ item.purpose }}</p>
                   <p class="cg-meta"><Icon name="clock" /> {{ item.departure_time }} → {{ item.estimated_return_time }}</p>
                   <p class="cg-meta"><Icon name="users" /> {{ item.number_of_passengers }} passengers · {{ item.passengers }}</p>
-                  <p v-if="item.status === 'disapproved' && item.disapproval_reason" class="cg-alert">
-                    Disapproval reason: {{ item.disapproval_reason }}
-                  </p>
                 </div>
               </article>
             </div>
             <p v-if="!vehicleRequestsError && !vehicleRequestsLoading && !filteredVehicleRequests.length" class="cg-empty">
               {{ vehicleRequestTypeFilter ? `No ${vehicleRequestTypeFilter} vehicle requests found.` : 'You have not submitted a vehicle request yet.' }}
             </p>
-            <p v-else-if="!vehicleRequestsError && !vehicleRequestsLoading && !facultyVehicleRequestLocalityGroups[selectedFacultyLocality].length" class="cg-empty">
-              No {{ selectedFacultyLocality === 'local' ? 'local' : 'non-local' }} vehicle requests found.
-            </p>
           </div>
         </section>
-
-        <div v-if="isAdmin" class="cg-stats">
-          <StatCard label="Scheduled" tone="neutral" :value="counts.scheduled" />
-          <StatCard label="Ongoing" tone="orange" :value="counts.in_progress" />
-          <StatCard label="Done" tone="green" :value="counts.completed" />
-          <StatCard label="Disapproved" tone="red" :value="disapprovedVehicleRequestCount" />
-        </div>
 
         <section v-if="isAdmin && (pendingRequests.length || dashboardLoading || changeRequestsError)" id="date-changes" class="cg-section">
           <div class="cg-section-head">
@@ -1022,40 +1116,40 @@ onUnmounted(stopAdminRefresh)
           <div class="cg-faculty-panel-content">
             <p v-if="listError" class="cg-error-text">{{ listError }}</p>
             <p v-else-if="dashboardLoading" class="cg-muted">Loading allocations...</p>
-            <div v-if="!listError && !dashboardLoading" class="cg-summary__tabs cg-faculty-locality-tabs" role="tablist" aria-label="Filter my allocations by locality">
+            <div v-if="!listError && !dashboardLoading" class="cg-request-type-filters" role="tablist" aria-label="Filter my allocations by trip type">
               <button
-                v-for="group in [
-                  { key: 'local', label: 'Local', items: facultyAllocationLocalityGroups.local },
-                  { key: 'nonLocal', label: 'Non-local', items: facultyAllocationLocalityGroups.nonLocal },
+                v-for="filter in [
+                  { key: '', label: 'All', count: facultyAllocationTypeCounts.all },
+                  { key: 'inclusive', label: 'Inclusive', count: facultyAllocationTypeCounts.inclusive },
+                  { key: 'exclusive', label: 'Exclusive', count: facultyAllocationTypeCounts.exclusive },
                 ]"
-                :key="group.key"
+                :key="filter.key || 'all'"
                 type="button"
                 role="tab"
-                :aria-selected="selectedFacultyLocality === group.key"
-                :class="['cg-summary__tab', { 'cg-summary__tab--active': selectedFacultyLocality === group.key }]"
-                @click="selectedFacultyLocality = group.key"
+                :aria-selected="facultyAllocationTripTypeFilter === filter.key"
+                :class="['cg-request-type-filter', { 'cg-request-type-filter--active': facultyAllocationTripTypeFilter === filter.key }]"
+                @click="facultyAllocationTripTypeFilter = filter.key"
               >
-                {{ group.label }} <span>{{ group.items.length }}</span>
+                {{ filter.label }} <span>{{ filter.count }}</span>
               </button>
             </div>
-            <template v-if="!listError && !dashboardLoading && facultyAllocationLocalityGroups[selectedFacultyLocality].length">
+            <template v-if="!listError && !dashboardLoading && filteredFacultyAllocations.length">
               <div class="cg-grid">
                 <AllocationCard
-                  v-for="a in facultyAllocationLocalityGroups[selectedFacultyLocality]"
+                  v-for="a in filteredFacultyAllocations"
                   :key="a.id"
                   :allocation="a"
                   :is-admin="isAdmin"
                   :pending-change="pendingByAllocation[a.id] ?? null"
                   @reschedule="rescheduleTarget = $event"
                   @reassign="openEdit"
-                  @print="openPrint"
-                  @share="(allocation) => openPrint(allocation, '', true)"
+                  @view="openPrint"
                 />
               </div>
             </template>
             <p v-if="!listError && !dashboardLoading && !filtered.length" class="cg-empty">No allocations found.</p>
-            <p v-else-if="!listError && !dashboardLoading && !facultyAllocationLocalityGroups[selectedFacultyLocality].length" class="cg-empty">
-              No {{ selectedFacultyLocality === 'local' ? 'local' : 'non-local' }} allocations found.
+            <p v-else-if="!listError && !dashboardLoading && !filteredFacultyAllocations.length" class="cg-empty">
+              No {{ facultyAllocationTripTypeFilter }} allocations found.
             </p>
           </div>
         </section>
@@ -1108,6 +1202,8 @@ onUnmounted(stopAdminRefresh)
       </div>
       <ConflictModal :conflict="pageConflict" hint="Please choose another date." @close="pageConflict = null" />
       <p v-if="toast" class="cg-toast" role="status">{{ toast }}</p>
+        </div>
+      </div>
     </template>
   </div>
 </template>

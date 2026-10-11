@@ -34,6 +34,29 @@ watch(
 const a = computed(() => props.data?.allocation ?? {})
 const r = computed(() => props.data?.request ?? {})
 const dash = (v) => (v === null || v === undefined || v === '' ? '—' : v)
+const official = computed(() => r.value.official ?? a.value.vehicle_request?.requester ?? '')
+const travelStart = computed(() => r.value.trip_date ?? a.value.trip?.trip_date)
+const travelEnd = computed(() => r.value.trip_end_date ?? travelStart.value)
+const travelDate = computed(() => {
+  if (!travelStart.value) return ''
+  const start = formatDate(travelStart.value)
+  const end = travelEnd.value && travelEnd.value !== travelStart.value
+    ? ` to ${formatDate(travelEnd.value)}`
+    : ''
+  return `${start}${end}`
+})
+const travelDays = computed(() => {
+  if (r.value.travel_days) return r.value.travel_days
+  if (!travelStart.value || !travelEnd.value) return ''
+  const start = Date.parse(`${travelStart.value}T00:00:00Z`)
+  const end = Date.parse(`${travelEnd.value}T00:00:00Z`)
+  return Number.isNaN(start) || Number.isNaN(end) ? '' : Math.floor((end - start) / 86400000) + 1
+})
+const requestedTime = computed(() => r.value.requested_time
+  ? formatTime(r.value.requested_time)
+  : '')
+const tripType = computed(() => String(r.value.trip_type ?? '').trim().toLowerCase())
+const copies = [1, 2]
 
 const vehicle = computed(() => {
   const v = a.value.vehicle
@@ -41,7 +64,6 @@ const vehicle = computed(() => {
   return `${v.vehicle_model ?? ''} (${v.plate_number ?? '—'})`.trim()
 })
 const status = computed(() => String(r.value.status || 'approved').toUpperCase())
-const printedOn = formatDate(new Date().toISOString())
 
 function printNow() {
   window.print() 
@@ -87,103 +109,105 @@ function printNow() {
       <p v-else-if="error" class="cg-form-error">{{ error }}</p>
 
       <article v-if="data" class="cg-sheet">
-        <header class="cg-sheet__head">
-          <div>
-            <p class="cg-sheet__org">Nueva Vizcaya State University · Motor Pool</p>
-            <h3 class="cg-sheet__title">TRIP REQUEST</h3>
-            <p class="cg-sheet__org">Request No. {{ dash(r.id) }}</p>
-          </div>
-          <span class="cg-stamp">{{ status }}</span>
-        </header>
+        <section v-for="copy in copies" :key="copy" class="cg-sheet__form">
+          <table class="cg-sheet__header">
+            <tbody>
+              <tr>
+                <td class="cg-sheet__logo-cell">
+                  <img src="/images/nvsu-logo.png" alt="NVSU logo" class="cg-sheet__logo" />
+                </td>
+                <td>
+                  <p class="cg-sheet__school">Republic of the Philippines</p>
+                  <p class="cg-sheet__school cg-sheet__school--bold">NUEVA VIZCAYA STATE UNIVERSITY</p>
+                  <p class="cg-sheet__school">Bayombong, Nueva Vizcaya</p>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" class="cg-sheet__form-title-cell">
+                  <p class="cg-sheet__form-title">REQUEST FOR USE OF VEHICLE</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-        <section>
-          <h4 class="cg-sheet__section-title">Request details</h4>
-          <div class="cg-fields">
-            <div class="cg-field">
-              <p class="cg-field__label">Requested by</p>
-              <p class="cg-field__value">{{ dash(a.vehicle_request?.requester) }}</p>
+          <p class="cg-sheet__ruv"><strong>RUV No.:</strong> <span class="cg-paper-blank cg-paper-blank--45"></span></p>
+
+          <div class="cg-sheet__grid">
+            <div class="cg-sheet__col-left">
+              <p><strong>Requesting Official:</strong> <span class="cg-paper-value cg-paper-value--bold">{{ official }}</span></p>
+              <p><strong>Position/Designation:</strong> <span class="cg-paper-value">{{ r.position }}</span></p>
+              <p><strong>Destination/Place(s):</strong> <span class="cg-paper-value">{{ a.trip?.destination }}</span></p>
+              <p><strong>Purpose(s):</strong> <span class="cg-paper-value">{{ a.trip?.purpose }}</span></p>
+              <p><strong>Authorized Passenger(s):</strong> <span class="cg-paper-value">{{ r.authorized_passengers }}</span></p>
             </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Date requested</p>
-              <p class="cg-field__value">{{ formatDate(r.requested_on) }}</p>
+            <div class="cg-sheet__col-right">
+              <p><strong>Request No.:</strong> <span class="cg-paper-value">{{ dash(r.id) }}</span></p>
+              <p><strong>Date Requested:</strong> <span class="cg-paper-value">{{ formatDate(r.requested_on) }}</span></p>
+              <p><strong>Time Requested:</strong> <span class="cg-paper-value">{{ requestedTime }}</span></p>
             </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Destination</p>
-              <p class="cg-field__value">{{ dash(a.trip?.destination) }}</p>
-            </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Number of passengers</p>
-              <p class="cg-field__value">{{ dash(r.passengers) }}</p>
-            </div>
-            <div class="cg-field cg-field--full">
-              <p class="cg-field__label">Purpose</p>
-              <p class="cg-field__value">{{ dash(a.trip?.purpose) }}</p>
-            </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Date of trip</p>
-              <p class="cg-field__value">{{ formatDate(a.trip?.trip_date) }}</p>
-            </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Departure · Estimated return</p>
-              <p class="cg-field__value">
-                {{ formatTime(a.trip?.departure_time) }} · {{ formatTime(a.trip?.estimated_return_time) }}
+          </div>
+
+          <div class="cg-sheet__grid cg-sheet__travel">
+            <div class="cg-sheet__col-left">
+              <p><strong>Date of Travel:</strong> <span class="cg-paper-value">{{ travelDate }}</span></p>
+              <p>
+                <strong>Days of Travel:</strong>
+                <span :class="{ 'cg-paper-underlined': tripType === 'inclusive' }">Inclusive</span>/
+                <span :class="{ 'cg-paper-underlined': tripType === 'exclusive' }">Exclusive</span>:
+                <span class="cg-paper-value">{{ travelDays }}</span>
               </p>
+              <p class="cg-sheet__hint">(Please underline)</p>
+            </div>
+            <div class="cg-sheet__col-right">
+              <p><strong>Time of Travel:</strong> <span class="cg-paper-value">{{ formatTime(a.trip?.departure_time) }}</span></p>
             </div>
           </div>
-        </section>
 
-        <section>
-          <h4 class="cg-sheet__section-title">Vehicle &amp; driver assigned</h4>
-          <div class="cg-fields">
-            <div class="cg-field">
-              <p class="cg-field__label">Vehicle</p>
-              <p class="cg-field__value">{{ vehicle }}</p>
-            </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Driver</p>
-              <p class="cg-field__value">{{ dash(a.driver?.name) }}</p>
-            </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Driver contact number</p>
-              <p class="cg-field__value">{{ dash(a.driver?.contact_number) }}</p>
-            </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Driver license number</p>
-              <p class="cg-field__value">{{ dash(a.driver?.license_number) }}</p>
-            </div>
-            <div v-if="a.notes" class="cg-field cg-field--full">
-              <p class="cg-field__label">Remarks</p>
-              <p class="cg-field__value">{{ a.notes }}</p>
-            </div>
+          <div class="cg-sheet__requester-sign">
+            <p class="cg-sheet__sign-name">{{ official }}</p>
+            <p class="cg-sheet__sign-label">Name and Signature of Requesting Official</p>
           </div>
-        </section>
 
-        <section>
-          <h4 class="cg-sheet__section-title">Approval</h4>
-          <div class="cg-fields">
-            <div class="cg-field">
-              <p class="cg-field__label">Approved by</p>
-              <p class="cg-field__value">{{ dash(r.approved_by) }}</p>
-            </div>
-            <div class="cg-field">
-              <p class="cg-field__label">Approval date</p>
-              <p class="cg-field__value">{{ formatDate(r.approved_on) }}</p>
-            </div>
-          </div>
-        </section>
+          <div class="cg-sheet__rule"><em>For the Motorpool only</em></div>
+          <p class="cg-sheet__action-title">ACTION ON REQUEST</p>
 
-        <section class="cg-sign">
-          <div>
-            <div class="cg-sign__space"></div>
-            <p class="cg-sign__line">Chief General Service and Special Projects</p>
+          <div class="cg-sheet__action-top">
+            <div>
+              <p>Vehicle Plate No.: <span class="cg-paper-value">{{ a.vehicle?.plate_number }}</span></p>
+              <p>Driver: <span class="cg-paper-value">{{ a.driver?.name }}</span></p>
+            </div>
+            <div class="cg-sheet__request-checks">
+              <span>Request:</span>
+              <div>
+                <p><span class="cg-paper-box">{{ status === 'APPROVED' ? '✓' : '' }}</span> Approved</p>
+                <p><span class="cg-paper-box"></span> Disapproved due to: <span class="cg-paper-blank cg-paper-blank--30"></span></p>
+              </div>
+            </div>
           </div>
-          <div>
-            <div class="cg-sign__space"></div>
-            <p class="cg-sign__line">Date signed</p>
-          </div>
-        </section>
 
-        <footer class="cg-sheet__foot">Printed on {{ printedOn }}</footer>
+          <div class="cg-sheet__approvals">
+            <div>
+              <p><strong>Dispatched by:</strong></p>
+              <p class="cg-sheet__approval-name"></p>
+              <p>Chief, Mechanic</p>
+            </div>
+            <div>
+              <p><strong>Recommending Approval:</strong></p>
+              <p class="cg-sheet__approval-name">TONY O. BASATAN</p>
+              <p>Chief, Motorpool</p>
+            </div>
+            <div>
+              <p><strong>Approved:</strong></p>
+              <p class="cg-sheet__approval-name">JAYSON R. PIMENTEL</p>
+              <p>Unit Head-GSU</p>
+            </div>
+          </div>
+
+          <footer class="cg-sheet__foot">
+            <p><em>Note: Please accomplish this form three (3) days before travel.</em></p>
+            <small>NVSU-FR-PPS-13-02 (092524)</small>
+          </footer>
+        </section>
       </article>
     </div>
   </div>

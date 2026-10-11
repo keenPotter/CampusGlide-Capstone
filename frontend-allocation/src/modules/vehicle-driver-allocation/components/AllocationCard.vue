@@ -10,7 +10,7 @@ const props = defineProps({
   isAdmin: { type: Boolean, default: false },
   pendingChange: { type: Object, default: null }, // pending date-change request ng trip na ito
 })
-const emit = defineEmits(['reassign', 'print', 'share', 'reschedule'])
+const emit = defineEmits(['reassign', 'view', 'reschedule'])
 const detailsOpen = ref(false)
 
 // Palit ng petsa: scheduled pa lang. Admin = direct; Faculty = request lang (isa lang na pending).
@@ -25,7 +25,7 @@ const displayStatus = computed(() =>
     : props.allocation.status ?? 'unknown',
 )
 // Kapag na-allocate na ang vehicle at driver, pwedeng i-print ang Trip Request (hindi na kung cancelled).
-const canPrint = computed(() => props.isAdmin && props.allocation.status !== 'cancelled')
+const canView = computed(() => props.isAdmin && props.allocation.status !== 'cancelled')
 </script>
 
 <template>
@@ -67,17 +67,12 @@ const canPrint = computed(() => props.isAdmin && props.allocation.status !== 'ca
         Date change requested: {{ pendingChange.new_date }} (waiting for Admin approval)
       </p>
 
-      <div v-if="canManage || canPrint || canReschedule" class="cg-actions">
-        <AppButton v-if="canReschedule" variant="secondary" @click="emit('reschedule', allocation)">
-          <Icon name="calendar" /> {{ isAdmin ? 'Change date' : 'Request date change' }}
-        </AppButton>
-        <AppButton v-if="canPrint" variant="secondary" @click="emit('print', allocation)">
-          <Icon name="printer" /> Print
-        </AppButton>
-        <AppButton v-if="canPrint" variant="secondary" @click="emit('share', allocation)">
-          <Icon name="send" /> Send to admin
-        </AppButton>
+      <div v-if="canManage || canView || canReschedule" class="cg-actions">
         <AppButton v-if="canManage" variant="warning" @click="emit('reassign', allocation)">Reassign</AppButton>
+        <AppButton v-if="canView" variant="secondary" @click="emit('view', allocation)">View</AppButton>
+        <AppButton v-if="canReschedule" variant="secondary" @click="emit('reschedule', allocation)">
+          <Icon name="calendar" /> Change Date
+        </AppButton>
       </div>
     </div>
   </article>
