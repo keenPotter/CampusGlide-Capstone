@@ -4,6 +4,7 @@ defineProps({
   label: { type: String, default: '' },
   options: { type: Array, default: () => [] }, // [{ value, label }]
   placeholder: { type: String, default: 'Select an option' },
+  allowEmpty: { type: Boolean, default: false }, // lets the placeholder be picked, e.g. "All status"
   error: { type: String, default: '' },
   required: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
@@ -27,7 +28,7 @@ defineEmits(['update:modelValue'])
       :class="{ 'field-error': error }"
       @change="$emit('update:modelValue', $event.target.value)"
     >
-      <option value="" disabled>{{ placeholder }}</option>
+      <option value="" :disabled="!allowEmpty">{{ placeholder }}</option>
       <option v-for="option in options" :key="option.value" :value="option.value">
         {{ option.label }}
       </option>

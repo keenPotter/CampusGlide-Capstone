@@ -71,8 +71,8 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
     },
 
     async update(id, payload) {
-      const { data } = await api.put(`/vehicle-requests/${id}/edit`, payload)
-      return data.data
+      const response = await api.put(`/vehicle-requests/${id}/edit`, payload)
+      return unwrap(response)
     },
 
     // status is 'approved' or 'disapproved'. 'remarks' is required when disapproving.

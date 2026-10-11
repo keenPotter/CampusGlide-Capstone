@@ -10,6 +10,7 @@ defineProps({
   disabled: { type: Boolean, default: false },
   min: { type: [String, Number], default: undefined },
   max: { type: [String, Number], default: undefined },
+  step: { type: [String, Number], default: undefined },
 })
 
 defineEmits(['update:modelValue'])
@@ -29,6 +30,7 @@ defineEmits(['update:modelValue'])
       :disabled="disabled"
       :min="min"
       :max="max"
+      :step="step"
       class="field-control"
       :class="{ 'field-error': error }"
       @input="$emit('update:modelValue', $event.target.value)"

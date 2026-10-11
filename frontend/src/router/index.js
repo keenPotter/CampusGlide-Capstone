@@ -42,19 +42,19 @@ const routes = [
   {
     path: '/trip-schedule',
     name: 'tripSchedule',
-    component: () => import('@/views/TripScheduleView.vue'),
+    component: () => import('@/views/trip-schedule/TripScheduleView.vue'),
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {
     path: '/my-trip-schedule',
     name: 'facultyTripSchedule',
-    component: () => import('@/views/FacultyTripScheduleView.vue'),
+    component: () => import('@/views/trip-schedule/FacultyTripScheduleView.vue'),
     meta: { requiresAuth: true, roles: ['faculty'] },
   },
   {
     path: '/maintenance',
     name: 'maintenance',
-    component: () => import('@/views/MaintenanceView.vue'),
+    component: () => import('@/views/maintenance/MaintenanceView.vue'),
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {

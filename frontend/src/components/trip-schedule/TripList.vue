@@ -1,68 +1,77 @@
 <script setup>
+import BaseCard from '@/components/ui/BaseCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import TripTypeBadge from '@/components/ui/TripTypeBadge.vue'
+import { dayOfMonth, formatTime, shortMonth } from '@/lib/format'
+import {
+  driverName,
+  getTripStartDate,
+  requesterName,
+  tripDateRange,
+  tripType,
+  vehicleName,
+} from '@/lib/trips'
+
 defineProps({
-  tripTypeLabel: { type: String, required: true },
+  title: { type: String, required: true },
+  subtitle: { type: String, default: '' },
+  emptyMessage: { type: String, default: 'No scheduled trips found.' },
   trips: { type: Array, required: true },
   isNewTrip: { type: Function, required: true },
-  tripTypeClass: { type: Function, required: true },
-  tripTypeLabelForTrip: { type: Function, required: true },
-  dayNumber: { type: Function, required: true },
-  shortMonth: { type: Function, required: true },
-  formatDateRange: { type: Function, required: true },
-  formatTime: { type: Function, required: true },
-  vehicleName: { type: Function, required: true },
-  driverName: { type: Function, required: true },
 })
-const emit = defineEmits(['open-trip'])
+
+defineEmits(['open-trip'])
 </script>
 
 <template>
-  <div>
-    <div class="section-heading">
-      <div>
-        <h2>{{ tripTypeLabel }} scheduled trips</h2>
-        <p class="section-note">All allocated trips of this type</p>
-      </div>
-      <span class="trip-count">{{ trips.length }}</span>
-    </div>
-
-    <div v-if="trips.length" class="trip-list">
-      <button
-        v-for="trip in trips"
-        :key="trip.id"
-        type="button"
-        class="list-trip-card"
-        @click="emit('open-trip', trip)"
+  <BaseCard :title="title" :subtitle="subtitle" :padded="false">
+    <template #actions>
+      <span
+        class="inline-flex h-7 min-w-8 items-center justify-center rounded-full bg-primary-50 px-2.5 text-small font-semibold text-primary-700"
       >
-        <div class="list-trip-date">
-          <strong>{{ dayNumber(trip.trip_date) }}</strong>
-          <span>{{ shortMonth(trip.trip_date) }}</span>
-        </div>
+        {{ trips.length }}
+      </span>
+    </template>
 
-        <div class="list-trip-content">
-          <div class="list-title-row">
-            <h3>{{ trip.destination || 'Trip' }}</h3>
-            <div class="badge-row">
-              <span v-if="isNewTrip(trip)" class="new-indicator" title="New scheduled trip" aria-label="New scheduled trip"></span>
-              <span :class="['type-badge', tripTypeClass(trip)]">{{ tripTypeLabelForTrip(trip) }}</span>
+    <EmptyState v-if="!trips.length" title="No scheduled trips" :message="emptyMessage" />
+
+    <ul v-else class="divide-y divide-line">
+      <li v-for="trip in trips" :key="trip.id">
+        <button
+          type="button"
+          class="flex w-full items-center gap-3 px-card py-3 text-left hover:bg-neutral-50"
+          @click="$emit('open-trip', trip)"
+        >
+          <div class="w-12 shrink-0 text-center">
+            <p class="text-section-title leading-none">{{ dayOfMonth(getTripStartDate(trip)) }}</p>
+            <p class="text-small text-ink-muted">{{ shortMonth(getTripStartDate(trip)) }}</p>
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="truncate font-medium text-ink">{{ trip.destination || 'Trip' }}</p>
+              <div class="flex items-center gap-2">
+                <span
+                  v-if="isNewTrip(trip)"
+                  class="h-2 w-2 rounded-full bg-red-500"
+                  title="New scheduled trip"
+                  aria-label="New scheduled trip"
+                />
+                <TripTypeBadge :type="tripType(trip)" />
+              </div>
             </div>
+
+            <p class="mt-1 truncate text-small text-ink-muted">{{ trip.purpose || '—' }}</p>
+            <p class="mt-1 text-small text-ink-muted">
+              {{ requesterName(trip) }} · {{ tripDateRange(trip) }} ·
+              {{ formatTime(trip.departure_time) }} · {{ vehicleName(trip) }} ·
+              {{ driverName(trip) }}
+            </p>
           </div>
 
-          <p class="list-purpose">{{ trip.purpose || '—' }}</p>
-
-          <div class="list-details">
-            <span>{{ formatDateRange(trip) }}</span>
-            <span>{{ formatTime(trip.departure_time) }}</span>
-            <span>{{ vehicleName(trip) }}</span>
-            <span>{{ driverName(trip) }}</span>
-          </div>
-        </div>
-
-        <span class="arrow">›</span>
-      </button>
-    </div>
-
-    <div v-else class="no-trips">
-      <p>No {{ tripTypeLabel.toLowerCase() }} scheduled trips found.</p>
-    </div>
-  </div>
+          <span class="text-xl text-ink-muted">›</span>
+        </button>
+      </li>
+    </ul>
+  </BaseCard>
 </template>

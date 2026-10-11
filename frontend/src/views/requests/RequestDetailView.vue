@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
 import { errorMessage, validationErrors } from '@/lib/api'
-import { formatDate, formatDateTime, formatTime } from '@/lib/format'
+import { formatDate, formatDateTime, formatTime, fullName } from '@/lib/format'
 import { printRequest } from '@/lib/printRequest'
 import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -23,12 +23,9 @@ const request = ref(null)
 const loading = ref(true)
 const submitting = ref(false)
 const printing = ref(false)
-const cancelOpen = ref(false)
-const cancelRemarks = ref('')
-const cancelError = ref('')
-const rejectOpen = ref(false)
-const rejectReason = ref('')
-const rejectError = ref('')
+const disapproveOpen = ref(false)
+const disapproveReason = ref('')
+const disapproveError = ref('')
 
 const canEdit = computed(
   () => auth.isFaculty && ['pending', 'approved'].includes(request.value?.status),
@@ -42,7 +39,7 @@ const rows = computed(() => {
   const value = request.value
 
   return [
-    { label: 'Requesting official', value: value.requested_by?.first_name + ' ' + value.requested_by?.last_name },
+    { label: 'Requesting official', value: fullName(value.requested_by) },
     { label: 'Destination', value: value.destination },
     { label: 'Purpose', value: value.purpose },
     { label: 'Date of travel', value: formatDate(value.trip_date) },
@@ -96,36 +93,26 @@ async function approve() {
   }
 }
 
-async function confirmReject() {
+function openDisapprove() {
+  disapproveReason.value = ''
+  disapproveError.value = ''
+  disapproveOpen.value = true
+}
+
+async function confirmDisapprove() {
   submitting.value = true
-  rejectError.value = ''
+  disapproveError.value = ''
 
   try {
     await store.updateStatus(request.value.id, {
-      status: 'rejected',
-      remarks: rejectReason.value,
+      status: 'disapproved',
+      remarks: disapproveReason.value,
     })
-    toast.success('Request rejected.')
-    rejectOpen.value = false
+    toast.success('Request disapproved.')
+    disapproveOpen.value = false
     await load()
   } catch (error) {
-    rejectError.value = validationErrors(error).remarks ?? errorMessage(error)
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function confirmCancel() {
-  submitting.value = true
-  cancelError.value = ''
-
-  try {
-    await store.cancel(request.value.id, cancelRemarks.value)
-    toast.success('Request cancelled.')
-    cancelOpen.value = false
-    await load()
-  } catch (error) {
-    cancelError.value = validationErrors(error).cancellation_remarks ?? errorMessage(error)
+    disapproveError.value = validationErrors(error).remarks ?? errorMessage(error)
   } finally {
     submitting.value = false
   }
@@ -142,7 +129,7 @@ async function confirmCancel() {
       <div>
         <button
           type="button"
-          class="mb-1 text-medium text-ink-muted hover:text-ink"
+          class="mb-1 text-small text-ink-muted hover:text-ink"
           @click="router.push({ name: 'requests.index' })"
         >
           ← Back to requests
@@ -151,26 +138,15 @@ async function confirmCancel() {
         <p class="mt-0.5 text-small text-ink-muted">{{ request.destination }}</p>
       </div>
 
-      <!-- Status, with the Print button below it (approved requests only) -->
-      <div class="flex flex-col items-end gap-2">
-        <StatusBadge :status="request.status" />
-      </div>
+      <StatusBadge :status="request.status" />
     </div>
 
     <div
-      v-if="request.rejection_reason"
+      v-if="request.disapproval_reason"
       class="rounded-card border border-red-200 bg-red-50 p-card text-small text-red-800"
     >
       <p class="font-medium">Disapproved</p>
-      <p class="mt-1">{{ request.rejection_reason }}</p>
-    </div>
-
-    <div
-      v-if="request.cancellation_remarks"
-      class="rounded-card border border-line bg-neutral-100 p-card text-small text-ink-muted"
-    >
-      <p class="font-medium text-ink">Cancelled</p>
-      <p class="mt-1">{{ request.cancellation_remarks }}</p>
+      <p class="mt-1">{{ request.disapproval_reason }}</p>
     </div>
 
     <BaseCard title="Request for use of vehicle" :padded="false">
@@ -188,7 +164,7 @@ async function confirmCancel() {
 
     <div class="flex flex-wrap justify-end gap-3">
       <template v-if="auth.isAdministrator && request.status === 'pending'">
-        <BaseButton variant="outline" :disabled="submitting" @click="((rejectOpen = true), (rejectReason = ''), (rejectError = ''))">
+        <BaseButton variant="outline" :disabled="submitting" @click="openDisapprove">
           Disapprove
         </BaseButton>
         <BaseButton :loading="submitting" @click="approve">Approve</BaseButton>
@@ -199,58 +175,34 @@ async function confirmCancel() {
         Print
       </BaseButton>
 
-      <template v-if="canEdit">
-        <BaseButton
-          variant="outline"
-          @click="router.push({ name: 'requests.edit', params: { id: request.id } })"
-        >
-          Edit
-        </BaseButton>
-      </template>
+      <BaseButton
+        v-if="canEdit"
+        variant="outline"
+        @click="router.push({ name: 'requests.edit', params: { id: request.id } })"
+      >
+        Edit
+      </BaseButton>
     </div>
 
     <!-- Disapprove -->
     <BaseModal
-      :open="rejectOpen"
+      :open="disapproveOpen"
       title="Disapprove request"
       :subtitle="`Request #${request.id} — ${request.destination}`"
-      @close="rejectOpen = false"
+      @close="disapproveOpen = false"
     >
       <BaseTextarea
-        v-model="rejectReason"
+        v-model="disapproveReason"
         label="Reason for disapproval"
         placeholder="e.g. Vehicle already assigned for that date."
-        :error="rejectError"
+        :error="disapproveError"
         required
       />
 
       <template #footer>
-        <BaseButton variant="outline" @click="rejectOpen = false">Cancel</BaseButton>
-        <BaseButton variant="danger" :loading="submitting" @click="confirmReject">
+        <BaseButton variant="outline" @click="disapproveOpen = false">Cancel</BaseButton>
+        <BaseButton variant="danger" :loading="submitting" @click="confirmDisapprove">
           Disapprove request
-        </BaseButton>
-      </template>
-    </BaseModal>
-
-    <!-- Cancel -->
-    <BaseModal
-      :open="cancelOpen"
-      title="Cancel request"
-      subtitle="This releases the vehicle slot for other requests."
-      @close="cancelOpen = false"
-    >
-      <BaseTextarea
-        v-model="cancelRemarks"
-        label="Cancellation remarks"
-        placeholder="e.g. Meeting moved to a later date."
-        :error="cancelError"
-        required
-      />
-
-      <template #footer>
-        <BaseButton variant="outline" @click="cancelOpen = false">Keep request</BaseButton>
-        <BaseButton variant="danger" :loading="submitting" @click="confirmCancel">
-          Cancel request
         </BaseButton>
       </template>
     </BaseModal>
