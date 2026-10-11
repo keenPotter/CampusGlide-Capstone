@@ -2,49 +2,24 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Tables in dependency order (parents first).
-     */
-    private const TABLES = [
-        'users',
-        'vehicles',
-        'drivers',
-        'vehicle_requests',
-        'trips',
-        'vehicle_maintenance',
-        'post_travel_reports',
-        'fuel_usage_records',
-        'preventive_maintenance_checklists',
-    ];
+    use WithoutModelEvents;
 
+    /**
+     * Seed the application's database.
+     */
     public function run(): void
     {
-        Schema::disableForeignKeyConstraints();
+        // User::factory(10)->create();
 
-        foreach (array_reverse(self::TABLES) as $table) {
-            DB::table($table)->truncate();
-        }
-
-        Schema::enableForeignKeyConstraints();
-
-        DB::transaction(function () {
-            $this->call([
-                UserSeeder::class,
-                VehicleSeeder::class,
-                DriverSeeder::class,
-                VehicleRequestSeeder::class,
-                TripSeeder::class,
-                VehicleMaintenanceSeeder::class,
-                PostTravelReportSeeder::class,
-                FuelUsageRecordSeeder::class,
-                PreventiveMaintenanceChecklistSeeder::class,
-            ]);
-        });
+        User::factory()->create([
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+        ]);
     }
 }

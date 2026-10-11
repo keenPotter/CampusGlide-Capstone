@@ -34,13 +34,17 @@ CampusGlide digitizes the request, scheduling, and approval workflow for univers
 ### Backend Setup
 
 ```bash
-cd backend
+cd campusglide-api
 composer install
 cp .env.example .env
 php artisan key:generate
 php artisan migrate
 php artisan serve
 ```
+
+The API includes Sanctum token authentication. The Vue allocation frontend sends
+`POST /api/login` and receives a bearer token; keep this Laravel server running
+at `http://127.0.0.1:8000` while the frontend is running on Vite.
 
 ### Frontend Setup
 

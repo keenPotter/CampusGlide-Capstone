@@ -2,13 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * NEW — the original upload assumed a `TripRequest` model/table.
+ * campusglide_db calls this table `vehicle_requests`, and its columns
+ * are trip_date + departure_time + estimated_return_time (separate
+ * DATE/TIME fields) rather than a single departure_datetime /
+ * return_datetime pair. If Keen's Vehicle Request module already has
+ * this file, just make sure it has the two relationships below —
+ * don't overwrite whatever else is already in it.
+ */
 class VehicleRequest extends Model
 {
-    protected $table = 'vehicle_requests';
     use HasFactory;
 
     protected $fillable = [
@@ -29,37 +36,23 @@ class VehicleRequest extends Model
         'approved_date',
     ];
 
-    public function trip()
-    {
-        return $this->hasOne(Trip::class, 'vehicle_request_id');
-    }
-  
-    protected function casts(): array
-    {
-        return [
-            'trip_date' => 'date',
-            'trip_end_date' => 'date',
-            'request_date' => 'datetime',
-            'approved_date' => 'datetime',
-        ];
-    }
-
-    protected function travelDays(): Attribute
-    {
-        return Attribute::make(
-            get: fn() => $this->trip_date && $this->trip_end_date
-            ? $this->trip_date->diffInDays($this->trip_end_date) + 1
-            : null,
-        );
-    }
+    protected $casts = [
+        'trip_date' => 'date',
+        'trip_end_date' => 'date',
+    ];
 
     public function requester()
     {
         return $this->belongsTo(User::class, 'requester_id');
     }
 
-    public function approver()
+    public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function trip()
+    {
+        return $this->hasOne(Trip::class);
     }
 }
