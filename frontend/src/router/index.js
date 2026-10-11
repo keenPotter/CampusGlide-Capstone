@@ -52,6 +52,15 @@ const routes = [
     meta: { requiresAuth: true, roles: ['faculty'] },
   },
   {
+    path: '/allocations',
+    name: 'allocations',
+    component: () => import('@/modules/vehicle-driver-allocation/AllocationsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['administrator'],
+    },
+  },
+  {
     path: '/maintenance',
     name: 'maintenance',
     component: () => import('@/views/MaintenanceView.vue'),

@@ -577,3 +577,9 @@ textarea.cg-input { height: auto; min-height: 88px; padding: 10px 12px; resize: 
 .cg-logout-btn:hover { color: #dc2626; }
 @media (min-width: 1024px) { .cg-header__actions button[aria-label="Toggle navigation"] { display: none; } }
 @media (max-width: 1023px) { .cg-header__account-copy { display: none; } }
+/* Align Allocation content with the main CampusGlide layout */
+@media (min-width: 1024px) {
+  .cg-app .cg-main-content {
+    margin-left: 0;
+  }
+}

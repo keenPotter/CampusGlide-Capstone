@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ApiError, auth, isAdmin, isLoggedIn, logout, request, UnauthorizedError } from './api'
+import { ApiError, auth, bindMainAuth, isAdmin, isLoggedIn, logout, request, UnauthorizedError } from './api'
+import { useAuthStore } from '@/stores/auth'
 import './styles/allocation.css'
 import AllocationCard from './components/AllocationCard.vue'
 import AllocationModal from './components/AllocationModal.vue'
@@ -25,6 +26,14 @@ const optionVehicles = ref([])
 const optionDrivers = ref([])
 const search = ref('')
 const listError = ref('')
+const mainAuth = useAuthStore()
+bindMainAuth(mainAuth)
+
+watch(
+  () => [mainAuth.token, mainAuth.user],
+  () => bindMainAuth(mainAuth),
+  { immediate: true },
+)
 const panelOpen = ref(!isLoggedIn.value) 
 const modalOpen = ref(false)
 const editing = ref(null)
@@ -710,12 +719,7 @@ onUnmounted(stopAdminRefresh)
 
 <template>
   <div class="cg-app">
-    <main v-if="!isLoggedIn" class="cg-login-screen">
-      <AuthPanel :open="true" @login="onLoggedIn" />
-    </main>
-
-    <template v-else>
-      <div class="cg-shell">
+    <div class="cg-shell">
         <button
           v-if="panelOpen"
           type="button"
@@ -723,18 +727,7 @@ onUnmounted(stopAdminRefresh)
           aria-label="Close account sidebar"
           @click="panelOpen = false"
         ></button>
-        <AuthPanel :open="panelOpen" menu @login="onLoggedIn" />
         <div class="cg-main-content">
-          <div class="cg-header-menu">
-        <AppHeader
-          title="Vehicle-Driver Allocation"
-          :badge="isAdmin ? pendingVehicleRequestCount : vehicleRequests.length"
-          :notifications-open="vehicleNotificationsOpen"
-          :menu-open="panelOpen"
-          @toggle-panel="panelOpen = !panelOpen"
-          @bell="showWaiting"
-          @logout="logout()"
-        />
         <aside v-if="isAdmin && vehicleNotificationsOpen" class="cg-notifications-panel" aria-label="Pending vehicle request notifications">
           <div class="cg-notifications-panel__head">
             <h2 class="cg-section-title">Vehicle requests ({{ pendingVehicleRequestCount }} pending)</h2>
@@ -785,7 +778,6 @@ onUnmounted(stopAdminRefresh)
             </article>
           </div>
         </aside>
-      </div>
 
       <main class="cg-container cg-main">
 
@@ -1202,8 +1194,7 @@ onUnmounted(stopAdminRefresh)
       </div>
       <ConflictModal :conflict="pageConflict" hint="Please choose another date." @close="pageConflict = null" />
       <p v-if="toast" class="cg-toast" role="status">{{ toast }}</p>
-        </div>
       </div>
-    </template>
+    </div>
   </div>
 </template>
