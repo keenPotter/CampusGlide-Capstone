@@ -35,13 +35,7 @@ const navigation = computed(() => {
         icon: 'list',
         badge: notifications.pendingRequests,
       },
-      {
-        name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
-      {
-        name: 'Allocations',
-        to: { name: 'allocations' },
-        icon: 'calendar',
-      },
+      { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
       {
         name: 'Maintenance',
         to: { name: 'maintenance' },
