@@ -46,6 +46,12 @@ const routes = [
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {
+    path: '/my-trip-schedule',
+    name: 'facultyTripSchedule',
+    component: () => import('@/views/FacultyTripScheduleView.vue'),
+    meta: { requiresAuth: true, roles: ['faculty'] },
+  },
+  {
     path: '/maintenance',
     name: 'maintenance',
     component: () => import('@/views/MaintenanceView.vue'),

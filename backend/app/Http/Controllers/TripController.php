@@ -17,6 +17,27 @@ class TripController extends Controller
         ])->get();
     }
 
+    /**
+     * Return trips belonging only to the currently authenticated faculty member.
+     * Filters trips through their associated vehicle request's requester_id
+     * to prevent faculty members from seeing other users' trips.
+     */
+
+    public function myTrips(Request $request)
+    {
+        return Trip::with([
+            'driver',
+            'vehicle',
+            'vehicleRequest',
+        ])
+            ->whereHas('vehicleRequest', function ($query) use ($request) {
+                $query->where('requester_id', $request->user()->id);
+            })
+            ->orderBy('trip_date')
+            ->orderBy('departure_time')
+            ->get();
+    }
+
     public function show($id)
     {
         $trip = Trip::with([
