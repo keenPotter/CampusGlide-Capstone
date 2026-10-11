@@ -1,9 +1,8 @@
-
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import api from '@/lib/api'
-import { errorMessage } from '@/lib/api'
+import api, { errorMessage, unwrap } from '@/lib/api'
 import { formatDate, formatTime } from '@/lib/format'
+import { driverContact, driverName, getTripStartDate, vehicleName } from '@/lib/trips'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -15,7 +14,7 @@ const loadError = ref('')
 
 const sortedTrips = computed(() =>
   [...trips.value].sort((a, b) => {
-    const dateCompare = String(a.trip_date ?? '').localeCompare(String(b.trip_date ?? ''))
+    const dateCompare = getTripStartDate(a).localeCompare(getTripStartDate(b))
     if (dateCompare !== 0) return dateCompare
     return String(a.departure_time ?? '').localeCompare(String(b.departure_time ?? ''))
   }),
@@ -26,8 +25,8 @@ async function fetchTrips() {
   loadError.value = ''
 
   try {
-    const response = await api.get('/my-trips')
-    trips.value = Array.isArray(response.data) ? response.data : []
+    const payload = unwrap(await api.get('/my-trips'))
+    trips.value = Array.isArray(payload) ? payload : []
   } catch (error) {
     loadError.value = errorMessage(error, 'Unable to load your trip schedule.')
   } finally {
@@ -51,9 +50,9 @@ onMounted(fetchTrips)
       <p class="text-small text-ink-muted">
         {{ sortedTrips.length }} scheduled {{ sortedTrips.length === 1 ? 'trip' : 'trips' }}
       </p>
-        <BaseButton :disabled="loading" @click="fetchTrips">
-            Refresh
-        </BaseButton>
+      <BaseButton variant="outline" size="sm" :disabled="loading" @click="fetchTrips">
+        Refresh
+      </BaseButton>
     </div>
 
     <BaseCard>
@@ -84,7 +83,7 @@ onMounted(fetchTrips)
                 {{ trip.destination || 'Destination not specified' }}
               </h2>
               <p class="mt-1 text-small text-ink-muted">
-                {{ formatDate(trip.trip_date) }}
+                {{ formatDate(getTripStartDate(trip)) }}
               </p>
             </div>
             <StatusBadge :status="trip.trip_status || 'scheduled'" />
@@ -109,18 +108,14 @@ onMounted(fetchTrips)
             <div class="rounded-card bg-surface p-3">
               <p class="text-xs text-ink-muted">Assigned vehicle</p>
               <p class="mt-1 text-small font-medium text-ink">
-                {{ trip.vehicle?.plate_number || 'Not assigned' }}
+                {{ trip.vehicle ? vehicleName(trip) : 'Not assigned' }}
               </p>
               <p class="mt-2 text-xs text-ink-muted">Driver</p>
               <p class="mt-1 text-small font-medium text-ink">
-                {{
-                  trip.driver
-                    ? `${trip.driver.first_name || ''} ${trip.driver.last_name || ''}`.trim()
-                    : 'Not assigned'
-                }}
+                {{ trip.driver ? driverName(trip) : 'Not assigned' }}
               </p>
-              <p v-if="trip.driver?.contact_number" class="mt-1 text-xs text-ink-muted">
-                Contact: {{ trip.driver.contact_number }}
+              <p v-if="trip.driver && driverContact(trip) !== '—'" class="mt-1 text-xs text-ink-muted">
+                Contact: {{ driverContact(trip) }}
               </p>
             </div>
           </div>

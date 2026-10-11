@@ -15,8 +15,8 @@ const requests = useVehicleRequestStore()
 const loading = ref(true)
 
 onMounted(async () => {
-  await Promise.allSettled([requests.fetch({ status: '', trip_type: '', page: 1 })]),
-    loading.value = false
+  await Promise.allSettled([requests.fetch({ status: '', trip_type: '', page: 1 })])
+  loading.value = false
 })
 
 const stats = computed(() => {

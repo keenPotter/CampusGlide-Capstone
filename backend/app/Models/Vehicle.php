@@ -5,12 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-/**
- * NOTE: You already have a Vehicle model from earlier sprints.
- * Don't overwrite it with this file — just merge in the
- * `maintenanceLogs()` relation and `latestMaintenanceLog()` helper
- * below, plus the STATUSES constant if useful.
- */
 class Vehicle extends Model
 {
     use HasFactory;

@@ -4,11 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Vehicle;
 
-/**
- * NOTE: You already have a VehicleController from earlier sprints.
- * This file just shows the new `status()` action — copy that method
- * into your existing controller rather than replacing the whole file.
- */
 class VehicleController extends Controller
 {
     /**
