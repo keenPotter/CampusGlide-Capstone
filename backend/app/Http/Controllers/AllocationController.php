@@ -7,10 +7,12 @@ use App\Http\Requests\UpdateAllocationRequest;
 use App\Http\Resources\AllocationResource;
 use App\Models\Allocation;
 use App\Models\Driver;
+use App\Models\RescheduleRequest;
 use App\Models\Trip;
 use App\Models\Vehicle;
 use App\Models\VehicleRequest;
 use App\Services\AllocationService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -153,9 +155,11 @@ class AllocationController extends Controller
 
     /**
      * PUT /api/allocations/{allocation}
-     * Reassigns the vehicle or driver, or changes the trip status.
-     * A completed trip can no longer be changed, because that could free a
-     * vehicle or driver that another trip is already using.
+     * One call for everything on the Reassign window: vehicle, driver, trip date and trip status.
+     * - A new date (new_date) needs a reason, and only a scheduled trip can be moved.
+     * - The conflict check uses the new date together with the chosen vehicle and driver.
+     * - A completed trip can no longer be changed, because that could free a
+     *   vehicle or driver that another trip is already using.
      */
     public function update(UpdateAllocationRequest $request, Allocation $allocation)
     {
@@ -170,17 +174,33 @@ class AllocationController extends Controller
         $statusChanged = $newStatus !== $trip->trip_status;
         $wasActive = in_array($trip->trip_status, AllocationService::ACTIVE, true);
 
-        if (! $wasActive && ($vehicleChanged || $driverChanged || $statusChanged)) {
+        $newDate = $request->input('new_date');
+        $dateChanged = $newDate && $newDate !== Carbon::parse($trip->trip_date)->toDateString();
+
+        if (! $wasActive && ($vehicleChanged || $driverChanged || $statusChanged || $dateChanged)) {
             throw ValidationException::withMessages([
                 'status' => "This trip is already {$trip->trip_status} and can no longer be changed. Create a new request instead.",
             ]);
         }
 
-        if ($wasActive && ($vehicleChanged || $driverChanged)) {
-            $this->allocations->assertAssignable($trip->vehicleRequest, $vehicle, $driver, $trip);
+        // Only a scheduled trip can be moved to another date.
+        if ($dateChanged && $trip->trip_status !== 'scheduled') {
+            throw ValidationException::withMessages([
+                'new_date' => "Only scheduled trips can have their date changed (this trip is {$trip->trip_status}).",
+            ]);
         }
 
-        DB::transaction(function () use ($request, $allocation, $trip, $vehicle, $driver, $vehicleChanged, $driverChanged, $newStatus) {
+        if ($wasActive && ($vehicleChanged || $driverChanged || $dateChanged)) {
+            $this->allocations->assertAssignable(
+                $trip->vehicleRequest,
+                $vehicle,
+                $driver,
+                $trip,
+                $dateChanged ? $newDate : null
+            );
+        }
+
+        DB::transaction(function () use ($request, $allocation, $trip, $vehicle, $driver, $vehicleChanged, $driverChanged, $newStatus, $dateChanged, $newDate) {
             if ($vehicleChanged) {
                 Vehicle::where('id', $trip->vehicle_id)->update(['status' => 'available']);
                 Vehicle::where('id', $vehicle->id)->update(['status' => 'in_use']);
@@ -207,6 +227,25 @@ class AllocationController extends Controller
                 'driver_id' => $driver->id,
                 'notes' => $request->input('notes', $allocation->notes),
             ]);
+
+            // The new date: move the trip and its request, and keep a record with the reason.
+            if ($dateChanged) {
+                $oldDate = $this->allocations->shiftTripDate($trip, $newDate);
+
+                // A pending faculty request is no longer needed once the date is changed directly.
+                RescheduleRequest::where('trip_id', $trip->id)->where('status', 'pending')->delete();
+
+                RescheduleRequest::create([
+                    'trip_id' => $trip->id,
+                    'requested_by' => $request->user()->id,
+                    'old_date' => $oldDate,
+                    'new_date' => $newDate,
+                    'reason' => $request->input('reason'),
+                    'status' => 'approved',
+                    'handled_by' => $request->user()->id,
+                    'handled_at' => now(),
+                ]);
+            }
 
             // A finished trip frees its vehicle and driver.
             if ($newStatus === 'completed') {

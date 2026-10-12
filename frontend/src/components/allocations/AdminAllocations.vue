@@ -17,7 +17,7 @@ import AllocationModal from '@/components/allocations/AllocationModal.vue'
 import ConflictModal from '@/components/allocations/ConflictModal.vue'
 import DateChangeDecisionModal from '@/components/allocations/DateChangeDecisionModal.vue'
 import PrintableTripRequest from '@/components/allocations/PrintableTripRequest.vue'
-import RescheduleModal from '@/components/allocations/RescheduleModal.vue'
+import QuickAddModal from '@/components/allocations/QuickAddModal.vue'
 import RescheduleRequestCard from '@/components/allocations/RescheduleRequestCard.vue'
 
 // The allocation page for administrators.
@@ -25,7 +25,6 @@ const toast = useToast()
 const notifications = useNotificationStore()
 
 const {
-  allocations,
   waiting,
   vehicles,
   drivers,
@@ -52,10 +51,12 @@ const typeFilter = ref('')
 const modalOpen = ref(false)
 const editing = ref(null)
 const presetRequestId = ref(null)
-const rescheduleTarget = ref(null)
 const pageConflict = ref(null)
 const printTarget = ref(null)
 const printNotice = ref('')
+
+// 'vehicle' or 'driver' while the "Add" window is open.
+const quickAdd = ref('')
 
 // The faculty date change request the administrator is deciding on.
 const decisionItem = ref(null)
@@ -95,6 +96,7 @@ const typeOptions = computed(() => [
 ])
 
 // The trip type is the one the faculty member chose on the request form.
+// The order of the rows is set in useAllocations.
 const visibleRows = computed(() => {
   const query = search.value.trim().toLowerCase()
 
@@ -152,10 +154,27 @@ function openPrint(allocation, notice = '') {
   printTarget.value = allocation
 }
 
-function onRescheduleSaved(message) {
-  rescheduleTarget.value = null
-  toast.success(message)
-  reload()
+// Clicking anywhere on a row opens it: "Needs allocation" rows open the Assign window,
+// all other rows open the View / Print window. Clicks on a button or link keep doing their own job.
+function onRowClick(event, row) {
+  if (event.target.closest('a, button')) return
+
+  if (row.kind === 'waiting') {
+    openNew(row.request.id)
+  } else if (canPrint(row.allocation)) {
+    openPrint(row.allocation)
+  }
+}
+
+function onQuickAdded({ kind, item }) {
+  if (kind === 'driver') {
+    addDriver(item)
+    toast.success('Driver added.')
+  } else {
+    addVehicle(item)
+    toast.success('Vehicle added.')
+  }
+  quickAdd.value = ''
 }
 
 function decide(item, action) {
@@ -184,18 +203,12 @@ function onDecisionConflict(conflict) {
 <template>
   <div class="flex flex-col gap-page">
     <!-- Header -->
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 class="text-page-title">Vehicle-Driver Allocation</h1>
-        <p class="mt-1 text-small text-ink-muted">
-          Assign vehicles and drivers to approved trip requests. Scheduling conflicts are flagged
-          automatically.
-        </p>
-      </div>
-      <div class="flex gap-2">
-        <BaseButton variant="outline" :disabled="loading" @click="reload">Refresh</BaseButton>
-        <BaseButton @click="openNew()">+ Allocate</BaseButton>
-      </div>
+    <div>
+      <h1 class="text-page-title">Vehicle-Driver Allocation</h1>
+      <p class="mt-1 text-small text-ink-muted">
+        Assign vehicles and drivers to approved trip requests. Scheduling conflicts are flagged
+        automatically.
+      </p>
     </div>
 
     <LoadError :message="loadError" @retry="reload" />
@@ -218,6 +231,10 @@ function onDecisionConflict(conflict) {
     <!-- Vehicles and drivers -->
     <div class="grid grid-cols-1 gap-page lg:grid-cols-2">
       <BaseCard title="Vehicles" subtitle="Availability on the allocation schedule" :padded="false">
+        <template #actions>
+          <BaseButton size="sm" @click="quickAdd = 'vehicle'">+ Add vehicle</BaseButton>
+        </template>
+
         <EmptyState v-if="!loading && !vehicleList.length" title="No vehicles found" />
         <ul v-else class="max-h-80 divide-y divide-line overflow-y-auto">
           <li v-for="item in vehicleList" :key="item.id" class="flex items-center gap-3 px-card py-3">
@@ -238,6 +255,10 @@ function onDecisionConflict(conflict) {
       </BaseCard>
 
       <BaseCard title="Drivers" subtitle="Availability on the allocation schedule" :padded="false">
+        <template #actions>
+          <BaseButton size="sm" @click="quickAdd = 'driver'">+ Add driver</BaseButton>
+        </template>
+
         <EmptyState v-if="!loading && !driverList.length" title="No drivers found" />
         <ul v-else class="max-h-80 divide-y divide-line overflow-y-auto">
           <li v-for="item in driverList" :key="item.id" class="flex items-center gap-3 px-card py-3">
@@ -325,7 +346,10 @@ function onDecisionConflict(conflict) {
         <li
           v-for="row in visibleRows"
           :key="row.key"
-          class="flex flex-col gap-3 p-card lg:flex-row lg:items-center"
+          class="flex cursor-pointer flex-col gap-3 p-card transition hover:bg-neutral-50 lg:flex-row lg:items-center"
+          tabindex="0"
+          @click="onRowClick($event, row)"
+          @keydown.enter="onRowClick($event, row)"
         >
           <!-- Trip -->
           <div class="min-w-0 lg:w-1/4">
@@ -373,21 +397,14 @@ function onDecisionConflict(conflict) {
           <!-- Actions -->
           <div class="flex flex-wrap gap-2 lg:justify-end">
             <template v-if="row.kind === 'allocation'">
+              <!-- One Reassign button for vehicle, driver and date. It turns red when there is a conflict. -->
               <BaseButton
                 v-if="ACTIVE_STATUSES.includes(row.allocation.status)"
                 size="sm"
-                variant="outline"
+                :variant="conflicts[row.allocation.id] ? 'danger' : 'outline'"
                 @click="openEdit(row.allocation)"
               >
-                Reassign vehicle/driver
-              </BaseButton>
-              <BaseButton
-                v-if="row.allocation.status === 'scheduled'"
-                size="sm"
-                variant="outline"
-                @click="rescheduleTarget = row.allocation"
-              >
-                Reassign date
+                Reassign
               </BaseButton>
               <!-- Printing is available only for an approved request with a vehicle and driver assigned. -->
               <BaseButton
@@ -426,17 +443,9 @@ function onDecisionConflict(conflict) {
       :drivers="drivers"
       @close="modalOpen = false"
       @saved="onSaved"
-      @vehicle-added="addVehicle"
-      @driver-added="addDriver"
     />
 
-    <RescheduleModal
-      :allocation="rescheduleTarget"
-      is-admin
-      @close="rescheduleTarget = null"
-      @saved="onRescheduleSaved"
-      @conflict="pageConflict = $event"
-    />
+    <QuickAddModal :kind="quickAdd" @close="quickAdd = ''" @created="onQuickAdded" />
 
     <DateChangeDecisionModal
       :item="decisionItem"

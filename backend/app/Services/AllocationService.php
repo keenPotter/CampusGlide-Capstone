@@ -101,10 +101,22 @@ class AllocationService
         $this->assertFree('vehicle_id', $trip->vehicle_id, $newDate, $trip->departure_time, $trip->estimated_return_time, $trip->id);
         $this->assertFree('driver_id', $trip->driver_id, $newDate, $trip->departure_time, $trip->estimated_return_time, $trip->id);
 
-        $vehicleRequest = VehicleRequest::findOrFail($trip->vehicle_request_id);
+        return $this->shiftTripDate($trip, $newDate);
+    }
 
-        // Fixed: only the start date was moved before, so a multi-day trip could end
-        // before it started. The end date now moves by the same number of days.
+    /**
+     * Writes the new date on the trip and on its vehicle request. No checks here.
+     * The caller must run the conflict checks first.
+     *
+     * The end date moves by the same number of days, so a multi-day trip
+     * never ends before it starts.
+     *
+     * @return string the old date (YYYY-MM-DD)
+     */
+    public function shiftTripDate(Trip $trip, string $newDate): string
+    {
+        $old = Carbon::parse($trip->trip_date)->toDateString();
+        $vehicleRequest = VehicleRequest::findOrFail($trip->vehicle_request_id);
         $shift = (int) Carbon::parse($old)->diffInDays(Carbon::parse($newDate), false);
 
         DB::transaction(function () use ($trip, $newDate, $vehicleRequest, $shift) {
@@ -121,14 +133,17 @@ class AllocationService
 
     /**
      * @param  Trip|null  $currentTrip  pass this when reassigning an existing trip
+     * @param  string|null  $newDate  pass this (YYYY-MM-DD) when the trip is also moved to another date.
+     *                              The checks then run against the new date.
      */
     public function assertAssignable(
         VehicleRequest $vehicleRequest,
         Vehicle $vehicle,
         Driver $driver,
-        ?Trip $currentTrip = null
+        ?Trip $currentTrip = null,
+        ?string $newDate = null
     ): void {
-        $date = Carbon::parse($vehicleRequest->trip_date)->toDateString(); // 'YYYY-MM-DD'
+        $date = $newDate ?? Carbon::parse($vehicleRequest->trip_date)->toDateString(); // 'YYYY-MM-DD'
         $start = $vehicleRequest->departure_time;
         $end = $vehicleRequest->estimated_return_time;
         $ignoreTripId = $currentTrip?->id;
@@ -146,6 +161,11 @@ class AllocationService
 
         if (! $currentTrip || (int) $driver->id !== (int) $currentTrip->driver_id) {
             $this->assertDriverReady($driver, $date);
+        }
+
+        // A driver who is kept on the trip still needs a valid license on the new date.
+        if ($newDate) {
+            $this->assertLicenseValidOn($driver, $date);
         }
     }
 
