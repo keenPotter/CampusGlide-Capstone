@@ -8,17 +8,28 @@ export const useNotificationStore = defineStore('notifications', {
   state: () => ({
     pendingRequests: 0,
     openMaintenance: 0,
+    // Approved requests that still need a vehicle and driver.
+    needsAllocation: 0,
+    // Faculty requests to change the date of a trip.
+    pendingDateChanges: 0,
   }),
 
   getters: {
-    total: (state) => state.pendingRequests + state.openMaintenance,
+    allocationAttention: (state) => state.needsAllocation + state.pendingDateChanges,
+    total: (state) =>
+      state.pendingRequests +
+      state.openMaintenance +
+      state.needsAllocation +
+      state.pendingDateChanges,
   },
 
   actions: {
     async refresh() {
-      const [requests, maintenance] = await Promise.allSettled([
+      const [requests, maintenance, approved, dateChanges] = await Promise.allSettled([
         api.get('/vehicle-requests', { params: { status: 'pending' } }),
         api.get('/maintenance-logs'),
+        api.get('/vehicle-requests/approved'),
+        api.get('/reschedule-requests', { params: { status: 'pending' } }),
       ])
 
       if (requests.status === 'fulfilled') {
@@ -32,11 +43,22 @@ export const useNotificationStore = defineStore('notifications', {
         const logs = Array.isArray(body) ? body : (body?.data ?? [])
         this.openMaintenance = logs.filter((log) => OPEN_MAINTENANCE.includes(log.status)).length
       }
+
+      // This endpoint is not paginated, so the number of rows is the total.
+      if (approved.status === 'fulfilled') {
+        this.needsAllocation = approved.value.data?.data?.length ?? 0
+      }
+
+      if (dateChanges.status === 'fulfilled') {
+        this.pendingDateChanges = dateChanges.value.data?.data?.length ?? 0
+      }
     },
 
     reset() {
       this.pendingRequests = 0
       this.openMaintenance = 0
+      this.needsAllocation = 0
+      this.pendingDateChanges = 0
     },
   },
 })

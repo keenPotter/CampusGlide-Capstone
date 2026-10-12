@@ -8,8 +8,8 @@ class StoreAllocationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // users.role enum is 'administrator', not 'admin'.
-        return $this->user()?->role === 'administrator';
+        // Only administrators can assign a vehicle and driver.
+        return $this->user()?->hasRole('administrator') ?? false;
     }
 
     public function rules(): array

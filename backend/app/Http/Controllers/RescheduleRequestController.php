@@ -1,52 +1,53 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Http\Resources\RescheduleRequestResource;
 use App\Models\Allocation;
 use App\Models\RescheduleRequest;
 use App\Services\AllocationService;
-use Carbon\Carbon;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Palit ng petsa ng trip.
- *  - Faculty (end user): request lang (POST allocations/{id}/reschedule-requests).
- *  - Admin: approve / cancel ang request, o direct na palitan ang petsa na may reason.
+ * Changing the date of a trip.
+ *  - Faculty can only send a request (POST allocations/{id}/reschedule-requests).
+ *  - Administrators approve or disapprove a request, or reassign the date directly with a reason.
  */
 class RescheduleRequestController extends Controller
 {
-    private const WITH = ['trip', 'requester', 'handler'];
+    private const WITH = ['trip.allocation', 'requester', 'handler'];
 
     public function __construct(protected AllocationService $allocations)
     {
-        Allocation::registerSharedRelations();
     }
 
-    /** Admin: lahat. End user: sariling requests lang. ?status=pending */
-    public function index(Request $request): JsonResponse
+    /**
+     * GET /api/reschedule-requests
+     * Administrators see all. Faculty see only their own. Optional: ?status=pending
+     */
+    public function index(Request $request)
     {
         $user = $request->user();
         $query = RescheduleRequest::with(self::WITH)->latest();
 
-        if (! AllocationService::isAdmin($user)) {
-            $query->whereHas('trip.vehicleRequest', fn ($r) => $r->where('requester_id', $user->id));
+        if ($user->hasRole('faculty')) {
+            $query->whereHas('trip.vehicleRequest', fn ($q) => $q->where('requester_id', $user->id));
         }
 
         if ($status = $request->query('status')) {
             $query->where('status', $status);
         }
 
-        return response()->json(['data' => $query->limit(100)->get()->map(fn ($r) => $this->shape($r))->values()]);
+        return RescheduleRequestResource::collection($query->limit(100)->get());
     }
 
-    /** Faculty: request for date change (hindi siya ang naglilipat). */
-    public function store(Request $request, Allocation $allocation): JsonResponse
+    /**
+     * POST /api/allocations/{allocation}/reschedule-requests
+     * Faculty only (route middleware). Faculty ask for a change; they do not move the trip.
+     */
+    public function store(Request $request, Allocation $allocation)
     {
         $user = $request->user();
-
-        abort_if(AllocationService::isAdmin($user), 403, 'Admins change the date directly.');
 
         $allocation->loadMissing('trip.vehicleRequest');
         $trip = $allocation->trip;
@@ -57,46 +58,49 @@ class RescheduleRequestController extends Controller
             'You may only request a date change for your own trips.'
         );
 
-        $data = $request->validate([
+        $validated = $request->validate([
             'new_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'reason' => ['required', 'string', 'max:500'],
         ]);
 
-        if ($trip->trip_status !== 'scheduled') {
-            return response()->json(['message' => "A {$trip->trip_status} trip can no longer be rescheduled."], 422);
-        }
+        abort_unless($trip->trip_status === 'scheduled', 422, "A {$trip->trip_status} trip can no longer be rescheduled.");
 
-        if (RescheduleRequest::where('trip_id', $trip->id)->where('status', 'pending')->exists()) {
-            return response()->json(['message' => 'This trip already has a pending date change request.'], 422);
-        }
+        abort_if(
+            RescheduleRequest::where('trip_id', $trip->id)->where('status', 'pending')->exists(),
+            422,
+            'This trip already has a pending date change request.'
+        );
 
-        $old = Carbon::parse($trip->trip_date)->toDateString();
+        $oldDate = $trip->trip_date->toDateString();
 
-        if ($data['new_date'] === $old) {
-            return response()->json(['message' => 'The new date is the same as the current date.'], 422);
-        }
+        abort_if($validated['new_date'] === $oldDate, 422, 'The new date is the same as the current date.');
 
-        $rr = RescheduleRequest::create([
+        $rescheduleRequest = RescheduleRequest::create([
             'trip_id' => $trip->id,
             'requested_by' => $user->id,
-            'old_date' => $old,
-            'new_date' => $data['new_date'],
-            'reason' => $data['reason'],
+            'old_date' => $oldDate,
+            'new_date' => $validated['new_date'],
+            'reason' => $validated['reason'],
             'status' => 'pending',
         ]);
 
-        return response()->json(['data' => $this->shape($rr->load(self::WITH))], 201);
+        return (new RescheduleRequestResource($rescheduleRequest->load(self::WITH)))
+            ->response()
+            ->setStatusCode(201);
     }
 
-    /** Admin: i-approve = ililipat ang trip sa hiniling na petsa (may conflict check). */
-    public function approve(Request $request, RescheduleRequest $rescheduleRequest): JsonResponse
+    /**
+     * POST /api/reschedule-requests/{rescheduleRequest}/approve
+     * Moves the trip to the requested date. The conflict check runs first.
+     * The administrator's note is optional.
+     */
+    public function approve(Request $request, RescheduleRequest $rescheduleRequest)
     {
-        abort_unless(AllocationService::isAdmin($request->user()), 403, 'Admin only.');
         $this->assertPending($rescheduleRequest);
 
         $request->validate(['admin_reason' => ['nullable', 'string', 'max:500']]);
 
-        $this->allocations->moveTrip($rescheduleRequest->trip, Carbon::parse($rescheduleRequest->new_date)->toDateString());
+        $this->allocations->moveTrip($rescheduleRequest->trip, $rescheduleRequest->new_date->toDateString());
 
         $rescheduleRequest->update([
             'status' => 'approved',
@@ -105,79 +109,67 @@ class RescheduleRequestController extends Controller
             'admin_reason' => $request->input('admin_reason'),
         ]);
 
-        return response()->json(['data' => $this->shape($rescheduleRequest->load(self::WITH))]);
+        return new RescheduleRequestResource($rescheduleRequest->load(self::WITH));
     }
 
-    /** Admin: i-delete ang request kapag kinansela (hindi gagalawin ang trip). */
-    public function cancel(Request $request, RescheduleRequest $rescheduleRequest): JsonResponse
+    /**
+     * POST /api/reschedule-requests/{rescheduleRequest}/disapprove
+     * The trip is not touched. The reason is required, and the faculty member can see it.
+     * (This replaces the old "cancel", which deleted the request.)
+     */
+    public function disapprove(Request $request, RescheduleRequest $rescheduleRequest)
     {
-        abort_unless(AllocationService::isAdmin($request->user()), 403, 'Admin only.');
         $this->assertPending($rescheduleRequest);
 
-        $rescheduleRequest->delete();
+        $validated = $request->validate([
+            'admin_reason' => ['required', 'string', 'max:500'],
+        ]);
 
-        return response()->json(['message' => 'Request cancelled and deleted.']);
+        $rescheduleRequest->update([
+            'status' => 'disapproved',
+            'handled_by' => $request->user()->id,
+            'handled_at' => now(),
+            'admin_reason' => $validated['admin_reason'],
+        ]);
+
+        return new RescheduleRequestResource($rescheduleRequest->load(self::WITH));
     }
 
-    /** Admin: direct na palit ng petsa, kailangan ng reason. */
-    public function reschedule(Request $request, Allocation $allocation): JsonResponse
+    /**
+     * POST /api/allocations/{allocation}/reschedule
+     * Administrator reassigns the date directly. A reason is required.
+     */
+    public function reschedule(Request $request, Allocation $allocation)
     {
-        abort_unless(AllocationService::isAdmin($request->user()), 403, 'Admin only.');
-
-        $data = $request->validate([
+        $validated = $request->validate([
             'new_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'reason' => ['required', 'string', 'max:500'],
         ]);
 
         $trip = $allocation->trip;
-        $old = $this->allocations->moveTrip($trip, $data['new_date']);
+        $oldDate = $this->allocations->moveTrip($trip, $validated['new_date']);
 
-        // Hindi na kailangan ang pending faculty request dahil direkta nang pinalitan ng Admin ang petsa.
+        // A pending faculty request is no longer needed once the date is changed directly.
         RescheduleRequest::where('trip_id', $trip->id)->where('status', 'pending')->delete();
 
-        $rr = RescheduleRequest::create([
+        $rescheduleRequest = RescheduleRequest::create([
             'trip_id' => $trip->id,
             'requested_by' => $request->user()->id,
-            'old_date' => $old,
-            'new_date' => $data['new_date'],
-            'reason' => $data['reason'],
+            'old_date' => $oldDate,
+            'new_date' => $validated['new_date'],
+            'reason' => $validated['reason'],
             'status' => 'approved',
             'handled_by' => $request->user()->id,
             'handled_at' => now(),
         ]);
 
-        return response()->json(['data' => $this->shape($rr->load(self::WITH))], 201);
+        return (new RescheduleRequestResource($rescheduleRequest->load(self::WITH)))
+            ->response()
+            ->setStatusCode(201);
     }
 
-    private function assertPending(RescheduleRequest $rr): void
+    private function assertPending(RescheduleRequest $rescheduleRequest): void
     {
-        abort_unless($rr->status === 'pending', 422, "This request is already {$rr->status}.");
-    }
-
-    private function shape(RescheduleRequest $r): array
-    {
-        $trip = $r->trip;
-        $name = fn ($u) => $u ? trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? '')) : null;
-
-        return [
-            'id' => $r->id,
-            'status' => $r->status,
-            'old_date' => Carbon::parse($r->old_date)->toDateString(),
-            'new_date' => Carbon::parse($r->new_date)->toDateString(),
-            'reason' => $r->reason,
-            'admin_reason' => $r->admin_reason,
-            'requested_by' => $name($r->requester),
-            'handled_by' => $name($r->handler),
-            'handled_at' => $r->handled_at,
-            'created_at' => $r->created_at,
-            'allocation_id' => $trip ? Allocation::where('trip_id', $trip->id)->value('id') : null,
-            'trip' => [
-                'id' => $trip?->id,
-                'destination' => $trip?->destination,
-                'trip_date' => $trip?->trip_date ? Carbon::parse($trip->trip_date)->toDateString() : null,
-                'departure_time' => $trip?->departure_time,
-                'estimated_return_time' => $trip?->estimated_return_time,
-            ],
-        ];
+        abort_unless($rescheduleRequest->status === 'pending', 422, "This request is already {$rescheduleRequest->status}.");
     }
 }

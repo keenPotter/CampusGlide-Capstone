@@ -9,6 +9,13 @@ class Vehicle extends Model
 {
     use HasFactory;
 
+    public const STATUSES = [
+        'available',
+        'in_use',
+        'maintenance',
+        'retired',
+    ];
+
     protected $fillable = [
         'plate_number',
         'vehicle_model',
@@ -23,12 +30,14 @@ class Vehicle extends Model
         'is_active',
     ];
 
-    public const STATUSES = [
-        'available',
-        'in_use',
-        'maintenance',
-        'retired',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'last_maintenance_date' => 'date:Y-m-d',
+            'next_maintenance_date' => 'date:Y-m-d',
+            'is_active' => 'boolean',
+        ];
+    }
 
     public function maintenanceLogs()
     {

@@ -1,17 +1,19 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Http\Resources\AllocationResource;
+use App\Http\Resources\TripRequestShareResource;
 use App\Models\Allocation;
 use App\Models\TripRequestShare;
 use App\Models\User;
-use App\Services\AllocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+/**
+ * Sending a printed trip request to another administrator.
+ * Administrators only (route middleware).
+ */
 class TripRequestShareController extends Controller
 {
     private const WITH = [
@@ -20,25 +22,23 @@ class TripRequestShareController extends Controller
         'allocation.driver',
         'allocation.allocatedBy',
         'sender',
+        'recipient',
     ];
 
-    public function __construct()
-    {
-        Allocation::registerSharedRelations();
-    }
-
+    /**
+     * GET /api/admins
+     * Other active administrators who can receive a trip request.
+     */
     public function admins(Request $request): JsonResponse
     {
-        $this->assertAdmin($request);
-
-        $admins = User::query()
-            ->whereIn('role', AllocationService::ADMIN_ROLES)
+        $admins = User::where('role', User::ROLE_ADMINISTRATOR)
+            ->where('is_active', true)
             ->where('id', '!=', $request->user()->id)
             ->orderBy('email')
             ->get()
             ->map(fn (User $user) => [
                 'id' => $user->id,
-                'name' => self::userName($user),
+                'name' => $user->full_name,
                 'email' => $user->email,
             ])
             ->values();
@@ -46,79 +46,47 @@ class TripRequestShareController extends Controller
         return response()->json(['data' => $admins]);
     }
 
-    public function index(Request $request): JsonResponse
+    /**
+     * GET /api/trip-request-shares
+     * Trip requests sent to the logged-in administrator.
+     */
+    public function index(Request $request)
     {
-        $this->assertAdmin($request);
-
-        $shares = TripRequestShare::query()
-            ->with(self::WITH)
+        $shares = TripRequestShare::with(self::WITH)
             ->where('recipient_id', $request->user()->id)
             ->latest()
             ->limit(100)
-            ->get()
-            ->map(fn (TripRequestShare $share) => $this->shape($share, $request))
-            ->values();
+            ->get();
 
-        return response()->json(['data' => $shares]);
+        return TripRequestShareResource::collection($shares);
     }
 
-    public function store(Request $request): JsonResponse
+    /**
+     * POST /api/trip-request-shares
+     */
+    public function store(Request $request)
     {
-        $this->assertAdmin($request);
-
-        $data = $request->validate([
+        $validated = $request->validate([
             'allocation_id' => ['required', 'integer', 'exists:allocations,id'],
             'recipient_id' => [
                 'required',
                 'integer',
-                Rule::exists('users', 'id')->where(
-                    fn ($query) => $query->whereIn('role', AllocationService::ADMIN_ROLES)
-                ),
+                Rule::exists('users', 'id')->where('role', User::ROLE_ADMINISTRATOR),
             ],
         ]);
 
-        abort_if((int) $data['recipient_id'] === (int) $request->user()->id, 422, 'Choose another admin.');
+        abort_if((int) $validated['recipient_id'] === (int) $request->user()->id, 422, 'Choose another admin.');
 
-        $allocation = Allocation::with('trip')->findOrFail($data['allocation_id']);
-        abort_unless($allocation->trip && $allocation->trip->trip_status !== 'cancelled', 422, 'Cancelled trip requests cannot be sent.');
+        $allocation = Allocation::findOrFail($validated['allocation_id']);
 
         $share = TripRequestShare::create([
             'allocation_id' => $allocation->id,
             'sender_id' => $request->user()->id,
-            'recipient_id' => $data['recipient_id'],
-        ])->load(self::WITH);
+            'recipient_id' => $validated['recipient_id'],
+        ]);
 
-        return response()->json(['data' => $this->shape($share, $request)], 201);
-    }
-
-    private function assertAdmin(Request $request): void
-    {
-        abort_unless(AllocationService::isAdmin($request->user()), 403, 'Admin only.');
-    }
-
-    private function shape(TripRequestShare $share, Request $request): array
-    {
-        return [
-            'id' => $share->id,
-            'created_at' => $share->created_at,
-            'sender' => [
-                'id' => $share->sender->id,
-                'name' => self::userName($share->sender),
-                'email' => $share->sender->email,
-            ],
-            'recipient' => [
-                'id' => $share->recipient->id,
-                'name' => self::userName($share->recipient),
-                'email' => $share->recipient->email,
-            ],
-            'allocation' => (new AllocationResource($share->allocation))->resolve($request),
-        ];
-    }
-
-    private static function userName(User $user): string
-    {
-        $name = trim(($user->first_name ?? '').' '.($user->last_name ?? ''));
-
-        return $name !== '' ? $name : ($user->name ?? $user->email);
+        return (new TripRequestShareResource($share->load(self::WITH)))
+            ->response()
+            ->setStatusCode(201);
     }
 }

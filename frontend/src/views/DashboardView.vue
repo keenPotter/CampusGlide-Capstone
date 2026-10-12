@@ -3,24 +3,40 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
-import { formatDate, formatTime, ROLE_LABELS } from '@/lib/format'
+import { errorMessage } from '@/lib/api'
+import { formatDate, formatTime, fullName, ROLE_LABELS } from '@/lib/format'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import LoadError from '@/components/ui/LoadError.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 const requests = useVehicleRequestStore()
-const loading = ref(true)
 
-onMounted(async () => {
-  await Promise.allSettled([requests.fetch({ status: '', trip_type: '', page: 1 })])
-  loading.value = false
-})
+const loading = ref(true)
+const loadError = ref('')
+const summary = ref({ counts: {}, upcoming: [] })
+
+// The numbers come from the server totals, so they cover every page of requests.
+async function load() {
+  loading.value = true
+  loadError.value = ''
+
+  try {
+    summary.value = await requests.fetchSummary()
+  } catch (error) {
+    loadError.value = errorMessage(error, 'Unable to load the dashboard.')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(load)
 
 const stats = computed(() => {
-  const counts = requests.countByStatus
+  const counts = summary.value.counts
   return [
     { label: 'Pending', value: counts.pending ?? 0, tone: 'secondary' },
     { label: 'Approved', value: counts.approved ?? 0, tone: 'primary' },
@@ -32,15 +48,9 @@ const tones = {
   primary: 'bg-primary-50 text-primary-700',
   secondary: 'bg-secondary-50 text-secondary-700',
   danger: 'bg-red-50 text-red-700',
-  neutral: 'bg-neutral-100 text-ink-muted',
 }
 
-const upcoming = computed(() =>
-  [...requests.items]
-    .filter((item) => ['pending', 'approved'].includes(item.status))
-    .sort((a, b) => String(a.trip_date).localeCompare(String(b.trip_date)))
-    .slice(0, 5),
-)
+const upcoming = computed(() => summary.value.upcoming)
 </script>
 
 <template>
@@ -60,13 +70,11 @@ const upcoming = computed(() =>
       </BaseButton>
     </div>
 
+    <LoadError :message="loadError" @retry="load" />
+
     <!-- Stats Grid -->
     <div class="responsive-grid">
-      <div
-        v-for="stat in stats"
-        :key="stat.label"
-        class="stat-card"
-      >
+      <div v-for="stat in stats" :key="stat.label" class="stat-card">
         <span
           class="inline-flex rounded-full px-2 py-0.5 text-small font-medium"
           :class="tones[stat.tone]"
@@ -88,14 +96,22 @@ const upcoming = computed(() =>
         </RouterLink>
       </template>
 
+      <div v-if="loading" class="flex justify-center p-8">
+        <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
+      </div>
+
       <EmptyState
-        v-if="!loading && !upcoming.length"
+        v-else-if="!upcoming.length"
         title="No upcoming trips"
         message="Requests you create or approve will appear here."
       />
 
       <ul v-else class="flex flex-col divide-y divide-line">
-        <li v-for="request in upcoming" :key="request.id" class="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+        <li
+          v-for="request in upcoming"
+          :key="request.id"
+          class="flex flex-col gap-2 py-3 first:pt-0 last:pb-0"
+        >
           <RouterLink
             :to="{ name: 'requests.show', params: { id: request.id } }"
             class="block text-body font-medium text-ink hover:text-primary"
@@ -108,7 +124,7 @@ const upcoming = computed(() =>
             </p>
             <StatusBadge :status="request.status" />
           </div>
-          <p class="text-small text-ink-muted">{{ request.requested_by?.first_name }} {{ request.requested_by?.last_name }}</p>
+          <p class="text-small text-ink-muted">{{ fullName(request.requested_by) }}</p>
         </li>
       </ul>
     </BaseCard>

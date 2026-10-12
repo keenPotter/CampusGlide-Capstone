@@ -2,14 +2,14 @@ import { formatDateRange, fullName } from '@/lib/format'
 
 const TRIP_TYPES = ['inclusive', 'exclusive']
 
+// The backend (TripResource) sends the request as `vehicle_request`.
 function requestOf(trip) {
-  // Laravel serializes vehicleRequest as vehicle_request by default.
-  return trip?.vehicle_request || trip?.vehicleRequest || null
+  return trip?.vehicle_request ?? null
 }
 
 /** Returns 'inclusive', 'exclusive', or null. Missing values are never treated as Inclusive. */
 export function tripType(trip) {
-  const type = String(trip?.trip_type || requestOf(trip)?.trip_type || '')
+  const type = String(requestOf(trip)?.trip_type || '')
     .trim()
     .toLowerCase()
   return TRIP_TYPES.includes(type) ? type : null
@@ -30,10 +30,9 @@ export function getTripStartDate(trip) {
   return String(trip?.trip_date || requestOf(trip)?.trip_date || '').slice(0, 10)
 }
 
+// The end date is kept on the vehicle request, not on the trip.
 export function getTripEndDate(trip) {
-  return String(
-    trip?.trip_end_date || requestOf(trip)?.trip_end_date || getTripStartDate(trip),
-  ).slice(0, 10)
+  return String(requestOf(trip)?.trip_end_date || getTripStartDate(trip)).slice(0, 10)
 }
 
 export function dateIsWithinTrip(date, trip) {
@@ -51,12 +50,7 @@ export function tripDateRange(trip) {
 }
 
 export function requesterName(trip) {
-  if (trip?.requester_name) return trip.requester_name
-
-  const request = requestOf(trip)
-  const requester =
-    trip?.requester || trip?.requested_by || request?.requester || request?.requested_by
-  return requester?.name || fullName(requester) || 'Approved trip'
+  return fullName(requestOf(trip)?.requester) || 'Approved trip'
 }
 
 export function vehicleName(trip) {
@@ -65,14 +59,12 @@ export function vehicleName(trip) {
   return [vehicle.vehicle_model, vehicle.plate_number].filter(Boolean).join(' - ') || '—'
 }
 
-/** Works whether the driver's name is on driver.user or on the driver itself. */
+// A driver is a record only (no login), so the name is on the driver itself.
 export function driverName(trip) {
   const driver = trip?.driver
-  const person = driver?.user ?? driver
-  return person?.name || fullName(person) || '—'
+  return driver?.name || fullName(driver) || '—'
 }
 
 export function driverContact(trip) {
-  const driver = trip?.driver
-  return driver?.user?.phone_number || driver?.phone_number || driver?.contact_number || '—'
+  return trip?.driver?.contact_number || '—'
 }

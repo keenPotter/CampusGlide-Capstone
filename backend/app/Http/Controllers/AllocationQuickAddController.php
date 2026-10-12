@@ -1,73 +1,70 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Driver;
 use App\Models\Vehicle;
 use App\Services\AllocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 /**
- * "Add new driver" / "Add new vehicle" mula mismo sa allocation page. Admin lang.
- * Columns na wala sa table ay awtomatikong nilalaktawan (iba-iba ang schema ng Driver/Vehicle Management).
+ * "Add new driver" and "Add new vehicle" from the allocation page.
+ * Administrators only (route middleware).
  */
 class AllocationQuickAddController extends Controller
 {
+    /**
+     * POST /api/allocation-drivers
+     */
     public function storeDriver(Request $request): JsonResponse
     {
-        abort_unless(AllocationService::isAdmin($request->user()), 403, 'Admin only.');
-
-        $v = $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
-            'contact_number' => ['required', 'string', 'max:30'],
-            'license_number' => ['required', 'string', 'max:50'],
+            // Column length is 20 in the drivers table.
+            'contact_number' => ['required', 'string', 'max:20'],
+            'license_number' => ['required', 'string', 'max:50', 'unique:drivers,license_number'],
             'license_expiry_date' => ['required', 'date_format:Y-m-d'],
         ]);
 
-        $data = [
-            'contact_number' => $v['contact_number'],
-            'license_number' => $v['license_number'],
-            'license_expiry_date' => $v['license_expiry_date'],
+        // The drivers table keeps first and last name in separate columns.
+        // The last word is the last name. A single word is used for both.
+        $parts = preg_split('/\s+/', trim($validated['name']));
+        $lastName = count($parts) > 1 ? array_pop($parts) : $parts[0];
+        $firstName = implode(' ', $parts);
+
+        $driver = Driver::create([
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'contact_number' => $validated['contact_number'],
+            'license_number' => $validated['license_number'],
+            'license_expiry_date' => $validated['license_expiry_date'],
             'is_available' => true,
-        ];
-
-        if (Schema::hasColumn('drivers', 'name')) {
-            $data['name'] = $v['name'];
-        } else {
-            $parts = preg_split('/\s+/', trim($v['name']));
-            $data['last_name'] = count($parts) > 1 ? array_pop($parts) : $parts[0];
-            $data['first_name'] = count($parts) ? implode(' ', $parts) : $data['last_name'];
-        }
-
-        $driver = Driver::forceCreate($this->onlyExistingColumns('drivers', $data));
+        ]);
 
         return response()->json(['data' => AllocationService::driverOption($driver)], 201);
     }
 
+    /**
+     * POST /api/allocation-vehicles
+     */
     public function storeVehicle(Request $request): JsonResponse
     {
-        abort_unless(AllocationService::isAdmin($request->user()), 403, 'Admin only.');
-
-        $v = $request->validate([
+        $validated = $request->validate([
             'plate_number' => ['required', 'string', 'max:20', 'unique:vehicles,plate_number'],
             'vehicle_model' => ['required', 'string', 'max:100'],
+            'vehicle_type' => ['nullable', 'string', 'max:50'],
             'capacity' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $data = $v + ['status' => 'available', 'is_active' => true];
-
-        $vehicle = Vehicle::forceCreate($this->onlyExistingColumns('vehicles', $data));
+        $vehicle = Vehicle::create([
+            ...$validated,
+            // vehicle_type is required in the table, but the quick-add form does not ask for it.
+            'vehicle_type' => $validated['vehicle_type'] ?? 'Not specified',
+            'status' => 'available',
+            'is_active' => true,
+        ]);
 
         return response()->json(['data' => AllocationService::vehicleOption($vehicle)], 201);
-    }
-
-    private function onlyExistingColumns(string $table, array $data): array
-    {
-        $columns = Schema::getColumnListing($table);
-
-        return array_filter($data, fn ($v, $k) => in_array($k, $columns, true) && $v !== null, ARRAY_FILTER_USE_BOTH);
     }
 }

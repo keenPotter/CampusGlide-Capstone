@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -37,6 +38,14 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'password' => 'hashed',
         ];
+    }
+
+    // "First Last". Added because many resources repeated the same code.
+    protected function fullName(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => trim("{$this->first_name} {$this->last_name}"),
+        );
     }
 
     public function hasRole(string ...$roles): bool

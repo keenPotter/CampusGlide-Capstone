@@ -15,7 +15,6 @@ import {
   vehicleName,
 } from '@/lib/trips'
 
-const NAV_SEEN_KEY = 'campusglide_trip_schedule_nav_seen'
 const VIEWED_KEY = 'campusglide_trip_schedule_viewed'
 
 function getStoredIds(key) {
@@ -54,7 +53,6 @@ export function useTripSchedule() {
   const activeDateLabel = ref('')
   const loadError = ref('')
 
-  const navSeenIds = ref(getStoredIds(NAV_SEEN_KEY))
   const viewedIds = ref(getStoredIds(VIEWED_KEY))
 
   const currentTripTypeLabel = computed(() => TRIP_TYPE_LABELS[currentTripType.value])
@@ -116,14 +114,7 @@ export function useTripSchedule() {
 
   const newTripCount = computed(() => filteredTrips.value.filter(isNewTrip).length)
 
-  onMounted(async () => {
-    await fetchTrips()
-
-    // Opening Trip Schedule clears only the navigation notification.
-    const currentIds = scheduledTripList.value.map((trip) => Number(trip.id))
-    navSeenIds.value = [...new Set([...navSeenIds.value, ...currentIds])]
-    storeIds(NAV_SEEN_KEY, navSeenIds.value)
-  })
+  onMounted(fetchTrips)
 
   function isNewTrip(trip) {
     return !viewedIds.value.includes(Number(trip?.id))

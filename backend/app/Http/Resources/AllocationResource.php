@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Services\AllocationService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -12,7 +11,7 @@ class AllocationResource extends JsonResource
     public function toArray(Request $request): array
     {
         $trip = $this->trip;
-        $requester = $trip?->vehicleRequest?->requester;
+        $vehicleRequest = $trip?->vehicleRequest;
 
         return [
             'id' => $this->id,
@@ -26,31 +25,30 @@ class AllocationResource extends JsonResource
                 'purpose' => $trip?->purpose,
             ],
             'vehicle_request' => [
-                'id' => $trip?->vehicleRequest?->id,
-                'requester' => self::fullName($requester),
+                'id' => $vehicleRequest?->id,
+                // The frontend shows the print button only for an approved request.                
+                'status' => $vehicleRequest?->status,
+                // The frontend filters allocations by trip type.
+                'trip_type' => $vehicleRequest?->trip_type,
+                'requester' => $vehicleRequest?->requester?->full_name,
             ],
             'vehicle' => [
                 'id' => $this->vehicle?->id,
                 'plate_number' => $this->vehicle?->plate_number,
                 'vehicle_model' => $this->vehicle?->vehicle_model,
             ],
-            // Driver ay record lang: pangalan + contact number + license.
+            // A driver is a record only (no login): name, contact number and license.
             'driver' => [
                 'id' => $this->driver?->id,
-                'name' => AllocationService::driverName($this->driver),
-                'contact_number' => $this->driver?->getAttributes()['contact_number'] ?? null,
+                'name' => $this->driver?->full_name,
+                'contact_number' => $this->driver?->contact_number,
                 'license_number' => $this->driver?->license_number,
             ],
-            'allocated_by' => self::fullName($this->allocatedBy),
+            'allocated_by' => $this->allocatedBy?->full_name,
             'allocation_date' => $this->allocation_date,
             'notes' => $this->notes,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
-    }
-
-    private static function fullName($user): ?string
-    {
-        return $user ? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) : null;
     }
 }

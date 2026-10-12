@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Trip extends Model
 {
     protected $table = 'trips';
-    protected $guarded = [];
+
     protected $fillable = [
         'vehicle_request_id',
         'vehicle_id',
@@ -24,6 +24,15 @@ class Trip extends Model
         'notes',
     ];
 
+    // Added: trip_date was returned as plain text, so date methods such as
+    // ->toDateString() failed in the reschedule code and in TripResource.
+    protected function casts(): array
+    {
+        return [
+            'trip_date' => 'date:Y-m-d',
+        ];
+    }
+
     public function vehicleRequest()
     {
         return $this->belongsTo(VehicleRequest::class, 'vehicle_request_id');
@@ -37,5 +46,11 @@ class Trip extends Model
     public function driver()
     {
         return $this->belongsTo(Driver::class, 'driver_id');
+    }
+
+    // The allocation record of this trip (used by the allocation module).
+    public function allocation()
+    {
+        return $this->hasOne(Allocation::class);
     }
 }

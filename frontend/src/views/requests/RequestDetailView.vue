@@ -3,15 +3,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
-import { errorMessage, validationErrors } from '@/lib/api'
+import { errorMessage } from '@/lib/api'
 import { formatDate, formatDateTime, formatTime, fullName } from '@/lib/format'
-import { printRequest } from '@/lib/printRequest'
 import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
-import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
+import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 
 const auth = useAuthStore()
 const store = useVehicleRequestStore()
@@ -22,17 +20,11 @@ const toast = useToast()
 const request = ref(null)
 const loading = ref(true)
 const submitting = ref(false)
-const printing = ref(false)
 const disapproveOpen = ref(false)
-const disapproveReason = ref('')
-const disapproveError = ref('')
 
 const canEdit = computed(
   () => auth.isFaculty && ['pending', 'approved'].includes(request.value?.status),
 )
-
-// Printing is for administrators only, and only after the request is approved.
-const canPrint = computed(() => auth.isAdministrator && request.value?.status === 'approved')
 
 const rows = computed(() => {
   if (!request.value) return []
@@ -69,17 +61,6 @@ async function load() {
   }
 }
 
-async function print() {
-  printing.value = true
-  try {
-    await printRequest(request.value)
-  } catch (error) {
-    toast.error(errorMessage(error, 'Unable to print this request.'))
-  } finally {
-    printing.value = false
-  }
-}
-
 async function approve() {
   submitting.value = true
   try {
@@ -93,29 +74,9 @@ async function approve() {
   }
 }
 
-function openDisapprove() {
-  disapproveReason.value = ''
-  disapproveError.value = ''
-  disapproveOpen.value = true
-}
-
-async function confirmDisapprove() {
-  submitting.value = true
-  disapproveError.value = ''
-
-  try {
-    await store.updateStatus(request.value.id, {
-      status: 'disapproved',
-      remarks: disapproveReason.value,
-    })
-    toast.success('Request disapproved.')
-    disapproveOpen.value = false
-    await load()
-  } catch (error) {
-    disapproveError.value = validationErrors(error).remarks ?? errorMessage(error)
-  } finally {
-    submitting.value = false
-  }
+function onDisapproved() {
+  disapproveOpen.value = false
+  load()
 }
 </script>
 
@@ -129,7 +90,7 @@ async function confirmDisapprove() {
       <div>
         <button
           type="button"
-          class="mb-1 text-small text-ink-muted hover:text-ink"
+          class="mb-1 text-body text-ink-muted hover:text-ink hover:underline"
           @click="router.push({ name: 'requests.index' })"
         >
           ← Back to requests
@@ -149,6 +110,15 @@ async function confirmDisapprove() {
       <p class="mt-1">{{ request.disapproval_reason }}</p>
     </div>
 
+    <!-- Shown while the request waits for approval again after an edit. -->
+    <div
+      v-if="request.edit_reason && request.status === 'pending'"
+      class="rounded-card border-l-4 border-secondary bg-secondary-50 p-card text-small text-secondary-700"
+    >
+      <p class="font-medium">Edited after approval</p>
+      <p class="mt-1">Reason: {{ request.edit_reason }}</p>
+    </div>
+
     <BaseCard title="Request for use of vehicle" :padded="false">
       <dl class="divide-y divide-line">
         <div
@@ -164,16 +134,11 @@ async function confirmDisapprove() {
 
     <div class="flex flex-wrap justify-end gap-3">
       <template v-if="auth.isAdministrator && request.status === 'pending'">
-        <BaseButton variant="outline" :disabled="submitting" @click="openDisapprove">
+        <BaseButton :loading="submitting" @click="approve">Approve</BaseButton>
+        <BaseButton variant="outline" :disabled="submitting" @click="disapproveOpen = true">
           Disapprove
         </BaseButton>
-        <BaseButton :loading="submitting" @click="approve">Approve</BaseButton>
       </template>
-
-      <!-- Print is for administrators only, and only after the request is approved -->
-      <BaseButton v-if="canPrint" :loading="printing" @click="print">
-        Print
-      </BaseButton>
 
       <BaseButton
         v-if="canEdit"
@@ -184,27 +149,10 @@ async function confirmDisapprove() {
       </BaseButton>
     </div>
 
-    <!-- Disapprove -->
-    <BaseModal
-      :open="disapproveOpen"
-      title="Disapprove request"
-      :subtitle="`Request #${request.id} — ${request.destination}`"
+    <DisapproveRequestModal
+      :request="disapproveOpen ? request : null"
       @close="disapproveOpen = false"
-    >
-      <BaseTextarea
-        v-model="disapproveReason"
-        label="Reason for disapproval"
-        placeholder="e.g. Vehicle already assigned for that date."
-        :error="disapproveError"
-        required
-      />
-
-      <template #footer>
-        <BaseButton variant="outline" @click="disapproveOpen = false">Cancel</BaseButton>
-        <BaseButton variant="danger" :loading="submitting" @click="confirmDisapprove">
-          Disapprove request
-        </BaseButton>
-      </template>
-    </BaseModal>
+      @done="onDisapproved"
+    />
   </div>
 </template>

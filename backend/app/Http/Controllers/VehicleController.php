@@ -2,10 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\VehicleResource;
 use App\Models\Vehicle;
 
 class VehicleController extends Controller
 {
+    /**
+     * GET /api/vehicles
+     * Administrators only (route middleware). The trip schedule and maintenance pages read this.
+     */
+    public function index()
+    {
+        return VehicleResource::collection(Vehicle::orderBy('plate_number')->get());
+    }
+
     /**
      * GET /api/vehicles/{id}/status
      *

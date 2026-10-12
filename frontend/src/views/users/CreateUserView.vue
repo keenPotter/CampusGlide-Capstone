@@ -19,6 +19,8 @@ function emptyForm() {
     first_name: '',
     last_name: '',
     email: '',
+    position: '',
+    phone_number: '',
     password: '',
     password_confirmation: '',
     role: '',
@@ -104,6 +106,23 @@ async function submit() {
               required
             />
           </div>
+
+          <!-- Added: the backend accepts these since Module 3. The position is printed on the request form. -->
+          <BaseInput
+            v-model="form.position"
+            label="Position / designation"
+            placeholder="e.g. Instructor III"
+            hint="Printed on the vehicle request form."
+            :error="errors.position"
+          />
+
+          <BaseInput
+            v-model="form.phone_number"
+            label="Phone number"
+            type="tel"
+            placeholder="0917-123-4567"
+            :error="errors.phone_number"
+          />
 
           <div class="sm:col-span-2">
             <BaseSelect

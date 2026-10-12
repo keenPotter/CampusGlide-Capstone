@@ -13,8 +13,8 @@ const props = defineProps({
 const variants = {
   primary: 'bg-primary text-white hover:bg-primary-600 active:bg-primary-700',
   secondary: 'bg-secondary text-white hover:bg-secondary-600 active:bg-secondary-700',
-  outline: 'border border-line bg-white text-ink hover:bg-neutral-50',
-  ghost: 'text-ink-muted hover:bg-neutral-100 hover:text-ink',
+  outline: 'border border-line bg-white text-ink hover:bg-neutral-200 hover:text-ink hover:underline',
+  ghost: 'cursor-pointer text-ink-muted underline-offset-4 hover:bg-neutral-100 hover:text-ink hover:underline',
   danger: 'bg-red-600 text-white hover:bg-red-700',
 }
 

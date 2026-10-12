@@ -117,8 +117,9 @@
 
     <div class="action-top">
       <div>
-        <p>Vehicle Plate No.: <span class="blank w55"></span></p>
-        <p>Driver: <span class="blank w65"></span></p>
+        {{-- Changed: filled in from the allocation (printing needs an assigned vehicle and driver). --}}
+        <p>Vehicle Plate No.: <u>{{ $plateNumber }}</u></p>
+        <p>Driver: <u>{{ $driverName }}</u></p>
       </div>
       <div class="request">
         <span>Request:</span>
