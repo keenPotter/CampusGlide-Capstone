@@ -3,6 +3,14 @@ import api, { errorMessage, unwrap } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { ACTIVE_STATUSES, findConflicts, resourceState } from '@/lib/allocations'
 
+// Order of the summary list: needs allocation, in progress, scheduled, completed.
+const ROW_ORDER = { waiting: 0, in_progress: 1, scheduled: 2, completed: 3 }
+
+function rowGroup(row) {
+  if (row.kind === 'waiting') return 'waiting'
+  return row.allocation?.status ?? 'scheduled'
+}
+
 /**
  * Data for the allocation pages.
  * Faculty get their own allocations and date change requests.
@@ -68,7 +76,7 @@ export function useAllocations() {
 
   onMounted(load)
 
-  // A vehicle or driver added from the allocation window shows up in the lists right away.
+  // A vehicle or driver added from the allocation page shows up in the lists right away.
   function addVehicle(vehicle) {
     vehicles.value = [...vehicles.value, vehicle]
   }
@@ -140,6 +148,8 @@ export function useAllocations() {
 
   // One list for the summary: allocations, approved requests that still need
   // a vehicle and driver, and trip requests sent by other administrators.
+  // Sorted by group: needs allocation, in progress, scheduled, completed.
+  // Inside a group, the soonest date comes first. Completed trips show the newest first.
   const summaryRows = computed(() => {
     const fromAllocation = (allocation, extra) => ({
       allocation,
@@ -173,9 +183,16 @@ export function useAllocations() {
       ),
     ]
 
-    return rows.sort((x, y) =>
-      `${x.date ?? ''} ${x.time ?? ''}`.localeCompare(`${y.date ?? ''} ${y.time ?? ''}`),
-    )
+    return rows.sort((x, y) => {
+      const groupX = rowGroup(x)
+      const groupY = rowGroup(y)
+
+      const byGroup = (ROW_ORDER[groupX] ?? 4) - (ROW_ORDER[groupY] ?? 4)
+      if (byGroup !== 0) return byGroup
+
+      const byDate = `${x.date ?? ''} ${x.time ?? ''}`.localeCompare(`${y.date ?? ''} ${y.time ?? ''}`)
+      return groupX === 'completed' ? -byDate : byDate
+    })
   })
 
   return {

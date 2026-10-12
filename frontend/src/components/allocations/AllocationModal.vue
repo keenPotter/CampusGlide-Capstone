@@ -1,16 +1,20 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import api, { errorMessage, unwrap, validationErrors } from '@/lib/api'
+import { todayIso } from '@/lib/format'
 import { conflictOf } from '@/lib/allocations'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 import ConflictModal from '@/components/allocations/ConflictModal.vue'
-import QuickAddModal from '@/components/allocations/QuickAddModal.vue'
 
 // Assigns a vehicle and driver to an approved request, or reassigns an existing allocation.
 // `allocation` is set when reassigning. `presetRequestId` is set when "Assign" was clicked on a request.
+// When reassigning, the window shows the vehicle, driver and date with their current values,
+// so the administrator changes only what is needed.
+// A reason is required only when the date is changed. The date is locked unless the trip is scheduled.
 // The lists (requests, vehicles, drivers) come from the page, so this window does not load them again.
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -21,7 +25,7 @@ const props = defineProps({
   drivers: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['close', 'saved', 'vehicle-added', 'driver-added'])
+const emit = defineEmits(['close', 'saved'])
 
 const statusOptions = [
   { value: 'scheduled', label: 'Scheduled' },
@@ -29,17 +33,33 @@ const statusOptions = [
   { value: 'completed', label: 'Completed' },
 ]
 
-const form = reactive({ request_id: '', vehicle_id: '', driver_id: '', status: '', notes: '' })
+const form = reactive({
+  request_id: '',
+  vehicle_id: '',
+  driver_id: '',
+  trip_date: '',
+  reason: '',
+  status: '',
+  notes: '',
+})
 const errors = ref({})
 const formError = ref('')
 const saving = ref(false)
 const conflict = ref(null)
-const quickAdd = ref('')
 
 const isEdit = computed(() => Boolean(props.allocation))
 
 const title = computed(() =>
   isEdit.value ? `Reassign allocation #${props.allocation.id}` : 'New allocation',
+)
+
+// Only a scheduled trip can be moved to another date.
+const dateLocked = computed(() => props.allocation?.status !== 'scheduled')
+
+const currentDate = computed(() => props.allocation?.trip?.trip_date ?? '')
+
+const dateChanged = computed(
+  () => isEdit.value && !dateLocked.value && Boolean(form.trip_date) && form.trip_date !== currentDate.value,
 )
 
 const requestOptions = computed(() => {
@@ -83,6 +103,10 @@ const requestPlaceholder = computed(() =>
   props.requests.length ? 'Select approved request' : 'No approved requests waiting',
 )
 
+const conflictHint = computed(() =>
+  dateChanged.value ? 'Please choose another date, vehicle or driver.' : '',
+)
+
 // Start fresh each time the window opens.
 watch(
   () => props.open,
@@ -92,13 +116,14 @@ watch(
     errors.value = {}
     formError.value = ''
     conflict.value = null
-    quickAdd.value = ''
 
     const current = props.allocation
     Object.assign(form, {
       request_id: current ? (current.vehicle_request?.id ?? '') : (props.presetRequestId ?? ''),
       vehicle_id: current?.vehicle?.id ?? '',
       driver_id: current?.driver?.id ?? '',
+      trip_date: current?.trip?.trip_date ?? '',
+      reason: '',
       status: current?.status ?? '',
       notes: current?.notes ?? '',
     })
@@ -122,6 +147,9 @@ async function save() {
       errors.value = problems
       return
     }
+  } else if (dateChanged.value && !form.reason.trim()) {
+    errors.value = { reason: 'Please give a reason for changing the date.' }
+    return
   }
 
   saving.value = true
@@ -132,6 +160,9 @@ async function save() {
         driver_id: driverId,
         status: form.status || undefined,
         notes: form.notes || null,
+        // The date and the reason are sent only when the date was changed.
+        new_date: dateChanged.value ? form.trip_date : undefined,
+        reason: dateChanged.value ? form.reason.trim() : undefined,
       })
       emit('saved', null)
     } else {
@@ -161,21 +192,13 @@ async function save() {
 }
 
 // After a conflict, clear the choice that caused it so a new one is picked.
+// When the date was changed, nothing is cleared, because the date may be the cause.
 function closeConflict() {
-  if (conflict.value?.type === 'driver') form.driver_id = ''
-  else form.vehicle_id = ''
-  conflict.value = null
-}
-
-function onQuickAdded({ kind, item }) {
-  if (kind === 'driver') {
-    emit('driver-added', item)
-    form.driver_id = item.id
-  } else {
-    emit('vehicle-added', item)
-    form.vehicle_id = item.id
+  if (!dateChanged.value) {
+    if (conflict.value?.type === 'driver') form.driver_id = ''
+    else form.vehicle_id = ''
   }
-  quickAdd.value = ''
+  conflict.value = null
 }
 </script>
 
@@ -192,51 +215,53 @@ function onQuickAdded({ kind, item }) {
         required
       />
 
-      <div>
-        <BaseSelect
-          v-model="form.vehicle_id"
-          label="Vehicle"
-          :options="vehicleOptions"
-          :placeholder="vehicleOptions.length ? 'Select vehicle' : 'No vehicle yet — add one'"
-          :error="errors.vehicle_id"
-          required
-        />
-        <button
-          type="button"
-          class="mt-1.5 text-small font-medium text-primary-700 hover:underline"
-          @click="quickAdd = 'vehicle'"
-        >
-          + Add new vehicle
-        </button>
-      </div>
-
-      <div>
-        <BaseSelect
-          v-model="form.driver_id"
-          label="Driver"
-          :options="driverOptions"
-          :placeholder="driverOptions.length ? 'Select driver' : 'No driver yet — add one'"
-          :error="errors.driver_id"
-          required
-        />
-        <button
-          type="button"
-          class="mt-1.5 text-small font-medium text-primary-700 hover:underline"
-          @click="quickAdd = 'driver'"
-        >
-          + Add new driver
-        </button>
-      </div>
+      <BaseSelect
+        v-model="form.vehicle_id"
+        label="Vehicle"
+        :options="vehicleOptions"
+        :placeholder="vehicleOptions.length ? 'Select vehicle' : 'No vehicle yet — add one first'"
+        :error="errors.vehicle_id"
+        required
+      />
 
       <BaseSelect
-        v-if="isEdit"
-        v-model="form.status"
-        label="Trip status"
-        :options="statusOptions"
-        placeholder="Unchanged"
-        allow-empty
-        :error="errors.status"
+        v-model="form.driver_id"
+        label="Driver"
+        :options="driverOptions"
+        :placeholder="driverOptions.length ? 'Select driver' : 'No driver yet — add one first'"
+        :error="errors.driver_id"
+        required
       />
+
+      <template v-if="isEdit">
+        <BaseInput
+          v-model="form.trip_date"
+          label="Trip date"
+          type="date"
+          :min="todayIso()"
+          :disabled="dateLocked"
+          :hint="dateLocked ? 'The date is locked. Only scheduled trips can be moved to another date.' : ''"
+          :error="errors.new_date"
+        />
+
+        <BaseTextarea
+          v-if="dateChanged"
+          v-model="form.reason"
+          label="Reason for changing the date"
+          placeholder="Why does the date need to change?"
+          :error="errors.reason"
+          required
+        />
+
+        <BaseSelect
+          v-model="form.status"
+          label="Trip status"
+          :options="statusOptions"
+          placeholder="Unchanged"
+          allow-empty
+          :error="errors.status"
+        />
+      </template>
 
       <BaseTextarea
         v-model="form.notes"
@@ -256,6 +281,5 @@ function onQuickAdded({ kind, item }) {
     </template>
   </BaseModal>
 
-  <ConflictModal :conflict="conflict" @close="closeConflict" />
-  <QuickAddModal :kind="quickAdd" @close="quickAdd = ''" @created="onQuickAdded" />
+  <ConflictModal :conflict="conflict" :hint="conflictHint" @close="closeConflict" />
 </template>

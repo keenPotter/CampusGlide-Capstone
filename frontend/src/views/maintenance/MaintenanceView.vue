@@ -26,8 +26,11 @@ import LoadError from '@/components/ui/LoadError.vue'
 const notifications = useNotificationStore()
 const toast = useToast()
 
-const PAGE_SIZE = 5
+const PAGE_SIZE = 10
 const today = todayIso()
+
+// Order of the list: in progress, upcoming, overdue, cancelled, completed.
+const STATUS_ORDER = ['in_progress', 'upcoming', 'overdue', 'cancelled', 'completed']
 
 const ICONS = {
   wrench:
@@ -130,7 +133,26 @@ function typeLabel(type) {
   return MAINTENANCE_TYPES.find((item) => item.value === type)?.label ?? type
 }
 
-const rows = computed(() => logs.value.map((log) => ({ ...log, display: displayStatus(log) })))
+// "Upcoming" and "Overdue" are sorted by the next due date. The other groups use the record date.
+function sortDate(log) {
+  return ['upcoming', 'overdue'].includes(log.display)
+    ? log.next_due_date || log.date_performed || ''
+    : log.date_performed || ''
+}
+
+// Sorted by status first. Inside a group the earliest date comes first,
+// except cancelled and completed records, which show the newest first.
+const rows = computed(() =>
+  logs.value
+    .map((log) => ({ ...log, display: displayStatus(log) }))
+    .sort((a, b) => {
+      const byStatus = STATUS_ORDER.indexOf(a.display) - STATUS_ORDER.indexOf(b.display)
+      if (byStatus !== 0) return byStatus
+
+      const byDate = sortDate(a).localeCompare(sortDate(b))
+      return ['cancelled', 'completed'].includes(a.display) ? -byDate : byDate
+    }),
+)
 
 const stats = computed(() => [
   { label: 'Total Maintenance', value: rows.value.length, path: ICONS.wrench, tone: TONES.primary },
@@ -211,9 +233,11 @@ watch([search, fStatus, fVehicle, fType, fTime], () => {
   page.value = 1
 })
 
+// Used by the card view (phones and tablets).
 function metaOf(log) {
   return [
     { label: 'Date', value: formatDate(log.date_performed) },
+    { label: 'Next due', value: formatDate(log.next_due_date) },
     { label: 'Odometer', value: formatKm(log.vehicle?.mileage) },
     { label: 'Cost', value: formatMoney(log.cost) },
   ]
@@ -255,6 +279,13 @@ function openEdit(log) {
   errors.value = {}
   formError.value = ''
   showForm.value = true
+}
+
+// Clicking anywhere on a row or card opens the edit form.
+// Clicks on a button or link are skipped, so they keep doing their own job.
+function onRowClick(event, log) {
+  if (event.target.closest('a, button')) return
+  openEdit(log)
 }
 
 async function save() {
@@ -327,16 +358,8 @@ async function markCompleted(log) {
     <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <div v-for="stat in stats" :key="stat.label" class="stat-card">
         <span class="inline-flex h-10 w-10 items-center justify-center rounded-card" :class="stat.tone">
-          <svg
-            class="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path :d="stat.path" />
           </svg>
         </span>
@@ -352,12 +375,7 @@ async function markCompleted(log) {
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <BaseSelect v-model="fStatus" :options="statusOptions" placeholder="All status" allow-empty />
-          <BaseSelect
-            v-model="fVehicle"
-            :options="vehicleFilterOptions"
-            placeholder="All vehicles"
-            allow-empty
-          />
+          <BaseSelect v-model="fVehicle" :options="vehicleFilterOptions" placeholder="All vehicles" allow-empty />
           <BaseSelect v-model="fType" :options="MAINTENANCE_TYPES" placeholder="All types" allow-empty />
           <BaseSelect v-model="fTime" :options="timeOptions" placeholder="All time" allow-empty />
         </div>
@@ -367,129 +385,130 @@ async function markCompleted(log) {
     <LoadError :message="loadError" @retry="loadAll" />
 
     <!-- Records -->
-    <BaseCard
-      title="Maintenance records"
-      subtitle="Recent maintenance activity for the motorpool fleet"
-      :padded="false"
-    >
+    <BaseCard title="Maintenance records" subtitle="In progress first, then upcoming, overdue, cancelled and completed"
+      :padded="false">
       <div v-if="loading" class="flex justify-center p-12">
         <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
       </div>
 
-      <EmptyState
-        v-else-if="!filtered.length"
-        title="No maintenance records found"
-        message="Get started by adding your first maintenance record."
-      >
+      <EmptyState v-else-if="!filtered.length" title="No maintenance records found"
+        message="Get started by adding your first maintenance record.">
         <BaseButton class="mt-2" @click="openAdd">Add maintenance</BaseButton>
       </EmptyState>
 
-      <ul v-else class="divide-y divide-line">
-        <li v-for="log in pageItems" :key="log.id" class="flex flex-col gap-3 p-card">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="font-medium text-ink">
-                {{ log.vehicle?.plate_number ?? '—' }}
-                <span class="font-normal text-ink-muted">· {{ vehicleModel(log.vehicle) }}</span>
-              </p>
-              <p class="mt-0.5 text-small text-ink-muted">
-                {{ log.description || typeLabel(log.type) }}
-              </p>
+      <template v-else>
+        <!-- Card view (phones and tablets). Tap a card to edit it. -->
+        <ul class="divide-y divide-line lg:hidden">
+          <li v-for="log in pageItems" :key="log.id"
+            class="flex cursor-pointer flex-col gap-2 p-card transition active:bg-neutral-50"
+            @click="onRowClick($event, log)">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="font-medium text-ink">
+                  {{ log.vehicle?.plate_number ?? '—' }}
+                  <span class="font-normal text-ink-muted">· {{ vehicleModel(log.vehicle) }}</span>
+                </p>
+                <p class="mt-0.5 truncate text-small text-ink-muted">
+                  {{ log.description || typeLabel(log.type) }}
+                </p>
+              </div>
+              <StatusBadge :status="log.display" class="shrink-0" />
             </div>
-            <StatusBadge :status="log.display" class="shrink-0" />
-          </div>
 
-          <dl class="grid grid-cols-3 gap-3 border-t border-line pt-3">
-            <div v-for="item in metaOf(log)" :key="item.label">
-              <dt class="text-small text-ink-muted">{{ item.label }}</dt>
-              <dd class="mt-0.5 text-small font-medium text-ink">{{ item.value }}</dd>
+            <dl class="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+              <div v-for="item in metaOf(log)" :key="item.label">
+                <dt class="text-small text-ink-muted">{{ item.label }}</dt>
+                <dd class="text-small font-medium text-ink">{{ item.value }}</dd>
+              </div>
+            </dl>
+
+            <div class="flex justify-end gap-2">
+              <BaseButton v-if="log.status !== 'completed'" size="sm" variant="primary" @click="markCompleted(log)">
+                Mark as completed
+              </BaseButton>
+              <BaseButton size="sm" variant="secondary" @click="openEdit(log)">Edit</BaseButton>
             </div>
-          </dl>
+          </li>
+        </ul>
 
-          <div class="flex justify-end gap-2">
-            <BaseButton size="sm" variant="secondary" @click="openEdit(log)">Edit</BaseButton>
-            <BaseButton
-              v-if="log.status !== 'completed'"
-              size="sm"
-              variant="primary"
-              @click="markCompleted(log)"
-            >
-              Mark as completed
-            </BaseButton>
-          </div>
-        </li>
-      </ul>
+        <!-- Table view (laptops and larger). Click a row to edit it. -->
+        <div class="hidden lg:block">
+          <table class="w-full table-fixed border-collapse">
+            <thead class="table-head">
+              <tr>
+                <th class="w-[15%] px-2 py-3 xl:px-card">Vehicle</th>
+                <th class="w-[17%] px-2 py-3 xl:px-card">Description</th>
+                <th class="w-[10%] px-2 py-3 xl:px-card">Date</th>
+                <th class="w-[10%] px-2 py-3 xl:px-card">Next due</th>
+                <th class="w-[10%] px-2 py-3 xl:px-card">Odometer</th>
+                <th class="w-[8%] px-2 py-3 xl:px-card">Cost</th>
+                <th class="w-[11%] px-2 py-3 xl:px-card">Status</th>
+                <th class="w-[19%] px-2 py-3 text-right xl:px-card">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody class="divide-y divide-line">
+              <tr v-for="log in pageItems" :key="log.id" class="cursor-pointer hover:bg-neutral-50" tabindex="0"
+                @click="onRowClick($event, log)" @keydown.enter="onRowClick($event, log)">
+                <td class="px-2 py-3 align-top xl:px-card">
+                  <p class="font-medium text-ink">{{ log.vehicle?.plate_number ?? '—' }}</p>
+                  <p class="truncate text-small text-ink-muted">{{ vehicleModel(log.vehicle) }}</p>
+                </td>
+                <td class="px-2 py-3 align-top text-small xl:px-card">
+                  <p class="line-clamp-3 break-words text-ink">
+                    {{ log.description || typeLabel(log.type) }}
+                  </p>
+                  <p class="text-ink-muted">{{ typeLabel(log.type) }}</p>
+                </td>
+                <td class="px-2 py-3 align-top text-small xl:px-card">{{ formatDate(log.date_performed) }}</td>
+                <td class="px-2 py-3 align-top text-small xl:px-card">{{ formatDate(log.next_due_date) }}</td>
+                <td class="px-2 py-3 align-top text-small xl:px-card">{{ formatKm(log.vehicle?.mileage) }}</td>
+                <td class="px-2 py-3 align-top text-small xl:px-card">{{ formatMoney(log.cost) }}</td>
+                <td class="px-2 py-3 align-top xl:px-card">
+                  <StatusBadge :status="log.display" />
+                </td>
+                <td class="px-2 py-3 align-top xl:px-card">
+                  <div class="flex flex-wrap justify-end gap-1.5">
+                    <BaseButton v-if="log.status !== 'completed'" size="sm" variant="primary"
+                      @click="markCompleted(log)">
+                      Mark as completed
+                    </BaseButton>
+                    <BaseButton size="sm" variant="secondary" @click="openEdit(log)">Edit</BaseButton>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
 
       <PaginationBar v-if="!loading" :meta="paginationMeta" @change="(value) => (page = value)" />
     </BaseCard>
 
     <!-- Add / edit modal -->
-    <BaseModal
-      :open="showForm"
-      :title="editingId ? 'Edit maintenance' : 'Add maintenance'"
-      subtitle="Maintenance record"
-      @close="showForm = false"
-    >
+    <BaseModal :open="showForm" :title="editingId ? 'Edit maintenance' : 'Add maintenance'"
+      subtitle="Maintenance record" @close="showForm = false">
       <div class="flex flex-col gap-4">
         <p class="rounded-card border-l-4 border-secondary bg-secondary-50 p-3 text-small text-secondary-700">
           The odometer on each record is the vehicle's current mileage from its vehicle record.
         </p>
 
-        <BaseSelect
-          v-model="form.vehicle_id"
-          label="Vehicle"
-          placeholder="Select vehicle"
-          :options="vehicleFormOptions"
-          :error="errors.vehicle_id"
-          required
-        />
+        <BaseSelect v-model="form.vehicle_id" label="Vehicle" placeholder="Select vehicle" :options="vehicleFormOptions"
+          :error="errors.vehicle_id" required />
 
-        <BaseSelect
-          v-model="form.type"
-          label="Type"
-          :options="MAINTENANCE_TYPES"
-          :error="errors.type"
-          required
-        />
+        <BaseSelect v-model="form.type" label="Type" :options="MAINTENANCE_TYPES" :error="errors.type" required />
 
-        <BaseTextarea
-          v-model="form.description"
-          label="Description"
-          placeholder="What work is being done?"
-          :error="errors.description"
-        />
+        <BaseTextarea v-model="form.description" label="Description" placeholder="What work is being done?"
+          :error="errors.description" />
 
         <div class="grid gap-4 sm:grid-cols-2">
-          <BaseInput
-            v-model="form.date_performed"
-            label="Date"
-            type="date"
-            :error="errors.date_performed"
-            required
-          />
-          <BaseInput
-            v-model="form.next_due_date"
-            label="Next due"
-            type="date"
-            :min="form.date_performed"
-            :error="errors.next_due_date"
-          />
-          <BaseInput
-            v-model="form.cost"
-            label="Cost (₱)"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="0.00"
-            :error="errors.cost"
-          />
-          <BaseSelect
-            v-model="form.status"
-            label="Status"
-            :options="formStatusOptions"
-            :error="errors.status"
-            required
-          />
+          <BaseInput v-model="form.date_performed" label="Date" type="date" :error="errors.date_performed" required />
+          <BaseInput v-model="form.next_due_date" label="Next due" type="date" :min="form.date_performed"
+            :error="errors.next_due_date" />
+          <BaseInput v-model="form.cost" label="Cost (₱)" type="number" min="0" step="0.01" placeholder="0.00"
+            :error="errors.cost" />
+          <BaseSelect v-model="form.status" label="Status" :options="formStatusOptions" :error="errors.status"
+            required />
         </div>
 
         <p v-if="formError" class="rounded-card bg-red-50 p-3 text-small font-medium text-red-700">

@@ -20,12 +20,21 @@ class VehicleRequestController extends Controller
      * GET /api/vehicle-requests
      * Administrators see all. Faculty see only their own.
      * Query params: ?status=pending, ?trip_type=inclusive
+     *
+     * Order: pending requests first, with the soonest travel date on top.
+     * All other requests follow, newest first.
+     * The sorting is done here (not in the frontend) so it covers every page.
      */
     public function index(Request $request)
     {
         $user = $request->user();
 
-        $query = VehicleRequest::with('requester')->latest();
+        $query = VehicleRequest::with('requester')
+            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN status = 'pending' THEN trip_date END ASC")
+            ->orderByRaw("CASE WHEN status = 'pending' THEN departure_time END ASC")
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
 
         if ($user->hasRole('faculty')) {
             $query->where('requester_id', $user->id);
