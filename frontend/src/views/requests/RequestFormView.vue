@@ -8,7 +8,9 @@ import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 
 const store = useVehicleRequestStore()
 const route = useRoute()
@@ -20,6 +22,12 @@ const loading = ref(false)
 const submitting = ref(false)
 const errors = ref({})
 
+// Status of the request when the page was opened.
+// Editing an approved request needs a reason and a confirmation.
+const originalStatus = ref('')
+const confirmOpen = ref(false)
+const needsReason = computed(() => isEdit.value && originalStatus.value === 'approved')
+
 const form = reactive({
   destination: '',
   purpose: '',
@@ -30,11 +38,12 @@ const form = reactive({
   estimated_return_time: '17:00',
   passengers: '',
   number_of_passengers: 1,
+  edit_reason: '',
 })
 
 const tripTypes = [
-  { value: 'inclusive', label: 'Inclusive (vehicle stays with the group)' },
-  { value: 'exclusive', label: 'Exclusive (vehicle returns between trips)' },
+  { value: 'inclusive', label: 'Inclusive (Inside Nueva Vizcaya)' },
+  { value: 'exclusive', label: 'Exclusive (Outside Nueva Vizcaya)' },
 ]
 
 onMounted(async () => {
@@ -43,6 +52,7 @@ onMounted(async () => {
   loading.value = true
   try {
     const request = await store.find(route.params.id)
+    originalStatus.value = request.status
     Object.assign(form, {
       destination: request.destination ?? '',
       purpose: request.purpose ?? '',
@@ -62,7 +72,24 @@ onMounted(async () => {
   }
 })
 
-async function submit() {
+// For an approved request: check the reason, then ask for confirmation before saving.
+function submit() {
+  errors.value = {}
+
+  if (needsReason.value) {
+    if (!form.edit_reason.trim()) {
+      errors.value = { edit_reason: 'Please give a reason for editing this approved request.' }
+      return
+    }
+
+    confirmOpen.value = true
+    return
+  }
+
+  save()
+}
+
+async function save() {
   submitting.value = true
   errors.value = {}
 
@@ -71,10 +98,20 @@ async function submit() {
     number_of_passengers: Number(form.number_of_passengers),
   }
 
+  if (needsReason.value) {
+    payload.edit_reason = form.edit_reason.trim()
+  } else {
+    delete payload.edit_reason
+  }
+
   try {
     if (isEdit.value) {
       await store.update(route.params.id, payload)
-      toast.success('Request updated. Approved requests return to pending for re-approval.')
+      toast.success(
+        needsReason.value
+          ? 'Request updated and sent back to the administrator for approval.'
+          : 'Request updated.',
+      )
       router.push({ name: 'requests.show', params: { id: route.params.id } })
     } else {
       const created = await store.create(payload)
@@ -82,6 +119,7 @@ async function submit() {
       router.push({ name: 'requests.show', params: { id: created.id } })
     }
   } catch (error) {
+    confirmOpen.value = false
     errors.value = validationErrors(error)
     if (!Object.keys(errors.value).length) {
       toast.error(errorMessage(error, 'Unable to save this request.'))
@@ -98,6 +136,18 @@ async function submit() {
       <h1 class="text-page-title">{{ isEdit ? 'Edit request' : 'Request for use of vehicle' }}</h1>
       <p class="mt-0.5 text-small text-ink-muted">
         Please accomplish this form three (3) days before travel.
+      </p>
+    </div>
+
+    <!-- Shown only when editing a request that was already approved. -->
+    <div
+      v-if="needsReason"
+      class="rounded-card border-l-4 border-secondary bg-secondary-50 p-card text-small text-secondary-700"
+    >
+      <p class="font-medium">This request is already approved.</p>
+      <p class="mt-1">
+        If you save your changes, the vehicle and driver assigned to it will be released and the
+        request will wait for the administrator's approval again.
       </p>
     </div>
 
@@ -165,7 +215,7 @@ async function submit() {
             label="Estimated return time"
             type="time"
             :error="errors.estimated_return_time"
-            :required="isEdit"
+            required
           />
         </div>
       </BaseCard>
@@ -193,12 +243,46 @@ async function submit() {
         </div>
       </BaseCard>
 
+      <BaseCard v-if="needsReason" title="Reason for editing">
+        <BaseTextarea
+          v-model="form.edit_reason"
+          label="Why are you changing this approved request?"
+          placeholder="e.g. The meeting was moved to a later date."
+          :error="errors.edit_reason"
+          required
+        />
+      </BaseCard>
+
       <div class="flex justify-end gap-3">
         <BaseButton variant="outline" @click="router.back()">Cancel</BaseButton>
-        <BaseButton type="submit" :loading="submitting || loading">
+        <BaseButton type="submit" :loading="(submitting && !confirmOpen) || loading">
           {{ isEdit ? 'Save changes' : 'Submit request' }}
         </BaseButton>
       </div>
     </form>
+
+    <!-- Confirmation before changing an approved request -->
+    <BaseModal
+      :open="confirmOpen"
+      title="Change an approved request?"
+      subtitle="Please read before you continue"
+      @close="confirmOpen = false"
+    >
+      <p class="text-body">If you continue:</p>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-body">
+        <li>The vehicle and driver assigned to this request will be released.</li>
+        <li>The request becomes a new pending request.</li>
+        <li>The administrator must approve it again before a vehicle and driver are assigned.</li>
+      </ul>
+
+      <template #footer>
+        <BaseButton variant="outline" :disabled="submitting" @click="confirmOpen = false">
+          Go back
+        </BaseButton>
+        <BaseButton variant="danger" :loading="submitting" @click="save">
+          Yes, save changes
+        </BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>

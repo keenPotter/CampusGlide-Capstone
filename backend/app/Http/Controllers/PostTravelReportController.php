@@ -2,63 +2,50 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StorePostTravelReportRequest;
+use App\Http\Requests\UpdatePostTravelReportRequest;
+use App\Http\Resources\PostTravelReportResource;
 use App\Models\PostTravelReport;
 use Illuminate\Http\Request;
 
 class PostTravelReportController extends Controller
 {
+    private const VEHICLE_COLUMNS = 'vehicle:id,plate_number,vehicle_model';
+
+    /**
+     * GET /api/post-travel-reports
+     * Query params: ?vehicle_id=3
+     */
     public function index(Request $request)
     {
-        $query = PostTravelReport::with('vehicle:id,plate_number,vehicle_model');
+        $query = PostTravelReport::with(self::VEHICLE_COLUMNS);
 
         if ($request->filled('vehicle_id')) {
             $query->where('vehicle_id', $request->integer('vehicle_id'));
         }
 
-        return response()->json([
-            'data' => $query->orderByDesc('travel_date_from')->get(),
-        ]);
+        return PostTravelReportResource::collection($query->orderByDesc('travel_date_from')->get());
     }
 
-    public function store(Request $request)
+    /**
+     * POST /api/post-travel-reports
+     */
+    public function store(StorePostTravelReportRequest $request)
     {
-        $validated = $request->validate([
-            'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
-            'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
-            'travel_date_from' => ['required', 'date'],
-            'travel_date_to' => ['nullable', 'date', 'after_or_equal:travel_date_from'],
-            'places_of_travel' => ['required', 'string', 'max:500'],
-            'defects_observed' => ['nullable', 'string'],
-            'defects_incurred' => ['nullable', 'string'],
-            'remarks' => ['nullable', 'string'],
-            'drivers' => ['nullable', 'string', 'max:500'],
-            'arrival_at' => ['nullable', 'date'],
-        ]);
+        $report = PostTravelReport::create($request->validated());
 
-        $report = PostTravelReport::create($validated);
-        $report->load('vehicle:id,plate_number,vehicle_model');
-
-        return response()->json(['data' => $report], 201);
+        return (new PostTravelReportResource($report->load(self::VEHICLE_COLUMNS)))
+            ->response()
+            ->setStatusCode(201);
     }
 
-    public function update(Request $request, PostTravelReport $postTravelReport)
+    /**
+     * PATCH /api/post-travel-reports/{id}
+     */
+    public function update(UpdatePostTravelReportRequest $request, PostTravelReport $postTravelReport)
     {
-        $validated = $request->validate([
-            'vehicle_id' => ['sometimes', 'integer', 'exists:vehicles,id'],
-            'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
-            'travel_date_from' => ['sometimes', 'date'],
-            'travel_date_to' => ['nullable', 'date', 'after_or_equal:travel_date_from'],
-            'places_of_travel' => ['sometimes', 'string', 'max:500'],
-            'defects_observed' => ['nullable', 'string'],
-            'defects_incurred' => ['nullable', 'string'],
-            'remarks' => ['nullable', 'string'],
-            'drivers' => ['nullable', 'string', 'max:500'],
-            'arrival_at' => ['nullable', 'date'],
-        ]);
+        $postTravelReport->update($request->validated());
 
-        $postTravelReport->update($validated);
-        $postTravelReport->load('vehicle:id,plate_number,vehicle_model');
-
-        return response()->json(['data' => $postTravelReport]);
+        return new PostTravelReportResource($postTravelReport->load(self::VEHICLE_COLUMNS));
     }
 }

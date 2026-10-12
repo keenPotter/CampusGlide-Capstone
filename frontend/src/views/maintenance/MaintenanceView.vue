@@ -407,11 +407,11 @@ async function markCompleted(log) {
           </dl>
 
           <div class="flex justify-end gap-2">
-            <BaseButton size="sm" variant="outline" @click="openEdit(log)">Edit</BaseButton>
+            <BaseButton size="sm" variant="secondary" @click="openEdit(log)">Edit</BaseButton>
             <BaseButton
               v-if="log.status !== 'completed'"
               size="sm"
-              variant="ghost"
+              variant="primary"
               @click="markCompleted(log)"
             >
               Mark as completed

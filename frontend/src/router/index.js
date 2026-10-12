@@ -39,6 +39,14 @@ const routes = [
     component: () => import('@/views/requests/RequestFormView.vue'),
     meta: { requiresAuth: true, roles: ['faculty'] },
   },
+  // Administrators manage allocations here. Faculty see their own allocations.
+  // Changed: the page now lives in views/allocations (it was in modules/vehicle-driver-allocation).
+  {
+    path: '/allocations',
+    name: 'allocations',
+    component: () => import('@/views/allocations/AllocationsView.vue'),
+    meta: { requiresAuth: true },
+  },
   {
     path: '/trip-schedule',
     name: 'tripSchedule',

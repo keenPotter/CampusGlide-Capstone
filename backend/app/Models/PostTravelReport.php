@@ -22,11 +22,14 @@ class PostTravelReport extends Model
         'arrival_at',
     ];
 
-    protected $casts = [
-        'travel_date_from' => 'date:Y-m-d',
-        'travel_date_to' => 'date:Y-m-d',
-        'arrival_at' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'travel_date_from' => 'date:Y-m-d',
+            'travel_date_to' => 'date:Y-m-d',
+            'arrival_at' => 'datetime',
+        ];
+    }
 
     public function vehicle()
     {

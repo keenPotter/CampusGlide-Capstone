@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
@@ -13,33 +12,35 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /**
+     * POST /api/register
+     * Creates a user account. Administrators only (route middleware and RegisterRequest).
+     */
     public function register(RegisterRequest $request)
     {
-        $user = User::create([
-            'first_name' => $request->validated('first_name'),
-            'last_name' => $request->validated('last_name'),
-            'email' => $request->validated('email'),
-            'password' => Hash::make($request->validated('password')),
-            'role' => $request->validated('role'),
-        ]);
+        // The User model hashes the password (see casts), so the plain value is passed here.
+        $user = User::create($request->validated());
 
-        return response()->json([
-            'message' => 'User registered successfully',
-            'user' => $user,
-        ], 201);
+        return (new UserResource($user))
+            ->additional(['message' => 'User registered successfully'])
+            ->response()
+            ->setStatusCode(201);
     }
 
+    /**
+     * POST /api/login
+     */
     public function login(LoginRequest $request)
     {
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             throw ValidationException::withMessages([
                 'email' => ['This account has been deactivated.'],
             ]);
@@ -53,6 +54,9 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * POST /api/logout
+     */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
@@ -60,6 +64,9 @@ class AuthController extends Controller
         return response()->noContent();
     }
 
+    /**
+     * GET /api/user
+     */
     public function user(Request $request)
     {
         return new UserResource($request->user());

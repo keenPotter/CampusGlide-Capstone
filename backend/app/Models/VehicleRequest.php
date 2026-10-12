@@ -8,8 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class VehicleRequest extends Model
 {
-    protected $table = 'vehicle_requests';
     use HasFactory;
+
+    protected $table = 'vehicle_requests';
 
     protected $fillable = [
         'requester_id',
@@ -25,15 +26,11 @@ class VehicleRequest extends Model
         'number_of_passengers',
         'status',
         'disapproval_reason',
+        'edit_reason',
         'approved_by',
         'approved_date',
     ];
 
-    public function trip()
-    {
-        return $this->hasOne(Trip::class, 'vehicle_request_id');
-    }
-  
     protected function casts(): array
     {
         return [
@@ -44,13 +41,20 @@ class VehicleRequest extends Model
         ];
     }
 
+    // Number of travel days, counting both the first and the last day.
+    // Cast to a whole number; it was returned as a decimal (for example 3.0).
     protected function travelDays(): Attribute
     {
         return Attribute::make(
-            get: fn() => $this->trip_date && $this->trip_end_date
-            ? $this->trip_date->diffInDays($this->trip_end_date) + 1
-            : null,
+            get: fn () => $this->trip_date && $this->trip_end_date
+                ? (int) $this->trip_date->diffInDays($this->trip_end_date) + 1
+                : null,
         );
+    }
+
+    public function trip()
+    {
+        return $this->hasOne(Trip::class, 'vehicle_request_id');
     }
 
     public function requester()
