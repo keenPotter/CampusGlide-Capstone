@@ -46,6 +46,14 @@ class AuthController extends Controller
             ]);
         }
 
+        // The selected role is only a sign-in preference; it must match the role
+        // already assigned to this account in the database.
+        if ($user->role !== $request->role) {
+            throw ValidationException::withMessages([
+                'role' => ['The selected account type does not match this account.'],
+            ]);
+        }
+
         $token = $user->createToken('campusglide')->plainTextToken;
 
         return response()->json([

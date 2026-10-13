@@ -1,105 +1,65 @@
 <script setup>
+import { onMounted, onUnmounted, ref } from 'vue'
 import nvsuLogo from '@/assets/nvsu-logo.png'
 import nvsuBuilding from '@/assets/nvsu-building.jpg'
 
-const features = [
-  {
-    text: 'Online vehicle request and approval, no paper forms',
-    icon: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6M9 14l2 2 4-4',
-  },
-  {
-    text: 'Trip scheduling with driver and vehicle assignment in one place',
-    icon: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
-  },
-  {
-    text: 'Maintenance records and service dates for every motor pool vehicle',
-    icon: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z',
-  },
-  {
-    text: 'Dashboard with request status and pending items for administrators',
-    icon: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
-  },
+const messages = [
+  { title: 'Smarter Fleet Management', text: 'Manage campus transportation in one organized place.' },
+  { title: 'Organized Trip Scheduling', text: 'Keep approved trips, schedules, drivers, and vehicles coordinated.' },
+  { title: 'Reliable Campus Transportation', text: 'Help administrators and faculty coordinate transportation needs.' },
 ]
+const activeMessage = ref(0)
+let intervalId
+onMounted(() => { intervalId = window.setInterval(() => { activeMessage.value = (activeMessage.value + 1) % messages.length }, 4500) })
+onUnmounted(() => window.clearInterval(intervalId))
 </script>
 
 <template>
-  <div class="grid min-h-screen bg-white lg:grid-cols-[1.35fr_1fr]">
-    <!-- Left brand panel (laptop and up) -->
-    <section
-      class="relative hidden overflow-hidden lg:flex lg:items-center lg:justify-center"
-      style="background-image: linear-gradient(135deg, #1a5c20 0%, #2f9a2f 55%, #8a9a2a 100%)"
-    >
-      <!-- Building photo, see-through over the gradient -->
-      <img
-        :src="nvsuBuilding"
-        alt=""
-        class="absolute inset-0 h-full w-full object-cover opacity-25"
-      />
-
-      <!-- Soft decorative circles -->
-      <div class="absolute -left-20 -top-20 h-80 w-80 rounded-full bg-white/10" />
-      <div class="absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-white/10" />
-
-      <div class="relative z-10 flex w-full max-w-md flex-col items-center px-page text-center text-white">
-        <div class="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-white/60 bg-white/15">
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M5 17h14M5 17a2 2 0 1 0 4 0m-4 0a2 2 0 1 1 4 0m6 0a2 2 0 1 0 4 0m-4 0a2 2 0 1 1 4 0" />
-            <path d="M3 17V9l2-4h9l3 4h4v8" />
-          </svg>
-        </div>
-
-        <h1 class="mt-4 !text-4xl font-bold">CampusGlide</h1>
-        <p class="mt-2 text-small text-white/85">
-          Nueva Vizcaya State University<br />
-          Vehicle Request System
-        </p>
-
-        <ul class="mt-10 flex w-full flex-col gap-3 text-left">
-          <li
-            v-for="feature in features"
-            :key="feature.text"
-            class="flex items-center gap-3 rounded-card border border-white/40 bg-white/15 px-4 py-3 backdrop-blur-sm"
-          >
-            <svg
-              class="shrink-0"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path :d="feature.icon" />
-            </svg>
-            <span class="text-small">{{ feature.text }}</span>
-          </li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Right form panel -->
-    <section class="flex min-h-screen flex-col items-center justify-center bg-white p-page">
-      <div class="w-full max-w-sm">
-        <div class="mb-8 flex items-center justify-center gap-3">
-          <img :src="nvsuLogo" alt="Nueva Vizcaya State University seal" class="h-14 w-14 object-contain" />
-          <p class="text-left text-body font-bold uppercase leading-tight text-primary-800">
-            Nueva Vizcaya<br />State University
-          </p>
-        </div>
-
-        <!-- Product name for phones and tablets, where the left panel is hidden -->
-        <p class="mb-6 text-center text-small font-medium text-ink-muted lg:hidden">
-          CampusGlide · Vehicle Request System
-        </p>
-
+  <main class="grid min-h-screen bg-white lg:grid-cols-2">
+    <section class="flex min-h-screen flex-col justify-center px-6 py-10 sm:px-10 lg:px-14 xl:px-20">
+      <div class="mx-auto w-full max-w-xl">
         <slot />
       </div>
-
-      <p class="mt-10 text-center text-small text-ink-muted">
-        NVSU-FR-PPS-13-02 · Motorpool &amp; General Services Unit
-      </p>
+      <footer class="mt-12 text-center text-xs text-ink-muted">NVSU · Motorpool &amp; General Services Unit</footer>
     </section>
-  </div>
+
+    <aside class="relative hidden min-h-screen overflow-hidden bg-primary-900 lg:block">
+      <img :src="nvsuBuilding" alt="Nueva Vizcaya State University campus building" class="absolute inset-0 h-full w-full object-cover" />
+      <div class="absolute inset-0 bg-gradient-to-br from-green-950/85 via-primary-800/75 to-emerald-700/70" />
+      <div class="absolute -right-24 -top-24 h-80 w-80 rounded-full border border-white/20" />
+      <div class="absolute -bottom-28 -left-20 h-96 w-96 rounded-full border border-white/15" />
+
+      <div class="relative z-10 flex min-h-screen flex-col justify-between p-10 text-white xl:p-14">
+        <div class="flex items-center gap-4">
+          <img :src="nvsuLogo" alt="NVSU university seal" class="h-16 w-16 rounded-full bg-white p-1 object-contain shadow-lg" />
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-white/80">Nueva Vizcaya State University</p>
+            <p class="mt-1 text-xl font-bold">CampusGlide</p>
+            <p class="text-sm text-white/80">Fleet Management System</p>
+          </div>
+        </div>
+
+        <div class="max-w-xl pb-8" aria-live="polite" aria-atomic="true">
+          <Transition name="feature" mode="out-in">
+            <div :key="activeMessage" class="min-h-40">
+              <div class="mb-5 h-1 w-14 rounded-full bg-amber-300" />
+              <h2 class="max-w-lg text-4xl font-bold leading-tight text-white xl:text-5xl">{{ messages[activeMessage].title }}</h2>
+              <p class="mt-5 max-w-md text-base leading-7 text-white/90">{{ messages[activeMessage].text }}</p>
+            </div>
+          </Transition>
+          <div class="mt-8 flex items-center gap-2" aria-label="Feature slide controls">
+            <button v-for="(message, index) in messages" :key="message.title" type="button" class="h-2.5 rounded-full transition-all" :class="activeMessage === index ? 'w-8 bg-white' : 'w-2.5 bg-white/50 hover:bg-white/80'" :aria-label="`Show feature ${index + 1}: ${message.title}`" :aria-pressed="activeMessage === index" @click="activeMessage = index" />
+          </div>
+        </div>
+        <p class="text-xs text-white/70">NVSU-FR-PPS-13-02 · Motorpool &amp; General Services Unit</p>
+      </div>
+    </aside>
+  </main>
 </template>
+
+<style scoped>
+.feature-enter-active, .feature-leave-active { transition: opacity 220ms ease, transform 220ms ease; }
+.feature-enter-from { opacity: 0; transform: translateY(8px); }
+.feature-leave-to { opacity: 0; transform: translateY(-8px); }
+@media (prefers-reduced-motion: reduce) { .feature-enter-active, .feature-leave-active { transition: none; } }
+</style>

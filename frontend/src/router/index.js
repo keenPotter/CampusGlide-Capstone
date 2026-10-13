@@ -10,6 +10,12 @@ const routes = [
     meta: { guestOnly: true },
   },
   {
+    path: '/login/sign-in',
+    name: 'login.form',
+    component: () => import('@/views/LoginFormView.vue'),
+    meta: { guestOnly: true },
+  },
+  {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
