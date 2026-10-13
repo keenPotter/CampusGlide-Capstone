@@ -22,6 +22,7 @@ import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
 import LoadError from '@/components/ui/LoadError.vue'
+import PreventiveMaintenanceSection from '@/components/maintenance/PreventiveMaintenanceSection.vue'
 
 const notifications = useNotificationStore()
 const toast = useToast()
@@ -484,6 +485,8 @@ async function markCompleted(log) {
 
       <PaginationBar v-if="!loading" :meta="paginationMeta" @change="(value) => (page = value)" />
     </BaseCard>
+
+    <PreventiveMaintenanceSection :vehicles="vehicles" />
 
     <!-- Add / edit modal -->
     <BaseModal :open="showForm" :title="editingId ? 'Edit maintenance' : 'Add maintenance'"
