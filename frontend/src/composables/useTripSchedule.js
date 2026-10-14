@@ -51,6 +51,7 @@ export function useTripSchedule() {
   const activeTrip = ref(null)
   const activeTrips = ref([])
   const activeDateLabel = ref('')
+  const loading = ref(false)
   const loadError = ref('')
 
   const viewedIds = ref(getStoredIds(VIEWED_KEY))
@@ -60,6 +61,7 @@ export function useTripSchedule() {
   /* ================= DATA ================= */
 
   async function fetchTrips() {
+    loading.value = true
     loadError.value = ''
     try {
       const { data: payload } = await api.get('/trips')
@@ -91,6 +93,8 @@ export function useTripSchedule() {
     } catch (error) {
       console.error(error)
       loadError.value = errorMessage(error, 'Unable to load scheduled trips.')
+    } finally {
+      loading.value = false
     }
   }
 
@@ -282,6 +286,7 @@ export function useTripSchedule() {
     activeTrip,
     activeTrips,
     activeDateLabel,
+    loading,
     loadError,
     currentTripTypeLabel,
     filteredTrips,

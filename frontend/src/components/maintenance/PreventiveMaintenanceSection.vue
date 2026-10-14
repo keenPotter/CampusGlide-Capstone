@@ -1,27 +1,39 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import api, { errorMessage, unwrap, validationErrors } from '@/lib/api'
-import { formatDate, formatKm, todayIso } from '@/lib/format'
-import { printPreventiveMaintenanceChecklist } from '@/lib/printPreventiveMaintenanceChecklist'
+import { formatDate, todayIso } from '@/lib/format'
+import { printHtml } from '@/lib/printHtml'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import PaginationBar from '@/components/ui/PaginationBar.vue'
 
+// The maintenance checklist: every vehicle of the motorpool is listed.
+// The administrator clicks "Assess" on a vehicle, fills in the checklist and prints it.
+// Printing saves the checklist as a record first (so the history is kept),
+// then the form goes back to blank so it can be used again for the next assessment.
 const props = defineProps({
   vehicles: { type: Array, default: () => [] },
 })
 
 const toast = useToast()
+
+const PAGE_SIZE = 10
+
 const records = ref([])
 const loading = ref(true)
 const loadError = ref('')
+const search = ref('')
+const page = ref(1)
+
 const showForm = ref(false)
-const editingId = ref(null)
+const assessing = ref(null)
 const saving = ref(false)
-const printingId = ref(null)
 const errors = ref({})
 const formError = ref('')
 
@@ -48,7 +60,6 @@ const CONDITION_FIELDS = [
   { field: 'radio_condition', label: 'Radio' },
   { field: 'tires_condition', label: 'Tires' },
   { field: 'liquid_levels_condition', label: 'Liquid levels' },
-  { field: 'other_parts_condition', label: 'Other parts' },
 ]
 
 const ratingOptions = [
@@ -57,16 +68,9 @@ const ratingOptions = [
   { value: 'poor', label: 'Poor' },
 ]
 
-const vehicleOptions = computed(() => props.vehicles.map((vehicle) => ({
-  value: vehicle.id,
-  label: `${vehicle.plate_number} — ${vehicle.vehicle_model ?? vehicle.model ?? 'Vehicle'}`,
-})))
-
-const form = ref(emptyForm())
-
+// The blank form. Used every time the Assess window opens and after printing.
 function emptyForm() {
   return {
-    vehicle_id: '',
     pmuv_no: '',
     inspection_date: todayIso(),
     inspector_mechanic: '',
@@ -82,6 +86,10 @@ function emptyForm() {
     supervisor_recommendation: '',
   }
 }
+
+const form = ref(emptyForm())
+
+/* ================= DATA ================= */
 
 onMounted(loadRecords)
 
@@ -99,85 +107,124 @@ async function loadRecords() {
   }
 }
 
-function openAdd() {
-  editingId.value = null
+function modelOf(vehicle) {
+  return vehicle?.vehicle_model ?? vehicle?.model ?? '—'
+}
+
+// vehicle id -> date of its latest saved checklist
+const lastInspection = computed(() => {
+  const latest = {}
+
+  for (const record of records.value) {
+    const id = record.vehicle?.id
+    if (!id || !record.inspection_date) continue
+    if (!latest[id] || record.inspection_date > latest[id]) latest[id] = record.inspection_date
+  }
+
+  return latest
+})
+
+const filtered = computed(() => {
+  const query = search.value.trim().toLowerCase()
+
+  return props.vehicles
+    .map((vehicle) => ({ ...vehicle, lastInspection: lastInspection.value[vehicle.id] ?? null }))
+    .filter((vehicle) => {
+      if (!query) return true
+      return [vehicle.plate_number, modelOf(vehicle)].join(' ').toLowerCase().includes(query)
+    })
+})
+
+const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
+const pageItems = computed(() =>
+  filtered.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE),
+)
+const paginationMeta = computed(() => ({
+  current_page: page.value,
+  last_page: pageCount.value,
+  total: filtered.value.length,
+}))
+
+watch(search, () => {
+  page.value = 1
+})
+
+watch(pageCount, (count) => {
+  if (page.value > count) page.value = count
+})
+
+/* ================= ACTIONS ================= */
+
+function openAssess(vehicle) {
+  assessing.value = vehicle
   form.value = emptyForm()
   errors.value = {}
   formError.value = ''
   showForm.value = true
 }
 
-function openEdit(record) {
-  editingId.value = record.id
-  form.value = {
-    ...emptyForm(),
-    ...record,
-    vehicle_id: record.vehicle_id ?? record.vehicle?.id ?? '',
-    current_mileage: record.current_mileage ?? '',
-  }
-  errors.value = {}
-  formError.value = ''
-  showForm.value = true
+// Clicking anywhere on a row or card opens the assessment.
+// Clicks on a button or link are skipped, so they keep doing their own job.
+function onRowClick(event, vehicle) {
+  if (event.target.closest('a, button')) return
+  openAssess(vehicle)
 }
 
-async function save() {
+function closeForm() {
+  showForm.value = false
+  assessing.value = null
+}
+
+// Saves the checklist, prints it, and resets the form so it can be used again.
+async function printAssessment() {
   errors.value = {}
   formError.value = ''
-  if (!form.value.vehicle_id) errors.value.vehicle_id = 'Please select a vehicle.'
-  if (!form.value.inspection_date) errors.value.inspection_date = 'Please select an inspection date.'
-  if (Object.keys(errors.value).length) return
+
+  if (!form.value.inspection_date) {
+    errors.value.inspection_date = 'Please select an inspection date.'
+    return
+  }
 
   const payload = {
     ...form.value,
-    vehicle_id: Number(form.value.vehicle_id),
+    vehicle_id: assessing.value.id,
     current_mileage: form.value.current_mileage === '' ? null : Number(form.value.current_mileage),
   }
 
   saving.value = true
   try {
-    if (editingId.value) {
-      await api.patch(`/preventive-maintenance-checklists/${editingId.value}`, payload)
-    } else {
-      await api.post('/preventive-maintenance-checklists', payload)
-    }
-    toast.success(editingId.value ? 'Checklist updated.' : 'Checklist saved.')
-    showForm.value = false
+    const created = unwrap(await api.post('/preventive-maintenance-checklists', payload))
+
+    // The printable form is built by the backend (legal size).
+    const { data: html } = await api.get(`/preventive-maintenance-checklists/${created.id}/print`, {
+      responseType: 'text',
+      headers: { Accept: 'text/html' },
+    })
+
+    closeForm()
+    form.value = emptyForm()
+    toast.success('Checklist saved. Opening the print window.')
+    printHtml(html)
     await loadRecords()
   } catch (error) {
     errors.value = validationErrors(error)
     if (!Object.keys(errors.value).length) {
-      formError.value = errorMessage(error, 'Unable to save this checklist.')
+      formError.value = errorMessage(error, 'Unable to save and print this checklist.')
     }
   } finally {
     saving.value = false
   }
 }
-
-async function printRecord(record) {
-  printingId.value = record.id ?? 'blank'
-  try {
-    printPreventiveMaintenanceChecklist(record)
-  } catch (error) {
-    toast.error(errorMessage(error, 'Unable to print this checklist.'))
-  } finally {
-    printingId.value = null
-  }
-}
-
-function vehicleName(record) {
-  const vehicle = record.vehicle
-  return [vehicle?.plate_number, vehicle?.vehicle_model ?? vehicle?.model].filter(Boolean).join(' — ') || 'Vehicle'
-}
 </script>
 
 <template>
   <BaseCard
-    title="Preventive maintenance checklists"
-    subtitle="Record vehicle inspections and print the checklist form"
+    title="Maintenance checklist"
+    subtitle="Click a vehicle to assess it, then print the monthly checklist"
     :padded="false"
   >
-    <div class="flex flex-wrap justify-end gap-2 border-b border-line p-card">
-      <BaseButton @click="openAdd">Add checklist</BaseButton>
+    <div class="border-b border-line p-card">
+      <BaseInput v-model="search" type="search" placeholder="Search by plate number or model..." />
     </div>
 
     <div v-if="loadError" class="m-card rounded-card bg-red-50 p-3 text-small text-red-700">
@@ -185,56 +232,93 @@ function vehicleName(record) {
       <button type="button" class="ml-2 font-semibold underline" @click="loadRecords">Retry</button>
     </div>
 
-    <div v-if="loading" class="flex justify-center p-8">
+    <div v-if="loading" class="flex justify-center p-12">
       <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
     </div>
-    <div v-else-if="records.length === 0" class="p-card text-center text-small text-ink-muted">
-      No preventive maintenance checklists yet.
-    </div>
-    <ul v-else class="divide-y divide-line">
-      <li
-        v-for="record in records"
-        :key="record.id"
-        class="flex flex-col gap-3 p-card sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div>
-          <p class="font-medium text-ink">{{ vehicleName(record) }}</p>
-          <p class="mt-0.5 text-small text-ink-muted">
-            {{ formatDate(record.inspection_date) }}
-            <span v-if="record.pmuv_no"> · PMUV No. {{ record.pmuv_no }}</span>
-            <span v-if="record.current_mileage != null"> · {{ formatKm(record.current_mileage) }}</span>
-          </p>
-        </div>
-        <div class="flex justify-end gap-2">
-          <BaseButton
-            size="sm"
-            variant="outline"
-            :loading="printingId === record.id"
-            @click="printRecord(record)"
-          >
-            Print
-          </BaseButton>
-          <BaseButton size="sm" variant="outline" @click="openEdit(record)">Edit</BaseButton>
-        </div>
-      </li>
-    </ul>
+
+    <EmptyState
+      v-else-if="!filtered.length"
+      title="No vehicles found"
+      :message="search ? 'No vehicles match your search.' : 'Vehicles of the motorpool will appear here.'"
+    />
+
+    <template v-else>
+      <!-- Card view (phones and tablets). Tap a card to assess it. -->
+      <ul class="divide-y divide-line lg:hidden">
+        <li
+          v-for="vehicle in pageItems"
+          :key="vehicle.id"
+          class="flex cursor-pointer flex-col gap-2 p-card transition active:bg-neutral-50"
+          @click="onRowClick($event, vehicle)"
+        >
+          <div class="min-w-0">
+            <p class="font-medium text-ink">
+              {{ vehicle.plate_number }}
+              <span class="font-normal text-ink-muted">· {{ modelOf(vehicle) }}</span>
+            </p>
+          </div>
+
+          <dl>
+            <dt class="text-small text-ink-muted">Last inspection</dt>
+            <dd class="text-small font-medium text-ink">
+              {{ vehicle.lastInspection ? formatDate(vehicle.lastInspection) : 'No inspection yet' }}
+            </dd>
+          </dl>
+
+          <div class="flex justify-end gap-2">
+            <BaseButton size="sm" variant="secondary" @click="openAssess(vehicle)">Assess</BaseButton>
+          </div>
+        </li>
+      </ul>
+
+      <!-- Table view (laptops and larger). Click a row to assess it. -->
+      <div class="hidden lg:block">
+        <table class="w-full table-fixed border-collapse">
+          <thead class="table-head">
+            <tr>
+              <th class="w-[25%] px-2 py-3 xl:px-card">Plate number</th>
+              <th class="w-[30%] px-2 py-3 xl:px-card">Model</th>
+              <th class="w-[25%] px-2 py-3 xl:px-card">Last inspection</th>
+              <th class="w-[20%] px-2 py-3 text-right xl:px-card">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y divide-line">
+            <tr
+              v-for="vehicle in pageItems"
+              :key="vehicle.id"
+              class="cursor-pointer hover:bg-neutral-50"
+              tabindex="0"
+              @click="onRowClick($event, vehicle)"
+              @keydown.enter="onRowClick($event, vehicle)"
+            >
+              <td class="px-2 py-3 align-top xl:px-card">
+                <p class="font-medium text-ink">{{ vehicle.plate_number }}</p>
+              </td>
+              <td class="px-2 py-3 align-top text-small xl:px-card">{{ modelOf(vehicle) }}</td>
+              <td class="px-2 py-3 align-top text-small xl:px-card">
+                {{ vehicle.lastInspection ? formatDate(vehicle.lastInspection) : 'No inspection yet' }}
+              </td>
+              <td class="px-2 py-3 align-top xl:px-card">
+                <div class="flex flex-wrap justify-end gap-1.5">
+                  <BaseButton size="sm" variant="primary" @click="openAssess(vehicle)">Assess</BaseButton>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <PaginationBar v-if="!loading" :meta="paginationMeta" @change="(value) => (page = value)" />
 
     <BaseModal
       :open="showForm"
-      :title="editingId ? 'Edit preventive maintenance checklist' : 'Add preventive maintenance checklist'"
-      subtitle="Vehicle inspection record"
-      @close="showForm = false"
+      title="Assess vehicle"
+      :subtitle="assessing ? `${assessing.plate_number} — ${modelOf(assessing)}` : ''"
+      @close="closeForm"
     >
       <div class="flex flex-col gap-4">
-        <BaseSelect
-          v-model="form.vehicle_id"
-          label="Vehicle"
-          placeholder="Select vehicle"
-          :options="vehicleOptions"
-          :error="errors.vehicle_id"
-          required
-        />
-
         <div class="grid gap-4 sm:grid-cols-2">
           <BaseInput v-model="form.pmuv_no" label="PMUV No." :error="errors.pmuv_no" />
           <BaseInput
@@ -292,12 +376,14 @@ function vehicleName(record) {
         <BaseTextarea
           v-model="form.other_parts"
           label="Other parts inspected"
+          :rows="6"
           :error="errors.other_parts"
         />
-        <BaseTextarea v-model="form.remarks" label="Remarks" :error="errors.remarks" />
+        <BaseTextarea v-model="form.remarks" label="Remarks" :rows="6" :error="errors.remarks" />
         <BaseTextarea
           v-model="form.supervisor_recommendation"
           label="Supervisor's recommendation"
+          :rows="6"
           :error="errors.supervisor_recommendation"
         />
 
@@ -307,8 +393,8 @@ function vehicleName(record) {
       </div>
 
       <template #footer>
-        <BaseButton variant="outline" @click="showForm = false">Cancel</BaseButton>
-        <BaseButton :loading="saving" @click="save">Save checklist</BaseButton>
+        <BaseButton variant="outline" @click="closeForm">Cancel</BaseButton>
+        <BaseButton :loading="saving" @click="printAssessment">Print</BaseButton>
       </template>
     </BaseModal>
   </BaseCard>

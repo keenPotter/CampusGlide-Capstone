@@ -32,7 +32,7 @@ onMounted(loadVehicles)
     <div>
       <h1 class="text-page-title">Preventive Maintenance</h1>
       <p class="mt-1 text-small text-ink-muted">
-        Schedule and record vehicle inspections using preventive maintenance checklists.
+        Choose a vehicle to assess, then print its monthly preventive maintenance checklist.
       </p>
     </div>
 
@@ -40,7 +40,7 @@ onMounted(loadVehicles)
       <p class="text-small text-ink-muted">Please wait...</p>
     </BaseCard>
 
-    <LoadError v-else-if="loadError" :message="loadError" />
+    <LoadError v-else-if="loadError" :message="loadError" @retry="loadVehicles" />
 
     <PreventiveMaintenanceSection v-else :vehicles="vehicles" />
   </div>

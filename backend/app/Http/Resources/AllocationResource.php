@@ -19,6 +19,10 @@ class AllocationResource extends JsonResource
             'trip' => [
                 'id' => $trip?->id,
                 'trip_date' => $trip?->trip_date ? Carbon::parse($trip->trip_date)->toDateString() : null,
+                // The last day of the trip (the end date is kept on the vehicle request).
+                'trip_end_date' => $vehicleRequest?->trip_end_date
+                    ? Carbon::parse($vehicleRequest->trip_end_date)->toDateString()
+                    : ($trip?->trip_date ? Carbon::parse($trip->trip_date)->toDateString() : null),
                 'departure_time' => $trip?->departure_time,
                 'estimated_return_time' => $trip?->estimated_return_time,
                 'destination' => $trip?->destination,
@@ -26,11 +30,13 @@ class AllocationResource extends JsonResource
             ],
             'vehicle_request' => [
                 'id' => $vehicleRequest?->id,
-                // The frontend shows the print button only for an approved request.                
+                // The frontend shows the print button only for an approved request.
                 'status' => $vehicleRequest?->status,
                 // The frontend filters allocations by trip type.
                 'trip_type' => $vehicleRequest?->trip_type,
                 'requester' => $vehicleRequest?->requester?->full_name,
+                // Shown in the allocation summary table.
+                'number_of_passengers' => $vehicleRequest?->number_of_passengers,
             ],
             'vehicle' => [
                 'id' => $this->vehicle?->id,

@@ -1,15 +1,16 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAllocations } from '@/composables/useAllocations'
 import { useToast } from '@/composables/useToast'
 import { useNotificationStore } from '@/stores/notifications'
 import { formatDate } from '@/lib/format'
-import { ACTIVE_STATUSES, canPrint, requestNumber, whenText } from '@/lib/allocations'
+import { canPrint, canReassign, passengerText, requestNumber, whenText } from '@/lib/allocations'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadError from '@/components/ui/LoadError.vue'
+import PaginationBar from '@/components/ui/PaginationBar.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import TripTypeBadge from '@/components/ui/TripTypeBadge.vue'
@@ -21,13 +22,12 @@ import QuickAddModal from '@/components/allocations/QuickAddModal.vue'
 import RescheduleRequestCard from '@/components/allocations/RescheduleRequestCard.vue'
 
 // The allocation page for administrators.
+// New allocations are made when a vehicle request is approved (Vehicle Requests page).
 const toast = useToast()
 const notifications = useNotificationStore()
 
 const {
   waiting,
-  vehicles,
-  drivers,
   admins,
   loading,
   loadError,
@@ -45,13 +45,16 @@ const {
   addDriver,
 } = useAllocations()
 
+const PAGE_SIZE = 10
+
 const search = ref('')
 const typeFilter = ref('')
+const page = ref(1)
 
 const modalOpen = ref(false)
 const editing = ref(null)
-const presetRequestId = ref(null)
-const pageConflict = ref(null)
+// Conflicts found when a date change request was approved (vehicle and driver together).
+const pageConflicts = ref([])
 const printTarget = ref(null)
 const printNotice = ref('')
 
@@ -74,14 +77,20 @@ const stats = computed(() => [
   { label: 'Needs allocation', value: waiting.value.length, tone: 'secondary' },
 ])
 
+// Availability is for today.
 const dotClass = { green: 'bg-primary', orange: 'bg-secondary', red: 'bg-red-500' }
-const dotLabel = { green: 'Available', orange: 'Has scheduled trip', red: 'Conflict' }
+const dotLabel = { green: 'Available', orange: 'Scheduled today', red: 'On a trip now' }
 
 const kindLabel = {
   allocation: 'Allocation',
   waiting: 'Needs allocation',
   received: 'Received request',
 }
+
+// The first conflicted trip that can still be reassigned (scheduled trips only).
+const resolvableConflict = computed(() =>
+  conflictedAllocations.value.find((allocation) => canReassign(allocation)),
+)
 
 /* ================= SUMMARY ================= */
 
@@ -118,6 +127,30 @@ const visibleRows = computed(() => {
   })
 })
 
+/* ================= PAGINATION ================= */
+
+const pageCount = computed(() => Math.max(1, Math.ceil(visibleRows.value.length / PAGE_SIZE)))
+
+const pageRows = computed(() =>
+  visibleRows.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE),
+)
+
+const paginationMeta = computed(() => ({
+  current_page: page.value,
+  last_page: pageCount.value,
+  total: visibleRows.value.length,
+}))
+
+// Go back to the first page when the search or filter changes.
+watch([search, typeFilter], () => {
+  page.value = 1
+})
+
+// If the list gets shorter (for example after a reload), stay on a page that exists.
+watch(pageCount, (count) => {
+  if (page.value > count) page.value = count
+})
+
 /* ================= ACTIONS ================= */
 
 // Reload the page data and the menu badges.
@@ -126,27 +159,15 @@ async function reload() {
   notifications.refresh()
 }
 
-function openNew(requestId = null) {
-  editing.value = null
-  presetRequestId.value = requestId
-  modalOpen.value = true
-}
-
 function openEdit(allocation) {
   editing.value = allocation
-  presetRequestId.value = null
   modalOpen.value = true
 }
 
-function onSaved(created) {
+function onSaved() {
   modalOpen.value = false
   reload()
-
-  if (created?.id) {
-    openPrint(created, 'Allocation complete. Print this trip request, or save it as a PDF.')
-  } else {
-    toast.success('Allocation updated.')
-  }
+  toast.success('Allocation updated.')
 }
 
 function openPrint(allocation, notice = '') {
@@ -154,14 +175,12 @@ function openPrint(allocation, notice = '') {
   printTarget.value = allocation
 }
 
-// Clicking anywhere on a row opens it: "Needs allocation" rows open the Assign window,
-// all other rows open the View / Print window. Clicks on a button or link keep doing their own job.
+// Clicking anywhere on a row opens the View / Print window (when printing is allowed).
+// Clicks on a button or link keep doing their own job.
 function onRowClick(event, row) {
   if (event.target.closest('a, button')) return
 
-  if (row.kind === 'waiting') {
-    openNew(row.request.id)
-  } else if (canPrint(row.allocation)) {
+  if (canPrint(row.allocation)) {
     openPrint(row.allocation)
   }
 }
@@ -193,22 +212,25 @@ function onDecided(message) {
   reload()
 }
 
-// The requested date is already booked: close the decision window and show the conflict.
-function onDecisionConflict(conflict) {
+// The requested date is already booked: close the decision window and show the conflicts.
+function onDecisionConflict(found) {
   closeDecision()
-  pageConflict.value = conflict
+  pageConflicts.value = found
 }
 </script>
 
 <template>
   <div class="flex flex-col gap-page">
     <!-- Header -->
-    <div>
-      <h1 class="text-page-title">Vehicle-Driver Allocation</h1>
-      <p class="mt-1 text-small text-ink-muted">
-        Assign vehicles and drivers to approved trip requests. Scheduling conflicts are flagged
-        automatically.
-      </p>
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h1 class="text-page-title">Vehicle-Driver Allocation</h1>
+        <p class="mt-1 text-small text-ink-muted">
+          A vehicle and driver are assigned when a vehicle request is approved. Scheduling conflicts
+          are flagged automatically.
+        </p>
+      </div>
+      <BaseButton variant="outline" size="sm" :disabled="loading" @click="reload">Refresh</BaseButton>
     </div>
 
     <LoadError :message="loadError" @retry="reload" />
@@ -223,14 +245,19 @@ function onDecisionConflict(conflict) {
         {{ conflictTexts.length }} conflict{{ conflictTexts.length > 1 ? 's' : '' }} detected:
         {{ conflictTexts.join(' · ') }}. Please resolve before confirming the schedule.
       </p>
-      <BaseButton size="sm" variant="outline" @click="openEdit(conflictedAllocations[0])">
+      <BaseButton
+        v-if="resolvableConflict"
+        size="sm"
+        variant="outline"
+        @click="openEdit(resolvableConflict)"
+      >
         Resolve
       </BaseButton>
     </div>
 
     <!-- Vehicles and drivers -->
     <div class="grid grid-cols-1 gap-page lg:grid-cols-2">
-      <BaseCard title="Vehicles" subtitle="Availability on the allocation schedule" :padded="false">
+      <BaseCard title="Vehicles" subtitle="Availability today" :padded="false">
         <template #actions>
           <BaseButton size="sm" @click="quickAdd = 'vehicle'">+ Add vehicle</BaseButton>
         </template>
@@ -254,7 +281,7 @@ function onDecisionConflict(conflict) {
         </ul>
       </BaseCard>
 
-      <BaseCard title="Drivers" subtitle="Availability on the allocation schedule" :padded="false">
+      <BaseCard title="Drivers" subtitle="Availability today" :padded="false">
         <template #actions>
           <BaseButton size="sm" @click="quickAdd = 'driver'">+ Add driver</BaseButton>
         </template>
@@ -344,7 +371,7 @@ function onDecisionConflict(conflict) {
 
       <ul v-else class="divide-y divide-line">
         <li
-          v-for="row in visibleRows"
+          v-for="row in pageRows"
           :key="row.key"
           class="flex cursor-pointer flex-col gap-3 p-card transition hover:bg-neutral-50 lg:flex-row lg:items-center"
           tabindex="0"
@@ -394,12 +421,17 @@ function onDecisionConflict(conflict) {
             </p>
           </div>
 
+          <!-- Number of passengers -->
+          <div class="min-w-0 text-small lg:w-28">
+            <p class="text-ink">{{ passengerText(row.passengers) }}</p>
+          </div>
+
           <!-- Actions -->
           <div class="flex flex-wrap gap-2 lg:justify-end">
             <template v-if="row.kind === 'allocation'">
-              <!-- One Reassign button for vehicle, driver and date. It turns red when there is a conflict. -->
+              <!-- Reassign is for scheduled trips only. It turns red when there is a conflict. -->
               <BaseButton
-                v-if="ACTIVE_STATUSES.includes(row.allocation.status)"
+                v-if="canReassign(row.allocation)"
                 size="sm"
                 :variant="conflicts[row.allocation.id] ? 'danger' : 'outline'"
                 @click="openEdit(row.allocation)"
@@ -417,10 +449,6 @@ function onDecisionConflict(conflict) {
               </BaseButton>
             </template>
 
-            <BaseButton v-else-if="row.kind === 'waiting'" size="sm" @click="openNew(row.request.id)">
-              Assign
-            </BaseButton>
-
             <BaseButton
               v-else-if="canPrint(row.allocation)"
               size="sm"
@@ -432,15 +460,13 @@ function onDecisionConflict(conflict) {
           </div>
         </li>
       </ul>
+
+      <PaginationBar v-if="!loading" :meta="paginationMeta" @change="(value) => (page = value)" />
     </BaseCard>
 
     <AllocationModal
       :open="modalOpen"
       :allocation="editing"
-      :preset-request-id="presetRequestId"
-      :requests="waiting"
-      :vehicles="vehicles"
-      :drivers="drivers"
       @close="modalOpen = false"
       @saved="onSaved"
     />
@@ -463,6 +489,10 @@ function onDecisionConflict(conflict) {
       @sent="reload"
     />
 
-    <ConflictModal :conflict="pageConflict" hint="Please choose another date." @close="pageConflict = null" />
+    <ConflictModal
+      :conflicts="pageConflicts"
+      hint="Please choose another date."
+      @close="pageConflicts = []"
+    />
   </div>
 </template>

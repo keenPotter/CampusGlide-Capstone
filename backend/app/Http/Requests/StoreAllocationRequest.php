@@ -20,6 +20,8 @@ class StoreAllocationRequest extends FormRequest
             // drivers.id, not users.id
             'driver_id' => ['required', 'integer', 'exists:drivers,id'],
             'notes' => ['nullable', 'string', 'max:500'],
+            // Sent when the administrator approves a pending request and assigns it in one step.
+            'approve_request' => ['sometimes', 'boolean'],
         ];
     }
 

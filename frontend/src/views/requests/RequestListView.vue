@@ -3,7 +3,6 @@ import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
-import { errorMessage } from '@/lib/api'
 import { formatDate, formatTime, fullName, STATUS_LABELS, TRIP_TYPE_LABELS } from '@/lib/format'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
@@ -12,6 +11,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
+import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 
 const auth = useAuthStore()
@@ -31,7 +31,8 @@ const typeOptions = ['inclusive', 'exclusive'].map((value) => ({
 }))
 
 const disapproving = ref(null)
-const submitting = ref(false)
+// The pending request that is being approved. The assign window is open while this is set.
+const approving = ref(null)
 
 // Reset the filters too, because the store is shared with other pages.
 onMounted(() => store.fetch({ status: '', trip_type: '', page: 1 }))
@@ -61,17 +62,16 @@ function onRowClick(event, request) {
   openRequest(request)
 }
 
-async function approve(request) {
-  submitting.value = true
-  try {
-    await store.updateStatus(request.id, { status: 'approved' })
-    toast.success(`Request #${request.id} approved.`)
-    await store.fetch()
-  } catch (error) {
-    toast.error(errorMessage(error, 'Unable to approve this request.'))
-  } finally {
-    submitting.value = false
-  }
+// Approve opens the assign window. The request is approved only after the vehicle and driver are saved.
+function openApprove(request) {
+  approving.value = request
+}
+
+function onApproved() {
+  const request = approving.value
+  approving.value = null
+  toast.success(`Request #${request.id} approved. Vehicle and driver assigned.`)
+  store.fetch()
 }
 
 function openDisapprove(request) {
@@ -183,7 +183,7 @@ function onDisapproved() {
 
         <div class="mt-auto flex gap-2 border-t border-line pt-3">
           <template v-if="auth.isAdministrator && request.status === 'pending'">
-            <BaseButton size="sm" class="flex-1" :disabled="submitting" @click="approve(request)">
+            <BaseButton size="sm" class="flex-1" @click="openApprove(request)">
               Approve
             </BaseButton>
             <BaseButton size="sm" variant="outline" class="flex-1" @click="openDisapprove(request)">
@@ -268,7 +268,7 @@ function onDisapproved() {
             <td class="px-2 py-3 align-top xl:px-card">
               <div class="flex flex-wrap justify-end gap-1.5">
                 <template v-if="auth.isAdministrator && request.status === 'pending'">
-                  <BaseButton size="sm" :disabled="submitting" @click="approve(request)">
+                  <BaseButton size="sm" @click="openApprove(request)">
                     Approve
                   </BaseButton>
                   <BaseButton size="sm" variant="outline" @click="openDisapprove(request)">
@@ -295,6 +295,8 @@ function onDisapproved() {
     >
       <PaginationBar :meta="store.meta" @change="(page) => store.fetch({ page })" />
     </div>
+
+    <ApproveAssignModal :request="approving" @close="approving = null" @done="onApproved" />
 
     <DisapproveRequestModal
       :request="disapproving"

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\TripResource;
 use App\Models\Trip;
+use App\Services\AllocationService;
 use Illuminate\Http\Request;
 
 /**
@@ -15,12 +16,19 @@ class TripController extends Controller
 {
     private const WITH = ['driver', 'vehicle', 'vehicleRequest.requester'];
 
+    public function __construct(protected AllocationService $allocations)
+    {
+    }
+
     /**
      * GET /api/trips
      * All trips. Administrators only (route middleware).
+     * Trips that already passed their return time are marked completed first.
      */
     public function index()
     {
+        $this->allocations->completeFinishedTrips();
+
         $trips = Trip::with(self::WITH)
             ->orderBy('trip_date')
             ->orderBy('departure_time')
@@ -37,6 +45,8 @@ class TripController extends Controller
      */
     public function myTrips(Request $request)
     {
+        $this->allocations->completeFinishedTrips();
+
         $trips = Trip::with(self::WITH)
             ->whereHas('vehicleRequest', fn ($query) => $query->where('requester_id', $request->user()->id))
             ->orderBy('trip_date')

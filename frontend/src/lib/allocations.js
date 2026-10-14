@@ -1,28 +1,26 @@
-import { formatDate, formatTime } from '@/lib/format'
+import { formatDate, formatTime, parseDate, toDateString } from '@/lib/format'
 
 /** Trip statuses that still block a vehicle or driver. */
 export const ACTIVE_STATUSES = ['scheduled', 'in_progress']
 
-function toMinutes(time) {
-  if (!time) return null
-  const [hours, minutes] = String(time).split(':')
-  return Number(hours) * 60 + Number(minutes || 0)
+// First and last day of a trip. A one-day trip ends on the day it starts.
+function tripRange(allocation) {
+  const start = allocation.trip?.trip_date
+  const end = allocation.trip?.trip_end_date || start
+  return { start, end }
 }
 
-// Two trips overlap when they are on the same date and their times cross.
+// Two trips overlap when they share at least one day.
 function overlaps(a, b) {
-  if (!a.trip?.trip_date || a.trip.trip_date !== b.trip?.trip_date) return false
+  const first = tripRange(a)
+  const second = tripRange(b)
+  if (!first.start || !second.start) return false
 
-  const aStart = toMinutes(a.trip.departure_time) ?? 0
-  const bStart = toMinutes(b.trip.departure_time) ?? 0
-  const aEnd = toMinutes(a.trip.estimated_return_time) ?? aStart + 1
-  const bEnd = toMinutes(b.trip.estimated_return_time) ?? bStart + 1
-
-  return aStart < bEnd && bStart < aEnd
+  return first.start <= second.end && second.start <= first.end
 }
 
 /**
- * Finds active allocations that share a driver or a vehicle at overlapping times.
+ * Finds active allocations that share a driver or a vehicle on the same day(s).
  * Returns { [allocationId]: { text, driverId, vehicleId } }.
  */
 export function findConflicts(allocations) {
@@ -53,13 +51,51 @@ export function findConflicts(allocations) {
 }
 
 /**
- * State of a vehicle or driver on the dashboard.
- * green = free, orange = has a scheduled trip, red = in a conflict.
+ * State of a vehicle or driver on the allocation page, for TODAY.
+ * green = available
+ * orange = has a scheduled trip today (the trip's dates include today)
+ * red = on a trip right now (in progress)
  * @param {'vehicle'|'driver'} kind
+ * @param {string} today "YYYY-MM-DD"
  */
-export function resourceState(kind, id, activeAllocations, conflictIds) {
-  if (conflictIds.has(id)) return 'red'
-  return activeAllocations.some((allocation) => allocation[kind]?.id === id) ? 'orange' : 'green'
+export function resourceState(kind, id, activeAllocations, today) {
+  const own = activeAllocations.filter((allocation) => allocation[kind]?.id === id)
+
+  if (own.some((allocation) => allocation.status === 'in_progress')) return 'red'
+
+  const scheduledToday = own.some((allocation) => {
+    const { start, end } = tripRange(allocation)
+    return Boolean(start) && start <= today && today <= end
+  })
+
+  return scheduledToday ? 'orange' : 'green'
+}
+
+/**
+ * Turns the vehicle or driver list from /allocation-options into dropdown options.
+ * Unavailable ones stay in the list but cannot be picked, and show the reason.
+ */
+export function availabilityOptions(items) {
+  return items.map((item) => ({
+    value: item.id,
+    label:
+      item.available === false
+        ? `${item.label} — Unavailable (${item.unavailable_reason})`
+        : item.label,
+    disabled: item.available === false,
+  }))
+}
+
+/**
+ * The date range of a trip when it starts on `newStart` instead.
+ * The end date moves by the same number of days.
+ */
+export function shiftedRange(start, end, newStart) {
+  const shift = Math.round((parseDate(newStart) - parseDate(start)) / 86400000)
+  const last = parseDate(end || start)
+  last.setDate(last.getDate() + shift)
+
+  return { start: newStart, end: toDateString(last) }
 }
 
 /** "Oct 12, 2026 · 7:30 AM" */
@@ -72,9 +108,24 @@ export function requestNumber(id) {
   return `REQ-${String(id).padStart(3, '0')}`
 }
 
-/** The "conflict" details the backend sends with a 422 response, or null. */
+/** 1 -> "1 passenger", 5 -> "5 passengers", missing -> "—" */
+export function passengerText(count) {
+  if (count === null || count === undefined || count === '') return '—'
+  return `${count} ${Number(count) === 1 ? 'passenger' : 'passengers'}`
+}
+
+/**
+ * The conflicts the backend sends with a 422 response, as a list, or null.
+ * One response can hold a vehicle conflict and a driver conflict together.
+ */
 export function conflictOf(error) {
-  return error?.response?.status === 422 ? (error.response.data?.conflict ?? null) : null
+  if (error?.response?.status !== 422) return null
+
+  const data = error.response.data
+  if (Array.isArray(data?.conflicts) && data.conflicts.length) return data.conflicts
+  if (data?.conflict) return [data.conflict]
+
+  return null
 }
 
 /**
@@ -87,4 +138,12 @@ export function canPrint(allocation) {
     Boolean(allocation.vehicle?.id) &&
     Boolean(allocation.driver?.id)
   )
+}
+
+/**
+ * Reassign is for scheduled trips only. A trip that is in progress or
+ * completed can no longer be reassigned.
+ */
+export function canReassign(allocation) {
+  return allocation?.status === 'scheduled'
 }

@@ -9,6 +9,7 @@ use App\Http\Controllers\FuelUsageRecordController;
 use App\Http\Controllers\MaintenanceLogController;
 use App\Http\Controllers\PostTravelReportController;
 use App\Http\Controllers\PreventiveMaintenanceChecklistController;
+use App\Http\Controllers\PreventiveMaintenanceChecklistPrintController;
 use App\Http\Controllers\RescheduleRequestController;
 use App\Http\Controllers\TripController;
 use App\Http\Controllers\TripRequestShareController;
@@ -67,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
             ->whereNumber('trip');
 
         // Vehicle-driver allocation
+        // A pending request is approved and assigned in one step: POST /allocations with approve_request = true.
         Route::get('/allocation-options', [AllocationController::class, 'options']);
         Route::post('/allocations', [AllocationController::class, 'store']);
         Route::put('/allocations/{allocation}', [AllocationController::class, 'update'])
@@ -113,5 +115,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/preventive-maintenance-checklists', [PreventiveMaintenanceChecklistController::class, 'index']);
         Route::post('/preventive-maintenance-checklists', [PreventiveMaintenanceChecklistController::class, 'store']);
         Route::patch('/preventive-maintenance-checklists/{preventiveMaintenanceChecklist}', [PreventiveMaintenanceChecklistController::class, 'update']);
+        // The printable checklist (legal size), built by the backend.
+        Route::get('/preventive-maintenance-checklists/{preventiveMaintenanceChecklist}/print', [PreventiveMaintenanceChecklistPrintController::class, 'show'])
+            ->whereNumber('preventiveMaintenanceChecklist');
     });
 });
