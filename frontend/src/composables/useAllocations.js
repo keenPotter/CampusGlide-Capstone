@@ -1,6 +1,7 @@
 import { computed, onMounted, ref } from 'vue'
 import api, { errorMessage, unwrap } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
+import { todayIso } from '@/lib/format'
 import { ACTIVE_STATUSES, findConflicts, resourceState } from '@/lib/allocations'
 
 // Order of the summary list: needs allocation, in progress, scheduled, completed.
@@ -40,10 +41,11 @@ export function useAllocations() {
     loadError.value = ''
 
     try {
-      const calls = [
-        api.get('/allocations', { params: { per_page: 100 } }),
-        api.get('/reschedule-requests'),
-      ]
+      // The allocation list goes first. The backend also marks finished trips as completed
+      // on this call, so the other lists below already show the updated status.
+      const allocationRows = unwrap(await api.get('/allocations', { params: { per_page: 100 } }))
+
+      const calls = [api.get('/reschedule-requests')]
 
       if (auth.isAdministrator) {
         calls.push(
@@ -53,9 +55,7 @@ export function useAllocations() {
         )
       }
 
-      const [allocationRows, changeRows, options, shareRows, adminRows] = (
-        await Promise.all(calls)
-      ).map(unwrap)
+      const [changeRows, options, shareRows, adminRows] = (await Promise.all(calls)).map(unwrap)
 
       allocations.value = allocationRows
       dateChanges.value = changeRows
@@ -120,27 +120,21 @@ export function useAllocations() {
     ...new Set(conflictedAllocations.value.map((allocation) => conflicts.value[allocation.id].text)),
   ])
 
-  function conflictIds(key) {
-    return new Set(
-      Object.values(conflicts.value)
-        .map((conflict) => conflict[key])
-        .filter(Boolean),
-    )
-  }
-
+  // Availability is checked for today:
+  // red = on a trip now (in progress), orange = has a scheduled trip today, green = available.
   const vehicleList = computed(() => {
-    const ids = conflictIds('vehicleId')
+    const today = todayIso()
     return vehicles.value.map((vehicle) => ({
       ...vehicle,
-      state: resourceState('vehicle', vehicle.id, activeAllocations.value, ids),
+      state: resourceState('vehicle', vehicle.id, activeAllocations.value, today),
     }))
   })
 
   const driverList = computed(() => {
-    const ids = conflictIds('driverId')
+    const today = todayIso()
     return drivers.value.map((driver) => ({
       ...driver,
-      state: resourceState('driver', driver.id, activeAllocations.value, ids),
+      state: resourceState('driver', driver.id, activeAllocations.value, today),
     }))
   })
 
@@ -158,6 +152,7 @@ export function useAllocations() {
       requester: allocation.vehicle_request?.requester,
       // The trip type is the one the faculty member chose on the request form.
       tripType: allocation.vehicle_request?.trip_type,
+      passengers: allocation.vehicle_request?.number_of_passengers,
       date: allocation.trip?.trip_date,
       time: allocation.trip?.departure_time,
       ...extra,
@@ -175,6 +170,7 @@ export function useAllocations() {
         destination: request.destination,
         requester: request.requester,
         tripType: request.trip_type,
+        passengers: request.number_of_passengers,
         date: request.trip_date,
         time: request.departure_time,
       })),

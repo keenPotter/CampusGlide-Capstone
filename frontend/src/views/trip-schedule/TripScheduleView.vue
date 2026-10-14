@@ -1,4 +1,5 @@
 <script setup>
+import BaseButton from '@/components/ui/BaseButton.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import LoadError from '@/components/ui/LoadError.vue'
 import ScheduleSummary from '@/components/trip-schedule/ScheduleSummary.vue'
@@ -26,6 +27,7 @@ const {
   activeTrip,
   activeTrips,
   activeDateLabel,
+  loading,
   loadError,
   currentTripTypeLabel,
   filteredTrips,
@@ -59,9 +61,12 @@ const {
 
 <template>
   <div class="flex flex-col gap-page">
-    <div>
-      <h1 class="text-page-title">Trip Schedule</h1>
-      <p class="mt-1 text-small text-ink-muted">View scheduled trips and allocation details</p>
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h1 class="text-page-title">Trip Schedule</h1>
+        <p class="mt-1 text-small text-ink-muted">View scheduled trips and allocation details</p>
+      </div>
+      <BaseButton variant="outline" size="sm" :disabled="loading" @click="fetchTrips">Refresh</BaseButton>
     </div>
 
     <SegmentedControl v-model="currentTripType" :options="typeOptions" label="Trip type" />

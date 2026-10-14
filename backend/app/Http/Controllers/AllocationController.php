@@ -30,9 +30,14 @@ class AllocationController extends Controller
      * GET /api/allocations
      * Administrators see everything. Faculty see only their own requests.
      * Query params: ?status=scheduled, ?per_page= (max 100, so the frontend stats are complete)
+     *
+     * Trips that already passed their return time are marked completed first,
+     * so the list always shows the right status when the page loads or is refreshed.
      */
     public function index(Request $request)
     {
+        $this->allocations->completeFinishedTrips();
+
         $user = $request->user();
 
         $query = Allocation::with(self::WITH);
@@ -72,14 +77,34 @@ class AllocationController extends Controller
 
     /**
      * GET /api/allocation-options
-     * Fills the dropdowns on the allocation page. Administrators only (route middleware).
+     * Fills the dropdowns for assigning a vehicle and driver. Administrators only (route middleware).
      * - requests: approved requests that do not have a trip yet
-     * - vehicles and drivers: every usable vehicle and every driver
-     * Busy vehicles and drivers are not removed here. The conflict check runs on Allocate
-     * and returns a 422 with "conflict" details for the conflict modal.
+     * - vehicles and drivers: every usable vehicle and every driver, each with
+     *   `available` and `unavailable_reason` for the chosen dates
+     *
+     * Query params (all optional):
+     *   ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD  the dates to check (default: today)
+     *   ?ignore_trip_id=5                           the trip being reassigned, so it does not block itself
+     *
+     * The conflict check still runs again on save, in case someone else booked in the meantime.
      */
-    public function options(): JsonResponse
+    public function options(Request $request): JsonResponse
     {
+        $this->allocations->completeFinishedTrips();
+
+        $request->validate([
+            'start_date' => ['nullable', 'date_format:Y-m-d'],
+            'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'ignore_trip_id' => ['nullable', 'integer'],
+        ]);
+
+        $start = $request->query('start_date') ?: now()->toDateString();
+        $end = $request->query('end_date') ?: $start;
+        $ignore = $request->filled('ignore_trip_id') ? (int) $request->query('ignore_trip_id') : null;
+
+        $busy = $this->allocations->unavailable($start, $end, $ignore);
+        $driversOnTrips = Trip::whereIn('trip_status', AllocationService::ACTIVE)->pluck('driver_id');
+
         $requests = VehicleRequest::with('requester')
             ->where('status', 'approved')
             ->whereDoesntHave('trip')
@@ -93,13 +118,26 @@ class AllocationController extends Controller
             ->whereIn('status', ['available', 'in_use'])
             ->orderBy('plate_number')
             ->get()
-            ->map(fn (Vehicle $v) => AllocationService::vehicleOption($v))
+            ->map(fn (Vehicle $v) => AllocationService::vehicleOption($v, $busy['vehicles'][$v->id] ?? null))
             ->values();
 
         $drivers = Driver::orderBy('last_name')
             ->orderBy('first_name')
             ->get()
-            ->map(fn (Driver $d) => AllocationService::driverOption($d))
+            ->map(function (Driver $d) use ($busy, $driversOnTrips, $end) {
+                $reason = $busy['drivers'][$d->id] ?? null;
+
+                // Marked unavailable by hand (not because of a trip).
+                if (! $reason && ! $d->is_available && ! $driversOnTrips->contains($d->id)) {
+                    $reason = 'Marked unavailable';
+                }
+
+                if (! $reason && $d->license_expiry_date && $d->license_expiry_date->toDateString() < $end) {
+                    $reason = 'License expires before the trip date';
+                }
+
+                return AllocationService::driverOption($d, $reason);
+            })
             ->values();
 
         return response()->json(compact('requests', 'vehicles', 'drivers'));
@@ -108,6 +146,10 @@ class AllocationController extends Controller
     /**
      * POST /api/allocations
      * Creates the trip and the allocation record together.
+     *
+     * With approve_request = true, a PENDING request is approved in the same step.
+     * The approval and the assignment are saved together, so a request is never
+     * approved without a vehicle and driver.
      */
     public function store(StoreAllocationRequest $request)
     {
@@ -115,9 +157,20 @@ class AllocationController extends Controller
         $vehicle = Vehicle::findOrFail($request->vehicle_id);
         $driver = Driver::findOrFail($request->driver_id);
 
-        $this->allocations->assertAssignable($vehicleRequest, $vehicle, $driver);
+        $approving = $request->boolean('approve_request') && $vehicleRequest->status === 'pending';
 
-        $allocation = DB::transaction(function () use ($request, $vehicleRequest, $vehicle, $driver) {
+        $this->allocations->assertAssignable($vehicleRequest, $vehicle, $driver, null, null, $approving);
+
+        $allocation = DB::transaction(function () use ($request, $vehicleRequest, $vehicle, $driver, $approving) {
+            if ($approving) {
+                $vehicleRequest->update([
+                    'status' => 'approved',
+                    'disapproval_reason' => null,
+                    'approved_by' => $request->user()->id,
+                    'approved_date' => now(),
+                ]);
+            }
+
             $trip = Trip::create([
                 'vehicle_request_id' => $vehicleRequest->id,
                 'vehicle_id' => $vehicle->id,

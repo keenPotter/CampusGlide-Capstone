@@ -9,6 +9,7 @@ import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
+import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 
 const auth = useAuthStore()
@@ -19,7 +20,7 @@ const toast = useToast()
 
 const request = ref(null)
 const loading = ref(true)
-const submitting = ref(false)
+const approveOpen = ref(false)
 const disapproveOpen = ref(false)
 
 const canEdit = computed(
@@ -61,17 +62,11 @@ async function load() {
   }
 }
 
-async function approve() {
-  submitting.value = true
-  try {
-    await store.updateStatus(request.value.id, { status: 'approved' })
-    toast.success('Request approved.')
-    await load()
-  } catch (error) {
-    toast.error(errorMessage(error, 'Unable to update this request.'))
-  } finally {
-    submitting.value = false
-  }
+// Approve opens the assign window. The request is approved only after the vehicle and driver are saved.
+function onApproved() {
+  approveOpen.value = false
+  toast.success('Request approved. Vehicle and driver assigned.')
+  load()
 }
 
 function onDisapproved() {
@@ -134,8 +129,8 @@ function onDisapproved() {
 
     <div class="flex flex-wrap justify-end gap-3">
       <template v-if="auth.isAdministrator && request.status === 'pending'">
-        <BaseButton :loading="submitting" @click="approve">Approve</BaseButton>
-        <BaseButton variant="outline" :disabled="submitting" @click="disapproveOpen = true">
+        <BaseButton @click="approveOpen = true">Approve</BaseButton>
+        <BaseButton variant="outline" @click="disapproveOpen = true">
           Disapprove
         </BaseButton>
       </template>
@@ -148,6 +143,12 @@ function onDisapproved() {
         Edit
       </BaseButton>
     </div>
+
+    <ApproveAssignModal
+      :request="approveOpen ? request : null"
+      @close="approveOpen = false"
+      @done="onApproved"
+    />
 
     <DisapproveRequestModal
       :request="disapproveOpen ? request : null"

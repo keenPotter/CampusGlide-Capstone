@@ -473,7 +473,7 @@ async function markCompleted(log) {
                       @click="markCompleted(log)">
                       Mark as completed
                     </BaseButton>
-                    <BaseButton size="sm" variant="secondary" @click="openEdit(log)">Edit</BaseButton>
+                    <BaseButton size="sm" variant="outline" @click="openEdit(log)">Edit</BaseButton>
                   </div>
                 </td>
               </tr>

@@ -16,6 +16,10 @@ use Illuminate\Validation\ValidationException;
  * Three rules from the capstone (Chapter III):
  * 1. Driver availability  2. Vehicle readiness  3. Assignment conflicts
  *
+ * Availability is checked by DATE. A vehicle or driver is unavailable when another
+ * scheduled or in-progress trip overlaps any day of the trip being assigned
+ * (a multi-day trip uses its whole date range).
+ *
  * When an ACTIVE trip is reassigned, the vehicle or driver that is not being
  * replaced is not checked for "readiness" again. They are already marked
  * in use because of their own trip.
@@ -46,8 +50,11 @@ class AllocationService
         ];
     }
 
-    /** Shape of a vehicle in the dropdown (and in the quick-add response). */
-    public static function vehicleOption(Vehicle $v): array
+    /**
+     * Shape of a vehicle in the dropdown (and in the quick-add response).
+     * $unavailableReason is set when the vehicle cannot be assigned on the chosen dates.
+     */
+    public static function vehicleOption(Vehicle $v, ?string $unavailableReason = null): array
     {
         return [
             'id' => $v->id,
@@ -55,11 +62,13 @@ class AllocationService
             'vehicle_model' => $v->vehicle_model,
             'plate_number' => $v->plate_number,
             'capacity' => $v->capacity,
+            'available' => $unavailableReason === null,
+            'unavailable_reason' => $unavailableReason,
         ];
     }
 
     /** Shape of a driver in the dropdown: name and contact number. */
-    public static function driverOption(Driver $d): array
+    public static function driverOption(Driver $d, ?string $unavailableReason = null): array
     {
         $name = $d->full_name ?: "Driver #{$d->id}";
         $expiry = $d->license_expiry_date;
@@ -72,12 +81,96 @@ class AllocationService
             'name' => $name,
             'contact_number' => $d->contact_number,
             'license_expiry_date' => $expiry?->toDateString(),
+            'available' => $unavailableReason === null,
+            'unavailable_reason' => $unavailableReason,
         ];
     }
 
     /**
+     * Marks every trip whose return time has passed as completed, and frees its vehicle and driver.
+     *
+     * The end of a trip is the END date of its request plus the estimated return time,
+     * so a multi-day trip is not completed on its first day.
+     * A trip with no estimated return time is left alone, because its end is not known.
+     *
+     * There is no scheduler. This runs when a page loads or is refreshed
+     * (allocation list and trip schedule).
+     *
+     * @return int number of trips that were completed
+     */
+    public function completeFinishedTrips(): int
+    {
+        $now = now();
+
+        $finished = Trip::with('vehicleRequest')
+            ->whereIn('trip_status', self::ACTIVE)
+            ->whereNotNull('estimated_return_time')
+            ->whereDate('trip_date', '<=', $now->toDateString())
+            ->get()
+            ->filter(function (Trip $trip) use ($now) {
+                $endDate = $trip->vehicleRequest?->trip_end_date ?? $trip->trip_date;
+                $end = Carbon::parse($endDate->toDateString() . ' ' . $trip->estimated_return_time);
+
+                return $end->lte($now);
+            });
+
+        if ($finished->isEmpty()) {
+            return 0;
+        }
+
+        DB::transaction(function () use ($finished) {
+            Trip::whereIn('id', $finished->pluck('id'))->update(['trip_status' => 'completed']);
+
+            foreach ($finished as $trip) {
+                $this->freeVehicleAndDriver((int) $trip->vehicle_id, (int) $trip->driver_id);
+            }
+        });
+
+        return $finished->count();
+    }
+
+    /**
+     * Frees a vehicle and a driver, unless another active trip still uses them.
+     * Only an "in use" vehicle is reset, so a vehicle under maintenance keeps its status.
+     */
+    protected function freeVehicleAndDriver(int $vehicleId, int $driverId): void
+    {
+        $stillUsed = fn (string $column, int $id) => Trip::where($column, $id)
+            ->whereIn('trip_status', self::ACTIVE)
+            ->exists();
+
+        if (! $stillUsed('vehicle_id', $vehicleId)) {
+            Vehicle::where('id', $vehicleId)->where('status', 'in_use')->update(['status' => 'available']);
+        }
+
+        if (! $stillUsed('driver_id', $driverId)) {
+            Driver::where('id', $driverId)->update(['is_available' => true, 'assigned_vehicle_id' => null]);
+        }
+    }
+
+    /**
+     * The first and last day of a request's trip.
+     * When $newDate is given, the whole range is moved so it starts on that date.
+     *
+     * @return array{0: string, 1: string} [start, end] as YYYY-MM-DD
+     */
+    public function tripRange(VehicleRequest $vehicleRequest, ?string $newDate = null): array
+    {
+        $start = Carbon::parse($vehicleRequest->trip_date)->toDateString();
+        $end = Carbon::parse($vehicleRequest->trip_end_date ?? $vehicleRequest->trip_date)->toDateString();
+
+        if ($newDate) {
+            $shift = (int) Carbon::parse($start)->diffInDays(Carbon::parse($newDate), false);
+            $end = Carbon::parse($end)->addDays($shift)->toDateString();
+            $start = $newDate;
+        }
+
+        return [$start, $end];
+    }
+
+    /**
      * Move the date of a SCHEDULED trip (and of its vehicle request).
-     * First checks that the current vehicle and driver are free on the new date.
+     * First checks that the current vehicle and driver are free on the new dates.
      *
      * @return string the old date (YYYY-MM-DD)
      */
@@ -96,10 +189,18 @@ class AllocationService
         }
 
         $driver = Driver::findOrFail($trip->driver_id);
-        $this->assertLicenseValidOn($driver, $newDate);
+        $vehicleRequest = VehicleRequest::findOrFail($trip->vehicle_request_id);
+        [$startDate, $endDate] = $this->tripRange($vehicleRequest, $newDate);
 
-        $this->assertFree('vehicle_id', $trip->vehicle_id, $newDate, $trip->departure_time, $trip->estimated_return_time, $trip->id);
-        $this->assertFree('driver_id', $trip->driver_id, $newDate, $trip->departure_time, $trip->estimated_return_time, $trip->id);
+        $this->assertLicenseValidOn($driver, $endDate);
+
+        $this->assertNoConflicts(
+            (int) $trip->vehicle_id,
+            (int) $trip->driver_id,
+            $startDate,
+            $endDate,
+            $trip->id
+        );
 
         return $this->shiftTripDate($trip, $newDate);
     }
@@ -134,62 +235,92 @@ class AllocationService
     /**
      * @param  Trip|null  $currentTrip  pass this when reassigning an existing trip
      * @param  string|null  $newDate  pass this (YYYY-MM-DD) when the trip is also moved to another date.
-     *                              The checks then run against the new date.
+     *                              The checks then run against the new dates.
+     * @param  bool  $allowPending  true when a pending request is approved together with its assignment
      */
     public function assertAssignable(
         VehicleRequest $vehicleRequest,
         Vehicle $vehicle,
         Driver $driver,
         ?Trip $currentTrip = null,
-        ?string $newDate = null
+        ?string $newDate = null,
+        bool $allowPending = false
     ): void {
-        $date = $newDate ?? Carbon::parse($vehicleRequest->trip_date)->toDateString(); // 'YYYY-MM-DD'
-        $start = $vehicleRequest->departure_time;
-        $end = $vehicleRequest->estimated_return_time;
+        [$startDate, $endDate] = $this->tripRange($vehicleRequest, $newDate);
         $ignoreTripId = $currentTrip?->id;
 
-        $this->assertRequestIsApproved($vehicleRequest);
+        $this->assertRequestIsApproved($vehicleRequest, $allowPending);
         $this->assertNotAlreadyAllocated($vehicleRequest, $ignoreTripId);
 
         // Conflicts first (so the conflict modal shows up first), then readiness.
-        $this->assertFree('vehicle_id', $vehicle->id, $date, $start, $end, $ignoreTripId);
-        $this->assertFree('driver_id', $driver->id, $date, $start, $end, $ignoreTripId);
+        // The vehicle and the driver are checked together, so every conflict is reported at once.
+        $this->assertNoConflicts((int) $vehicle->id, (int) $driver->id, $startDate, $endDate, $ignoreTripId);
 
         if (! $currentTrip || (int) $vehicle->id !== (int) $currentTrip->vehicle_id) {
             $this->assertVehicleReady($vehicle);
         }
 
         if (! $currentTrip || (int) $driver->id !== (int) $currentTrip->driver_id) {
-            $this->assertDriverReady($driver, $date);
+            $this->assertDriverReady($driver, $endDate);
         }
 
-        // A driver who is kept on the trip still needs a valid license on the new date.
+        // A driver who is kept on the trip still needs a valid license on the new dates.
         if ($newDate) {
-            $this->assertLicenseValidOn($driver, $date);
+            $this->assertLicenseValidOn($driver, $endDate);
         }
     }
 
     /**
-     * Active trips on the same date that overlap the given time.
-     * If there is no return time, a 2-hour block is used so trips do not collide.
+     * Active trips that share at least one day with the given date range.
+     * A trip covers its start date up to the end date of its vehicle request.
      */
-    public function busyTrips(string $date, $start, ?string $end, ?int $ignoreTripId = null): Builder
+    public function busyTrips(string $startDate, string $endDate, ?int $ignoreTripId = null): Builder
     {
-        $end = $end ?? date('H:i:s', strtotime($start) + 7200);
-
         return Trip::query()
-            ->whereIn('trip_status', self::ACTIVE)
-            ->whereDate('trip_date', $date)
-            ->where('departure_time', '<', $end)
-            ->where(function (Builder $q) use ($start) {
-                $q->whereNull('estimated_return_time')
-                    ->orWhere('estimated_return_time', '>', $start);
-            })
-            ->when($ignoreTripId, fn (Builder $q) => $q->where('id', '!=', $ignoreTripId));
+            ->select('trips.*')
+            ->leftJoin('vehicle_requests', 'vehicle_requests.id', '=', 'trips.vehicle_request_id')
+            ->whereIn('trips.trip_status', self::ACTIVE)
+            ->whereDate('trips.trip_date', '<=', $endDate)
+            ->whereRaw('DATE(COALESCE(vehicle_requests.trip_end_date, trips.trip_date)) >= ?', [$startDate])
+            ->when($ignoreTripId, fn (Builder $q) => $q->where('trips.id', '!=', $ignoreTripId));
     }
 
-    protected function assertRequestIsApproved(VehicleRequest $vehicleRequest): void
+    /**
+     * Vehicles and drivers that are NOT available on the given dates, with the reason.
+     * A trip in progress is reported as "On a trip (in progress)". A scheduled trip is reported as
+     * "Has a scheduled trip on this date".
+     *
+     * @return array{vehicles: array<int,string>, drivers: array<int,string>}  id => reason
+     */
+    public function unavailable(string $startDate, string $endDate, ?int $ignoreTripId = null): array
     {
+        $vehicles = [];
+        $drivers = [];
+
+        $mark = function (array &$list, int $id, Trip $trip) {
+            $inProgress = $trip->trip_status === 'in_progress';
+
+            // An in-progress trip is the stronger reason, so it replaces a "scheduled" one.
+            if (! isset($list[$id]) || $inProgress) {
+                $list[$id] = $inProgress ? 'On a trip (in progress)' : 'Has a scheduled trip on this date';
+            }
+        };
+
+        foreach ($this->busyTrips($startDate, $endDate, $ignoreTripId)->get() as $trip) {
+            $mark($vehicles, (int) $trip->vehicle_id, $trip);
+            $mark($drivers, (int) $trip->driver_id, $trip);
+        }
+
+        return ['vehicles' => $vehicles, 'drivers' => $drivers];
+    }
+
+    protected function assertRequestIsApproved(VehicleRequest $vehicleRequest, bool $allowPending = false): void
+    {
+        // A pending request may pass when it is being approved together with this assignment.
+        if ($allowPending && $vehicleRequest->status === 'pending') {
+            return;
+        }
+
         if ($vehicleRequest->status !== 'approved') {
             throw ValidationException::withMessages([
                 'vehicle_request_id' => 'Only approved vehicle requests can be allocated a vehicle and driver.',
@@ -210,7 +341,7 @@ class AllocationService
 
     protected function assertVehicleReady(Vehicle $vehicle): void
     {
-        // 'in_use' is allowed: the date and time block it (assertFree), not the status.
+        // 'in_use' is allowed: the dates block it (assertNoConflicts), not the status.
         if (! $vehicle->is_active || ! in_array($vehicle->status, ['available', 'in_use'], true)) {
             throw ValidationException::withMessages([
                 'vehicle_id' => "This vehicle is currently '{$vehicle->status}' and is not ready for dispatch.",
@@ -220,11 +351,11 @@ class AllocationService
 
     /**
      * A driver is a record only (no login), so only availability and license are checked.
-     * The license is checked against the TRIP DATE, not today.
+     * The license is checked against the LAST TRIP DATE, not today.
      */
-    protected function assertDriverReady(Driver $driver, string $tripDate): void
+    protected function assertDriverReady(Driver $driver, string $lastTripDate): void
     {
-        // is_available = false only because of another trip is not a problem (assertFree handles it).
+        // is_available = false only because of another trip is not a problem (assertNoConflicts handles it).
         // It blocks only when the driver was marked unavailable by hand and has no active trip.
         $hasActiveTrip = Trip::where('driver_id', $driver->id)->whereIn('trip_status', self::ACTIVE)->exists();
 
@@ -234,7 +365,7 @@ class AllocationService
             ]);
         }
 
-        $this->assertLicenseValidOn($driver, $tripDate);
+        $this->assertLicenseValidOn($driver, $lastTripDate);
     }
 
     protected function assertLicenseValidOn(Driver $driver, string $date): void
@@ -249,19 +380,61 @@ class AllocationService
     }
 
     /**
-     * One check for both driver and vehicle.
+     * Checks the vehicle AND the driver together and reports every conflict in one 422 response.
+     * A conflict is any active trip that shares at least one day with the given date range.
      *
-     * @param  string  $column  'driver_id' or 'vehicle_id' (the column in trips and the error field name)
+     * The response has:
+     *  - "conflicts": the full list (one entry for each conflicting trip and subject)
+     *  - "conflict": the first entry, kept for older code that reads a single conflict
      */
-    protected function assertFree(string $column, int $id, string $date, $start, ?string $end, ?int $ignoreTripId): void
-    {
-        $conflict = $this->busyTrips($date, $start, $end, $ignoreTripId)->where($column, $id)->first();
+    protected function assertNoConflicts(
+        int $vehicleId,
+        int $driverId,
+        string $startDate,
+        string $endDate,
+        ?int $ignoreTripId
+    ): void {
+        $conflicts = [];
 
-        if (! $conflict) {
+        foreach (['vehicle_id' => $vehicleId, 'driver_id' => $driverId] as $column => $id) {
+            $trips = $this->busyTrips($startDate, $endDate, $ignoreTripId)
+                ->where("trips.{$column}", $id)
+                ->with(['vehicle', 'driver', 'vehicleRequest'])
+                ->get();
+
+            foreach ($trips as $trip) {
+                $conflicts[] = $this->conflictDetails($column, $id, $trip);
+            }
+        }
+
+        if (! $conflicts) {
             return;
         }
 
-        $conflict->loadMissing(['vehicle', 'driver']);
+        $errors = [];
+        foreach ($conflicts as $conflict) {
+            $field = $conflict['type'] === 'vehicle' ? 'vehicle_id' : 'driver_id';
+            $errors[$field][] = $conflict['message'];
+        }
+
+        // 422 with "conflicts" details for the conflict modal of the frontend.
+        throw new HttpResponseException(response()->json([
+            'message' => implode(' ', array_column($conflicts, 'message')),
+            'errors' => $errors,
+            'conflict' => $conflicts[0],
+            'conflicts' => $conflicts,
+        ], 422));
+    }
+
+    /**
+     * Details of one conflict, for the conflict modal.
+     *
+     * @param  string  $column  'driver_id' or 'vehicle_id'
+     * @param  Trip  $conflict  the trip that is already using the vehicle or driver
+     */
+    protected function conflictDetails(string $column, int $id, Trip $conflict): array
+    {
+        $conflict->loadMissing(['vehicle', 'driver', 'vehicleRequest']);
 
         $isVehicle = $column === 'vehicle_id';
         $vehicleLabel = $conflict->vehicle
@@ -272,25 +445,28 @@ class AllocationService
         // The subject is the one being assigned, which is also the one already on the conflicting trip.
         $subjectName = $isVehicle ? ($vehicleLabel ?? 'Vehicle') : ($driverLabel ?: "Driver #{$id}");
 
-        $when = Carbon::parse($conflict->trip_date)->format('F j, Y');
+        $startDate = Carbon::parse($conflict->trip_date)->toDateString();
+        $endDate = Carbon::parse($conflict->vehicleRequest?->trip_end_date ?? $conflict->trip_date)->toDateString();
+
+        $when = $endDate === $startDate
+            ? Carbon::parse($startDate)->format('F j, Y')
+            : Carbon::parse($startDate)->format('F j, Y') . ' to ' . Carbon::parse($endDate)->format('F j, Y');
+
         $message = "{$subjectName} is already scheduled on {$when} at {$conflict->departure_time}"
             . ($conflict->estimated_return_time ? " – {$conflict->estimated_return_time}" : '') . '.';
 
-        // 422 with "conflict" details for the conflict modal of the frontend.
-        throw new HttpResponseException(response()->json([
+        return [
+            'type' => $isVehicle ? 'vehicle' : 'driver',
+            'subject' => $subjectName,
+            'trip_id' => $conflict->id,
+            'date' => $startDate,
+            'end_date' => $endDate,
+            'start' => $conflict->departure_time,
+            'end' => $conflict->estimated_return_time,
+            'destination' => $conflict->destination,
+            'driver' => $driverLabel,
+            'vehicle' => $vehicleLabel,
             'message' => $message,
-            'errors' => [$column => [$message]],
-            'conflict' => [
-                'type' => $isVehicle ? 'vehicle' : 'driver',
-                'subject' => $subjectName,
-                'trip_id' => $conflict->id,
-                'date' => Carbon::parse($conflict->trip_date)->toDateString(),
-                'start' => $conflict->departure_time,
-                'end' => $conflict->estimated_return_time,
-                'destination' => $conflict->destination,
-                'driver' => $driverLabel,
-                'vehicle' => $vehicleLabel,
-            ],
-        ], 422));
+        ];
     }
 }
