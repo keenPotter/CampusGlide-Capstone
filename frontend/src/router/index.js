@@ -72,6 +72,12 @@ const routes = [
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {
+    path: '/preventive-maintenance',
+    name: 'preventiveMaintenance',
+    component: () => import('@/views/maintenance/PreventiveMaintenanceView.vue'),
+    meta: { requiresAuth: true, roles: ['administrator'] },
+  },
+  {
     path: '/users/new',
     name: 'users.create',
     component: () => import('@/views/users/CreateUserView.vue'),
