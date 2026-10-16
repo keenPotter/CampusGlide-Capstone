@@ -79,7 +79,7 @@
       </tr>
     </table>
 
-    <div class="ruv"><b>RUV No.:</b> <span class="blank w45"></span></div>
+    <div class="ruv"><b>RUV No.:</b> @if (!empty($ruvNumber)) <u class="strong">{{ $ruvNumber }}</u> @else <span class="blank w45"></span> @endif</div>
 
     <div class="grid">
       <div class="col-left">
