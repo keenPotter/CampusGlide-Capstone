@@ -35,6 +35,7 @@ class AllocationPrintController extends Controller
         }
 
         $requester = $vehicleRequest->requester;
+        $ruvNumber = $allocation->ensureRuvNumber();
 
         $start = $vehicleRequest->trip_date;
         $end = $vehicleRequest->trip_end_date ?? $start;
@@ -47,6 +48,7 @@ class AllocationPrintController extends Controller
 
         return response()->view('print.vehicle-request', [
             'logo' => $this->logo(),
+            'ruvNumber' => $ruvNumber,
             'requestNo' => $vehicleRequest->id,
             'official' => $requester ? strtoupper($requester->full_name) : '',
             'position' => $requester?->position ?? '',
