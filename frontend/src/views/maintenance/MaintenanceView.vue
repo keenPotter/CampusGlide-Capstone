@@ -519,7 +519,7 @@ async function markCompleted(log) {
 
       <template #footer>
         <BaseButton variant="outline" @click="showForm = false">Cancel</BaseButton>
-        <BaseButton :loading="saving" @click="save">Save maintenance</BaseButton>
+        <BaseButton :loading="saving" @click="save">Save</BaseButton>
       </template>
     </BaseModal>
   </div>
