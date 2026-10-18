@@ -266,7 +266,7 @@ async function printAssessment() {
           </dl>
 
           <div class="flex justify-end gap-2">
-            <BaseButton size="sm" variant="secondary" @click="openAssess(vehicle)">Assess</BaseButton>
+            <BaseButton size="sm" variant="primary" @click="openAssess(vehicle)">Assess</BaseButton>
           </div>
         </li>
       </ul>

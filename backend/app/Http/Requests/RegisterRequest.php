@@ -20,7 +20,7 @@ class RegisterRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:100'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::in(['administrator', 'faculty'])],
+            'role' => ['required', Rule::in(['administrator', 'faculty', 'staff'])],
             // The position is printed on the vehicle request form.
             'position' => ['nullable', 'string', 'max:255'],
             'phone_number' => ['nullable', 'string', 'max:20'],

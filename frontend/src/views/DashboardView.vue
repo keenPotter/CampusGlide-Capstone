@@ -89,6 +89,7 @@ const upcoming = computed(() => summary.value.upcoming)
     <BaseCard title="Upcoming trips" subtitle="Pending and approved requests, soonest first">
       <template #actions>
         <RouterLink
+          v-if="!auth.isStaff"
           :to="{ name: 'requests.index' }"
           class="text-small font-medium text-primary hover:underline"
         >
@@ -113,11 +114,13 @@ const upcoming = computed(() => summary.value.upcoming)
           class="flex flex-col gap-2 py-3 first:pt-0 last:pb-0"
         >
           <RouterLink
+            v-if="!auth.isStaff"
             :to="{ name: 'requests.show', params: { id: request.id } }"
             class="block text-body font-medium text-ink hover:text-primary"
           >
             {{ request.destination }}
           </RouterLink>
+          <p v-else class="block text-body font-medium text-ink">{{ request.destination }}</p>
           <div class="flex flex-wrap items-center justify-between gap-2">
             <p class="text-small text-ink-muted">
               {{ formatDate(request.trip_date) }} · {{ formatTime(request.departure_time) }}
