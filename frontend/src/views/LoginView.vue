@@ -8,8 +8,8 @@ const route = useRoute()
 const selectedRole = ref('')
 const roles = [
   { value: 'administrator', title: 'Admin', description: 'Manage fleet operations and campus transportation.', icon: 'M12 3 4.5 7v5c0 4.5 3.2 7.7 7.5 9 4.3-1.3 7.5-4.5 7.5-9V7L12 3Zm-3 9 2 2 4-4' },
-  { value: 'faculty', title: 'User', description: 'Request and follow your campus transportation.', icon: 'M12 3 2.5 8 12 13l9.5-5L12 3Zm-6 8.2V16l6 3 6-3v-4.8' },
   { value: 'staff', title: 'Staff', description: 'View dashboard, allocations, and trip schedules.', icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+  { value: 'faculty', title: 'User', description: 'Request and follow your campus transportation.', icon: 'M12 3 2.5 8 12 13l9.5-5L12 3Zm-6 8.2V16l6 3 6-3v-4.8' },
 ]
 
 function chooseRole(role) {
