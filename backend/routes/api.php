@@ -33,21 +33,48 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vehicle-requests/{vehicleRequest}', [VehicleRequestController::class, 'show'])
         ->whereNumber('vehicleRequest');
 
-    // Allocations and date change requests: administrators see all, faculty see only their own
+    // Allocations and date change requests: administrators and staff see all, faculty see only their own
     Route::get('/allocations', [AllocationController::class, 'index']);
     Route::get('/allocations/{allocation}', [AllocationController::class, 'show'])
         ->whereNumber('allocation');
     Route::get('/reschedule-requests', [RescheduleRequestController::class, 'index']);
 
-    // ---------- Read-only fleet views for administrators and staff ----------
-    // Staff may view the trip schedule and its related fleet details, but all writes
-    // remain inside the administrator-only group below.
+    // ---------- Fleet views for administrators and staff ----------
+    // Staff may view the trip schedule and its related fleet details.
     Route::middleware('role:administrator,staff')->group(function () {
         Route::get('/trips', [TripController::class, 'index']);
         Route::get('/trips/{trip}', [TripController::class, 'show'])->whereNumber('trip');
         Route::get('/drivers', [DriverController::class, 'index']);
         Route::get('/vehicles', [VehicleController::class, 'index']);
         Route::get('/vehicles/{vehicle}/status', [VehicleController::class, 'status']);
+    });
+
+    // ---------- Allocation management for administrators and staff ----------
+    // Staff use the same allocation page as administrators.
+    // Approving or disapproving vehicle requests stays administrator only (see below).
+    Route::middleware('role:administrator,staff')->group(function () {
+        // Vehicle-driver allocation
+        Route::get('/allocation-options', [AllocationController::class, 'options']);
+        Route::post('/allocations', [AllocationController::class, 'store']);
+        Route::put('/allocations/{allocation}', [AllocationController::class, 'update'])
+            ->whereNumber('allocation');
+        Route::get('/allocations/{allocation}/print', [AllocationPrintController::class, 'show'])
+            ->whereNumber('allocation');
+        Route::post('/allocation-drivers', [AllocationQuickAddController::class, 'storeDriver']);
+        Route::post('/allocation-vehicles', [AllocationQuickAddController::class, 'storeVehicle']);
+
+        // Date changes: reassign the date directly, or approve / disapprove a faculty request.
+        Route::post('/allocations/{allocation}/reschedule', [RescheduleRequestController::class, 'reschedule'])
+            ->whereNumber('allocation');
+        Route::post('/reschedule-requests/{rescheduleRequest}/approve', [RescheduleRequestController::class, 'approve'])
+            ->whereNumber('rescheduleRequest');
+        Route::post('/reschedule-requests/{rescheduleRequest}/disapprove', [RescheduleRequestController::class, 'disapprove'])
+            ->whereNumber('rescheduleRequest');
+
+        // Sending a trip request to an administrator
+        Route::get('/admins', [TripRequestShareController::class, 'admins']);
+        Route::get('/trip-request-shares', [TripRequestShareController::class, 'index']);
+        Route::post('/trip-request-shares', [TripRequestShareController::class, 'store']);
     });
 
     // ---------- Faculty only ----------
@@ -75,30 +102,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Approved requests waiting to be scheduled ('whereNumber' on the show route keeps "approved" from being read as an ID).
         Route::get('/vehicle-requests/approved', [VehicleRequestController::class, 'approved']);
-
-        // Vehicle-driver allocation
-        // A pending request is approved and assigned in one step: POST /allocations with approve_request = true.
-        Route::get('/allocation-options', [AllocationController::class, 'options']);
-        Route::post('/allocations', [AllocationController::class, 'store']);
-        Route::put('/allocations/{allocation}', [AllocationController::class, 'update'])
-            ->whereNumber('allocation');
-        Route::get('/allocations/{allocation}/print', [AllocationPrintController::class, 'show'])
-            ->whereNumber('allocation');
-        Route::post('/allocation-drivers', [AllocationQuickAddController::class, 'storeDriver']);
-        Route::post('/allocation-vehicles', [AllocationQuickAddController::class, 'storeVehicle']);
-
-        // Date changes: reassign the date directly, or approve / disapprove a faculty request.
-        Route::post('/allocations/{allocation}/reschedule', [RescheduleRequestController::class, 'reschedule'])
-            ->whereNumber('allocation');
-        Route::post('/reschedule-requests/{rescheduleRequest}/approve', [RescheduleRequestController::class, 'approve'])
-            ->whereNumber('rescheduleRequest');
-        Route::post('/reschedule-requests/{rescheduleRequest}/disapprove', [RescheduleRequestController::class, 'disapprove'])
-            ->whereNumber('rescheduleRequest');
-        
-        // Sending a trip request to another administrator
-        Route::get('/admins', [TripRequestShareController::class, 'admins']);
-        Route::get('/trip-request-shares', [TripRequestShareController::class, 'index']);
-        Route::post('/trip-request-shares', [TripRequestShareController::class, 'store']);
 
         // Maintenance Monitoring
         Route::get('/maintenance-logs', [MaintenanceLogController::class, 'index']);
