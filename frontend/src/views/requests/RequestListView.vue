@@ -1,98 +1,86 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
-import { errorMessage, validationErrors } from '@/lib/api'
-import { formatDate, formatTime } from '@/lib/format'
-import { printRequest } from '@/lib/printRequest'
+import { formatDate, formatTime, fullName, STATUS_LABELS, TRIP_TYPE_LABELS } from '@/lib/format'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
-import BaseTextarea from '@/components/ui/BaseTextarea.vue'
+import BaseCard from '@/components/ui/BaseCard.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
+import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
+import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 
 const auth = useAuthStore()
 const store = useVehicleRequestStore()
 const router = useRouter()
 const toast = useToast()
 
-const tabs = [
-  { value: '', label: 'All', field: 'status' },
-  { value: 'pending', label: 'Pending', field: 'status' },
-  { value: 'approved', label: 'Approved', field: 'status' },
-  { value: 'disapproved', label: 'Disapproved', field: 'status' },
-  { value: 'inclusive', label: 'Inclusive', field: 'trip_type' },
-  { value: 'exclusive', label: 'Exclusive', field: 'trip_type' },
-]
+// Same style of filter as the Maintenance page: dropdowns with an "All" choice.
+const statusOptions = ['pending', 'approved', 'disapproved'].map((value) => ({
+  value,
+  label: STATUS_LABELS[value],
+}))
 
-// Only one filter is active at a time: either a status or a trip type.
-const activeTab = computed(() => store.filters.trip_type || store.filters.status)
+const typeOptions = ['inclusive', 'exclusive'].map((value) => ({
+  value,
+  label: TRIP_TYPE_LABELS[value],
+}))
 
 const disapproving = ref(null)
-const disapproveReason = ref('')
-const disapproveError = ref('')
-const submitting = ref(false)
+// The pending request that is being approved. The assign window is open while this is set.
+const approving = ref(null)
 
 // Reset the filters too, because the store is shared with other pages.
 onMounted(() => store.fetch({ status: '', trip_type: '', page: 1 }))
 
-function changeTab(tab) {
-  store.fetch({
-    status: tab.field === 'status' ? tab.value : '',
-    trip_type: tab.field === 'trip_type' ? tab.value : '',
-    page: 1,
-  })
+function changeStatus(value) {
+  store.fetch({ status: value, page: 1 })
+}
+
+function changeType(value) {
+  store.fetch({ trip_type: value, page: 1 })
 }
 
 // True when the row already shows a button besides "View"
-// (Approve/Disapprove for pending requests, Print for approved requests).
-// Both of these are for administrators only.
+// (Approve/Disapprove for pending requests, administrators only).
 function hasOtherActions(request) {
-  return auth.isAdministrator && (request.status === 'approved' || request.status === 'pending')
+  return auth.isAdministrator && request.status === 'pending'
 }
 
-async function print(request) {
-  try {
-    await printRequest(request)
-  } catch (error) {
-    toast.error(errorMessage(error, 'Unable to print this request.'))
-  }
+function openRequest(request) {
+  router.push({ name: 'requests.show', params: { id: request.id } })
 }
 
-async function approve(request) {
-  submitting.value = true
-  try {
-    await store.updateStatus(request.id, { status: 'approved' })
-    toast.success(`Request #${request.id} approved.`)
-    await store.fetch()
-  } catch (error) {
-    toast.error(errorMessage(error, 'Unable to approve this request.'))
-  } finally {
-    submitting.value = false
-  }
+// Clicking anywhere on a row or card opens the request.
+// Clicks on a button or link are skipped, so they keep doing their own job.
+function onRowClick(event, request) {
+  if (event.target.closest('a, button')) return
+  openRequest(request)
 }
 
-async function confirmDisapprove() {
-  submitting.value = true
-  disapproveError.value = ''
+// Approve opens the assign window. The request is approved only after the vehicle and driver are saved.
+function openApprove(request) {
+  approving.value = request
+}
 
-  try {
-    await store.updateStatus(disapproving.value.id, {
-      status: 'disapproved',
-      remarks: disapproveReason.value,
-    })
-    toast.success(`Request #${disapproving.value.id} disapproved.`)
-    disapproving.value = null
-    disapproveReason.value = ''
-    await store.fetch()
-  } catch (error) {
-    disapproveError.value = validationErrors(error).remarks ?? errorMessage(error)
-  } finally {
-    submitting.value = false
-  }
+function onApproved() {
+  const request = approving.value
+  approving.value = null
+  toast.success(`Request #${request.id} approved. Vehicle and driver assigned.`)
+  store.fetch()
+}
+
+function openDisapprove(request) {
+  disapproving.value = request
+}
+
+function onDisapproved() {
+  disapproving.value = null
+  store.fetch()
 }
 </script>
 
@@ -107,50 +95,68 @@ async function confirmDisapprove() {
         <p class="mt-1 text-small text-ink-muted">Request for Use of Vehicle (NVSU-FR-PPS-13-02)</p>
       </div>
 
-      <BaseButton v-if="auth.isFaculty" @click="router.push({ name: 'requests.create' })" block>
+      <BaseButton v-if="auth.isFaculty" block @click="router.push({ name: 'requests.create' })">
         New request
       </BaseButton>
     </div>
 
-    <!-- Tab Filter - Horizontal Scroll on Mobile -->
-    <div class="flex gap-2 overflow-x-auto pb-2 -mx-page px-page md:flex-wrap md:pb-0 md:mx-0 md:px-0">
-      <button v-for="tab in tabs" :key="tab.label" type="button"
-        class="flex-shrink-0 h-9 rounded-card px-3 text-small font-medium transition whitespace-nowrap" :class="activeTab === tab.value
-            ? 'bg-primary text-white'
-            : 'border border-line bg-white text-ink-muted hover:bg-neutral-50'
-          " @click="changeTab(tab)">
-        {{ tab.label }}
-      </button>
-    </div>
+    <!-- Filters -->
+    <BaseCard>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <BaseSelect
+          :model-value="store.filters.status"
+          :options="statusOptions"
+          placeholder="All status"
+          allow-empty
+          @update:model-value="changeStatus"
+        />
+        <BaseSelect
+          :model-value="store.filters.trip_type"
+          :options="typeOptions"
+          placeholder="All types"
+          allow-empty
+          @update:model-value="changeType"
+        />
+      </div>
+    </BaseCard>
 
     <!-- Content Area -->
     <div v-if="store.loading" class="flex justify-center p-12">
       <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
     </div>
 
-    <EmptyState v-else-if="!store.items.length" title="No requests found"
-      message="Try a different status filter, or create a new request." />
+    <EmptyState
+      v-else-if="!store.items.length"
+      title="No requests found"
+      message="Try a different filter, or create a new request."
+    />
 
     <!-- Mobile + Tablet Card View (1 column on mobile, 2 columns on tablet) -->
     <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:hidden">
-      <div v-for="request in store.items" :key="request.id" class="card-row !mb-0 flex flex-col">
+      <div
+        v-for="request in store.items"
+        :key="request.id"
+        class="card-row !mb-0 flex cursor-pointer flex-col transition active:bg-neutral-50"
+        @click="onRowClick($event, request)"
+      >
         <div class="card-row-header">
-          <div class="flex-1 min-w-0">
-            <RouterLink :to="{ name: 'requests.show', params: { id: request.id } }"
+          <div class="min-w-0 flex-1">
+            <RouterLink
+              :to="{ name: 'requests.show', params: { id: request.id } }"
               class="card-row-value block truncate hover:text-primary md:text-section-title"
-              :title="request.destination">
+              :title="request.destination"
+            >
               {{ request.destination }}
             </RouterLink>
-            <p class="text-small text-ink-muted truncate mt-0.5 md:text-body">{{ request.purpose }}</p>
+            <p class="mt-0.5 truncate text-small text-ink-muted md:text-body">{{ request.purpose }}</p>
           </div>
           <StatusBadge :status="request.status" class="shrink-0" />
         </div>
 
-        <div class="space-y-1.5 mb-3 md:space-y-2">
+        <div class="mb-3 space-y-1.5 md:space-y-2">
           <div class="flex items-center justify-between">
             <span class="card-row-label md:text-body">Requested by</span>
-            <span class="text-small text-ink md:text-body">{{ request.requested_by?.first_name }} {{
-              request.requested_by?.last_name }}</span>
+            <span class="text-small text-ink md:text-body">{{ fullName(request.requested_by) }}</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="card-row-label md:text-body">Travel date</span>
@@ -164,28 +170,33 @@ async function confirmDisapprove() {
             <span class="card-row-label md:text-body">Passengers</span>
             <span class="text-small text-ink md:text-body">{{ request.number_of_passengers ?? '—' }}</span>
           </div>
+          <div
+            v-if="request.status === 'disapproved' && request.disapproval_reason"
+            class="flex items-start justify-between gap-3"
+          >
+            <span class="card-row-label shrink-0 md:text-body">Reason</span>
+            <span class="text-right text-small text-red-700 md:text-body">
+              {{ request.disapproval_reason }}
+            </span>
+          </div>
         </div>
 
-        <div class="mt-auto flex gap-2 pt-3 border-t border-line">
+        <div class="mt-auto flex gap-2 border-t border-line pt-3">
           <template v-if="auth.isAdministrator && request.status === 'pending'">
-            <BaseButton size="sm" :disabled="submitting" @click="approve(request)" class="flex-1">
+            <BaseButton size="sm" class="flex-1" @click="openApprove(request)">
               Approve
             </BaseButton>
-            <BaseButton size="sm" variant="outline"
-              @click="((disapproving = request), (disapproveReason = ''), (disapproveError = ''))" class="flex-1">
+            <BaseButton size="sm" variant="outline" class="flex-1" @click="openDisapprove(request)">
               Disapprove
             </BaseButton>
           </template>
 
-          <!-- Print is for administrators only, and only after the request is approved -->
-          <BaseButton v-if="auth.isAdministrator && request.status === 'approved'" size="sm" variant="outline"
-            @click="print(request)" class="flex-1">
-            Print
-          </BaseButton>
-
-          <BaseButton size="sm" variant="ghost"
-            @click="router.push({ name: 'requests.show', params: { id: request.id } })"
-            :class="hasOtherActions(request) ? '' : 'w-full'">
+          <BaseButton
+            size="sm"
+            variant="ghost"
+            :class="hasOtherActions(request) ? '' : 'w-full'"
+            @click="openRequest(request)"
+          >
             View
           </BaseButton>
         </div>
@@ -193,31 +204,43 @@ async function confirmDisapprove() {
     </div>
 
     <!-- Laptop Table View (fits the screen, no side scrolling) -->
-    <div v-if="!store.loading && store.items.length"
-      class="hidden lg:block overflow-hidden rounded-card border border-line bg-white shadow-card">
+    <div
+      v-if="!store.loading && store.items.length"
+      class="hidden overflow-hidden rounded-card border border-line bg-white shadow-card lg:block"
+    >
       <table class="w-full table-fixed border-collapse">
         <thead class="table-head">
           <tr>
-            <th class="w-[20%] px-2 py-3 xl:px-card">Destination</th>
-            <th class="w-[14%] px-2 py-3 xl:px-card">Requested by</th>
-            <th class="w-[16%] px-2 py-3 xl:px-card">Travel</th>
-            <th class="w-[7%] px-2 py-3 xl:px-card">Pax</th>
-            <th class="w-[14%] px-2 py-3 xl:px-card">Status</th>
-            <th class="w-[29%] px-2 py-3 text-right xl:px-card">Actions</th>
+            <th class="w-[18%] px-2 py-3 xl:px-card">Destination</th>
+            <th class="w-[13%] px-2 py-3 xl:px-card">Requested by</th>
+            <th class="w-[14%] px-2 py-3 xl:px-card">Travel</th>
+            <th class="w-[6%] px-2 py-3 xl:px-card">Pax</th>
+            <th class="w-[12%] px-2 py-3 xl:px-card">Status</th>
+            <th class="w-[17%] px-2 py-3 xl:px-card">Reason</th>
+            <th class="w-[20%] px-2 py-3 text-right xl:px-card">Actions</th>
           </tr>
         </thead>
 
         <tbody class="divide-y divide-line text-body">
-          <tr v-for="request in store.items" :key="request.id" class="hover:bg-neutral-50">
+          <tr
+            v-for="request in store.items"
+            :key="request.id"
+            class="cursor-pointer hover:bg-neutral-50"
+            tabindex="0"
+            @click="onRowClick($event, request)"
+            @keydown.enter="onRowClick($event, request)"
+          >
             <td class="px-2 py-3 align-top xl:px-card">
-              <RouterLink :to="{ name: 'requests.show', params: { id: request.id } }"
-                class="font-medium hover:text-primary">
+              <RouterLink
+                :to="{ name: 'requests.show', params: { id: request.id } }"
+                class="font-medium hover:text-primary"
+              >
                 {{ request.destination }}
               </RouterLink>
               <p class="truncate text-small text-ink-muted">{{ request.purpose }}</p>
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
-              {{ request.requested_by?.first_name }} {{ request.requested_by?.last_name }}
+              {{ fullName(request.requested_by) }}
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
               <p>
@@ -232,26 +255,28 @@ async function confirmDisapprove() {
             <td class="px-2 py-3 align-top xl:px-card">
               <StatusBadge :status="request.status" />
             </td>
+            <!-- Reason for disapproval. Blank when there is none. -->
+            <td class="px-2 py-3 align-top text-small text-ink-muted xl:px-card">
+              <p
+                v-if="request.disapproval_reason"
+                class="line-clamp-3 break-words text-red-700"
+                :title="request.disapproval_reason"
+              >
+                {{ request.disapproval_reason }}
+              </p>
+            </td>
             <td class="px-2 py-3 align-top xl:px-card">
               <div class="flex flex-wrap justify-end gap-1.5">
                 <template v-if="auth.isAdministrator && request.status === 'pending'">
-                  <BaseButton size="sm" :disabled="submitting" @click="approve(request)">
+                  <BaseButton size="sm" @click="openApprove(request)">
                     Approve
                   </BaseButton>
-                  <BaseButton size="sm" variant="outline"
-                    @click="((disapproving = request), (disapproveReason = ''), (disapproveError = ''))">
+                  <BaseButton size="sm" variant="outline" @click="openDisapprove(request)">
                     Disapprove
                   </BaseButton>
                 </template>
 
-                <!-- Print is for administrators only, and only after the request is approved -->
-                <BaseButton v-if="auth.isAdministrator && request.status === 'approved'" size="sm"
-                  @click="print(request)">
-                  Print
-                </BaseButton>
-
-                <BaseButton size="sm" variant="ghost"
-                  @click="router.push({ name: 'requests.show', params: { id: request.id } })">
+                <BaseButton size="sm" variant="ghost" @click="openRequest(request)">
                   View
                 </BaseButton>
               </div>
@@ -264,24 +289,19 @@ async function confirmDisapprove() {
     </div>
 
     <!-- Pagination for the card view (mobile + tablet) -->
-    <div v-if="!store.loading && store.items.length"
-      class="overflow-hidden rounded-card border border-line bg-white lg:hidden">
+    <div
+      v-if="!store.loading && store.items.length"
+      class="overflow-hidden rounded-card border border-line bg-white lg:hidden"
+    >
       <PaginationBar :meta="store.meta" @change="(page) => store.fetch({ page })" />
     </div>
 
-    <!-- Disapprove Modal -->
-    <BaseModal :open="Boolean(disapproving)" title="Disapprove request"
-      :subtitle="disapproving ? `Request #${disapproving.id} — ${disapproving.destination}` : ''"
-      @close="disapproving = null">
-      <BaseTextarea v-model="disapproveReason" label="Reason for disapproval"
-        placeholder="e.g. Vehicle already assigned for that date." :error="disapproveError" required />
+    <ApproveAssignModal :request="approving" @close="approving = null" @done="onApproved" />
 
-      <template #footer>
-        <BaseButton variant="outline" @click="disapproving = null">Cancel</BaseButton>
-        <BaseButton variant="danger" :loading="submitting" @click="confirmDisapprove">
-          Disapprove request
-        </BaseButton>
-      </template>
-    </BaseModal>
+    <DisapproveRequestModal
+      :request="disapproving"
+      @close="disapproving = null"
+      @done="onDisapproved"
+    />
   </div>
 </template>

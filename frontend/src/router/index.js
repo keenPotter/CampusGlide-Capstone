@@ -10,6 +10,12 @@ const routes = [
     meta: { guestOnly: true },
   },
   {
+    path: '/login/sign-in',
+    name: 'login.form',
+    component: () => import('@/views/LoginFormView.vue'),
+    meta: { guestOnly: true },
+  },
+  {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
@@ -39,22 +45,36 @@ const routes = [
     component: () => import('@/views/requests/RequestFormView.vue'),
     meta: { requiresAuth: true, roles: ['faculty'] },
   },
+  // Administrators manage allocations here. Faculty see their own allocations.
+  // Changed: the page now lives in views/allocations (it was in modules/vehicle-driver-allocation).
+  {
+    path: '/allocations',
+    name: 'allocations',
+    component: () => import('@/views/allocations/AllocationsView.vue'),
+    meta: { requiresAuth: true },
+  },
   {
     path: '/trip-schedule',
     name: 'tripSchedule',
-    component: () => import('@/views/TripScheduleView.vue'),
+    component: () => import('@/views/trip-schedule/TripScheduleView.vue'),
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {
     path: '/my-trip-schedule',
     name: 'facultyTripSchedule',
-    component: () => import('@/views/FacultyTripScheduleView.vue'),
+    component: () => import('@/views/trip-schedule/FacultyTripScheduleView.vue'),
     meta: { requiresAuth: true, roles: ['faculty'] },
   },
   {
     path: '/maintenance',
     name: 'maintenance',
-    component: () => import('@/views/MaintenanceView.vue'),
+    component: () => import('@/views/maintenance/MaintenanceView.vue'),
+    meta: { requiresAuth: true, roles: ['administrator'] },
+  },
+  {
+    path: '/preventive-maintenance',
+    name: 'preventiveMaintenance',
+    component: () => import('@/views/maintenance/PreventiveMaintenanceView.vue'),
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {

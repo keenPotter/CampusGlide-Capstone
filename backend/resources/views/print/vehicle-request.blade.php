@@ -79,7 +79,7 @@
       </tr>
     </table>
 
-    <div class="ruv"><b>RUV No.:</b> <span class="blank w45"></span></div>
+    <div class="ruv"><b>RUV No.:</b> @if (!empty($ruvNumber)) <u class="strong">{{ $ruvNumber }}</u> @else <span class="blank w45"></span> @endif</div>
 
     <div class="grid">
       <div class="col-left">
@@ -117,8 +117,9 @@
 
     <div class="action-top">
       <div>
-        <p>Vehicle Plate No.: <span class="blank w55"></span></p>
-        <p>Driver: <span class="blank w65"></span></p>
+        {{-- Changed: filled in from the allocation (printing needs an assigned vehicle and driver). --}}
+        <p>Vehicle Plate No.: <u>{{ $plateNumber }}</u></p>
+        <p>Driver: <u>{{ $driverName }}</u></p>
       </div>
       <div class="request">
         <span>Request:</span>

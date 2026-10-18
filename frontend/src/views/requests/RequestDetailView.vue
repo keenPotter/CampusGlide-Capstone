@@ -3,15 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
-import { errorMessage, validationErrors } from '@/lib/api'
-import { formatDate, formatDateTime, formatTime } from '@/lib/format'
-import { printRequest } from '@/lib/printRequest'
+import { errorMessage } from '@/lib/api'
+import { formatDate, formatDateTime, formatTime, fullName } from '@/lib/format'
 import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import BaseModal from '@/components/ui/BaseModal.vue'
-import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
+import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
+import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 
 const auth = useAuthStore()
 const store = useVehicleRequestStore()
@@ -21,28 +20,19 @@ const toast = useToast()
 
 const request = ref(null)
 const loading = ref(true)
-const submitting = ref(false)
-const printing = ref(false)
-const cancelOpen = ref(false)
-const cancelRemarks = ref('')
-const cancelError = ref('')
-const rejectOpen = ref(false)
-const rejectReason = ref('')
-const rejectError = ref('')
+const approveOpen = ref(false)
+const disapproveOpen = ref(false)
 
 const canEdit = computed(
   () => auth.isFaculty && ['pending', 'approved'].includes(request.value?.status),
 )
-
-// Printing is for administrators only, and only after the request is approved.
-const canPrint = computed(() => auth.isAdministrator && request.value?.status === 'approved')
 
 const rows = computed(() => {
   if (!request.value) return []
   const value = request.value
 
   return [
-    { label: 'Requesting official', value: value.requested_by?.first_name + ' ' + value.requested_by?.last_name },
+    { label: 'Requesting official', value: fullName(value.requested_by) },
     { label: 'Destination', value: value.destination },
     { label: 'Purpose', value: value.purpose },
     { label: 'Date of travel', value: formatDate(value.trip_date) },
@@ -72,63 +62,16 @@ async function load() {
   }
 }
 
-async function print() {
-  printing.value = true
-  try {
-    await printRequest(request.value)
-  } catch (error) {
-    toast.error(errorMessage(error, 'Unable to print this request.'))
-  } finally {
-    printing.value = false
-  }
+// Approve opens the assign window. The request is approved only after the vehicle and driver are saved.
+function onApproved() {
+  approveOpen.value = false
+  toast.success('Request approved. Vehicle and driver assigned.')
+  load()
 }
 
-async function approve() {
-  submitting.value = true
-  try {
-    await store.updateStatus(request.value.id, { status: 'approved' })
-    toast.success('Request approved.')
-    await load()
-  } catch (error) {
-    toast.error(errorMessage(error, 'Unable to update this request.'))
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function confirmReject() {
-  submitting.value = true
-  rejectError.value = ''
-
-  try {
-    await store.updateStatus(request.value.id, {
-      status: 'rejected',
-      remarks: rejectReason.value,
-    })
-    toast.success('Request rejected.')
-    rejectOpen.value = false
-    await load()
-  } catch (error) {
-    rejectError.value = validationErrors(error).remarks ?? errorMessage(error)
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function confirmCancel() {
-  submitting.value = true
-  cancelError.value = ''
-
-  try {
-    await store.cancel(request.value.id, cancelRemarks.value)
-    toast.success('Request cancelled.')
-    cancelOpen.value = false
-    await load()
-  } catch (error) {
-    cancelError.value = validationErrors(error).cancellation_remarks ?? errorMessage(error)
-  } finally {
-    submitting.value = false
-  }
+function onDisapproved() {
+  disapproveOpen.value = false
+  load()
 }
 </script>
 
@@ -142,7 +85,7 @@ async function confirmCancel() {
       <div>
         <button
           type="button"
-          class="mb-1 text-medium text-ink-muted hover:text-ink"
+          class="mb-1 text-body text-ink-muted hover:text-ink hover:underline"
           @click="router.push({ name: 'requests.index' })"
         >
           ← Back to requests
@@ -151,26 +94,24 @@ async function confirmCancel() {
         <p class="mt-0.5 text-small text-ink-muted">{{ request.destination }}</p>
       </div>
 
-      <!-- Status, with the Print button below it (approved requests only) -->
-      <div class="flex flex-col items-end gap-2">
-        <StatusBadge :status="request.status" />
-      </div>
+      <StatusBadge :status="request.status" />
     </div>
 
     <div
-      v-if="request.rejection_reason"
+      v-if="request.disapproval_reason"
       class="rounded-card border border-red-200 bg-red-50 p-card text-small text-red-800"
     >
       <p class="font-medium">Disapproved</p>
-      <p class="mt-1">{{ request.rejection_reason }}</p>
+      <p class="mt-1">{{ request.disapproval_reason }}</p>
     </div>
 
+    <!-- Shown while the request waits for approval again after an edit. -->
     <div
-      v-if="request.cancellation_remarks"
-      class="rounded-card border border-line bg-neutral-100 p-card text-small text-ink-muted"
+      v-if="request.edit_reason && request.status === 'pending'"
+      class="rounded-card border-l-4 border-secondary bg-secondary-50 p-card text-small text-secondary-700"
     >
-      <p class="font-medium text-ink">Cancelled</p>
-      <p class="mt-1">{{ request.cancellation_remarks }}</p>
+      <p class="font-medium">Edited after approval</p>
+      <p class="mt-1">Reason: {{ request.edit_reason }}</p>
     </div>
 
     <BaseCard title="Request for use of vehicle" :padded="false">
@@ -188,71 +129,31 @@ async function confirmCancel() {
 
     <div class="flex flex-wrap justify-end gap-3">
       <template v-if="auth.isAdministrator && request.status === 'pending'">
-        <BaseButton variant="outline" :disabled="submitting" @click="((rejectOpen = true), (rejectReason = ''), (rejectError = ''))">
+        <BaseButton @click="approveOpen = true">Approve</BaseButton>
+        <BaseButton variant="outline" @click="disapproveOpen = true">
           Disapprove
         </BaseButton>
-        <BaseButton :loading="submitting" @click="approve">Approve</BaseButton>
       </template>
 
-      <!-- Print is for administrators only, and only after the request is approved -->
-      <BaseButton v-if="canPrint" :loading="printing" @click="print">
-        Print
+      <BaseButton
+        v-if="canEdit"
+        variant="outline"
+        @click="router.push({ name: 'requests.edit', params: { id: request.id } })"
+      >
+        Edit
       </BaseButton>
-
-      <template v-if="canEdit">
-        <BaseButton
-          variant="outline"
-          @click="router.push({ name: 'requests.edit', params: { id: request.id } })"
-        >
-          Edit
-        </BaseButton>
-      </template>
     </div>
 
-    <!-- Disapprove -->
-    <BaseModal
-      :open="rejectOpen"
-      title="Disapprove request"
-      :subtitle="`Request #${request.id} — ${request.destination}`"
-      @close="rejectOpen = false"
-    >
-      <BaseTextarea
-        v-model="rejectReason"
-        label="Reason for disapproval"
-        placeholder="e.g. Vehicle already assigned for that date."
-        :error="rejectError"
-        required
-      />
+    <ApproveAssignModal
+      :request="approveOpen ? request : null"
+      @close="approveOpen = false"
+      @done="onApproved"
+    />
 
-      <template #footer>
-        <BaseButton variant="outline" @click="rejectOpen = false">Cancel</BaseButton>
-        <BaseButton variant="danger" :loading="submitting" @click="confirmReject">
-          Disapprove request
-        </BaseButton>
-      </template>
-    </BaseModal>
-
-    <!-- Cancel -->
-    <BaseModal
-      :open="cancelOpen"
-      title="Cancel request"
-      subtitle="This releases the vehicle slot for other requests."
-      @close="cancelOpen = false"
-    >
-      <BaseTextarea
-        v-model="cancelRemarks"
-        label="Cancellation remarks"
-        placeholder="e.g. Meeting moved to a later date."
-        :error="cancelError"
-        required
-      />
-
-      <template #footer>
-        <BaseButton variant="outline" @click="cancelOpen = false">Keep request</BaseButton>
-        <BaseButton variant="danger" :loading="submitting" @click="confirmCancel">
-          Cancel request
-        </BaseButton>
-      </template>
-    </BaseModal>
+    <DisapproveRequestModal
+      :request="disapproveOpen ? request : null"
+      @close="disapproveOpen = false"
+      @done="onDisapproved"
+    />
   </div>
 </template>

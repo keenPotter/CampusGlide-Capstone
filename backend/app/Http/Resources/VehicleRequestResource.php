@@ -23,6 +23,8 @@ class VehicleRequestResource extends JsonResource
             'passengers' => $this->passengers,
             'number_of_passengers' => $this->number_of_passengers,
             'disapproval_reason' => $this->disapproval_reason,
+            // Reason the requester gave when editing the request after it was approved.
+            'edit_reason' => $this->edit_reason,
             'approved_by' => $this->approved_by,
             'approved_date' => $this->approved_date?->toIso8601String(),
             'requested_by' => [

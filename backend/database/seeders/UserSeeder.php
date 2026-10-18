@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
- * IDs: 1-2 administrator | 9-15 faculty
- * (IDs 3-8 are left unused on purpose so the vehicle request seeder keeps working.)
+ * IDs: 1-2 administrators | 3-12 faculty (10 is the University President)
+ * The administrators are the Chief, Motorpool and the Unit Head-GSU printed on the request form.
  * All passwords = "password"
  */
 class UserSeeder extends Seeder
@@ -24,15 +24,18 @@ class UserSeeder extends Seeder
         ];
 
         $users = [
-            [1,  'maria.santos@nvsu.edu.ph',        'Maria',      'Santos',     'Motor Pool Head',        '09171234501', 'administrator', true],
-            [2,  'roberto.delacruz@nvsu.edu.ph',    'Roberto',    'Dela Cruz',  'Administrative Officer', '09171234502', 'administrator', true],
-            [9,  'elena.garcia@nvsu.edu.ph',        'Elena',      'Garcia',     'Professor',              '09201234509', 'faculty',       true],
-            [10, 'ricardo.torres@nvsu.edu.ph',      'Ricardo',    'Torres',     'Associate Professor',    '09201234510', 'faculty',       true],
-            [11, 'luzviminda.castillo@nvsu.edu.ph', 'Luzviminda', 'Castillo',   'Assistant Professor',    '09201234511', 'faculty',       true],
-            [12, 'dennis.manalo@nvsu.edu.ph',       'Dennis',     'Manalo',     'Instructor',             '09201234512', 'faculty',       true],
-            [13, 'grace.pascual@nvsu.edu.ph',       'Grace',      'Pascual',    'Department Chair',       '09201234513', 'faculty',       true],
-            [14, 'joel.navarro@nvsu.edu.ph',        'Joel',       'Navarro',    'Instructor',             '09201234514', 'faculty',       true],
-            [15, 'hilda.soriano@nvsu.edu.ph',       'Hilda',      'Soriano',    'Professor',              null,          'faculty',       false],
+            [1,  'tony.basatan@nvsu.edu.ph',     'Tony O.',         'Basatan',    'Chief, Motorpool',    '09171234501', 'administrator', true],
+            [2,  'jayson.pimentel@nvsu.edu.ph',  'Jayson R.',       'Pimentel',   'Unit Head-GSU',       '09171234502', 'administrator', true],
+            [3,  'marife.aliaga@nvsu.edu.ph',    'Marife',          'Aliaga',     'Professor',           '09201234503', 'faculty',       true],
+            [4,  'vernyll.asis@nvsu.edu.ph',     'Vernyll Jan',     'Asis',       'Assistant Professor', '09201234504', 'faculty',       true],
+            [5,  'krizsha.salinas@nvsu.edu.ph',  'Krizsha Ellaine', 'Salinas',    'Associate Professor', '09201234505', 'faculty',       true],
+            [6,  'dennis.directo@nvsu.edu.ph',   'Dennis',          'Directo',    'Instructor',          '09201234506', 'faculty',       true],
+            [7,  'mark.viernes@nvsu.edu.ph',     'Mark John',       'Viernes',    'Assistant Professor', '09201234507', 'faculty',       true],
+            [8,  'gwen.gagasa@nvsu.edu.ph',      'Gwen Kyle',       'Gagasa',     'Instructor',          '09201234508', 'faculty',       true],
+            [9,  'percival.labog@nvsu.edu.ph',   'Percival',        'Labog',      'Associate Professor', '09201234509', 'faculty',       true],
+            [10, 'wilfredo.dumale@nvsu.edu.ph',  'Wilfredo',        'Dumale Jr.', 'University President', '09201234510', 'faculty',       true],
+            [11, 'gerals.perez@nvsu.edu.ph',     'Gerals',          'Perez',      'Professor',           '09201234511', 'faculty',       true],
+            [12, 'arnel.agustin@nvsu.edu.ph',    'Arnel',           'Agustin',    'Instructor',          '09201234512', 'faculty',       true],
         ];
 
         $rows = array_map(
