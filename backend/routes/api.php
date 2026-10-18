@@ -51,11 +51,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---------- Allocation management for administrators and staff ----------
     // Staff use the same allocation page as administrators.
-    // Approving or disapproving vehicle requests stays administrator only (see below).
+    // Creating an allocation (which can approve a request) stays administrator only (see below).
     Route::middleware('role:administrator,staff')->group(function () {
         // Vehicle-driver allocation
         Route::get('/allocation-options', [AllocationController::class, 'options']);
-        Route::post('/allocations', [AllocationController::class, 'store']);
         Route::put('/allocations/{allocation}', [AllocationController::class, 'update'])
             ->whereNumber('allocation');
         Route::get('/allocations/{allocation}/print', [AllocationPrintController::class, 'show'])
@@ -102,6 +101,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Approved requests waiting to be scheduled ('whereNumber' on the show route keeps "approved" from being read as an ID).
         Route::get('/vehicle-requests/approved', [VehicleRequestController::class, 'approved']);
+
+        // A pending request is approved and assigned in one step: POST /allocations with approve_request = true.
+        Route::post('/allocations', [AllocationController::class, 'store']);
 
         // Maintenance Monitoring
         Route::get('/maintenance-logs', [MaintenanceLogController::class, 'index']);
