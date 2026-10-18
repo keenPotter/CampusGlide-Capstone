@@ -4,7 +4,7 @@ import api, { TOKEN_KEY, unwrap } from '@/lib/api'
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
-    token: localStorage.getItem(TOKEN_KEY),
+    token: sessionStorage.getItem(TOKEN_KEY),
     ready: false,
   }),
 
@@ -13,15 +13,16 @@ export const useAuthStore = defineStore('auth', {
     role: (state) => state.user?.role ?? null,
     isAdministrator: (state) => state.user?.role === 'administrator',
     isFaculty: (state) => state.user?.role === 'faculty',
+    isStaff: (state) => state.user?.role === 'staff',
   },
 
   actions: {
     setToken(token) {
       this.token = token
       if (token) {
-        localStorage.setItem(TOKEN_KEY, token)
+        sessionStorage.setItem(TOKEN_KEY, token)
       } else {
-        localStorage.removeItem(TOKEN_KEY)
+        sessionStorage.removeItem(TOKEN_KEY)
       }
     },
 

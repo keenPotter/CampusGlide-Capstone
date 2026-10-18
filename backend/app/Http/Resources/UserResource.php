@@ -18,6 +18,8 @@ class UserResource extends JsonResource
             'position' => $this->position,
             'phone_number' => $this->phone_number,
             'is_active' => $this->is_active,
+            'deletion_requested_at' => $this->deletion_requested_at,
+            'deletion_due_at' => $this->deletion_requested_at?->copy()->addDays(30),
         ];
     }
 }
