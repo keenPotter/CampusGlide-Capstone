@@ -12,9 +12,10 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-    // Keep these in sync with the `role` enum on the users table
+    // Account role identifiers used by authentication and route authorization.
     public const ROLE_ADMINISTRATOR = 'administrator';
     public const ROLE_FACULTY = 'faculty';
+    public const ROLE_STAFF = 'staff';
 
     protected $fillable = [
         'email',
@@ -25,6 +26,7 @@ class User extends Authenticatable
         'phone_number',
         'role',
         'is_active',
+        'deletion_requested_at',
     ];
 
     protected $hidden = [
@@ -37,6 +39,7 @@ class User extends Authenticatable
         return [
             'is_active' => 'boolean',
             'password' => 'hashed',
+            'deletion_requested_at' => 'datetime',
         ];
     }
 

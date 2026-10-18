@@ -39,6 +39,17 @@ Route::middleware('auth:sanctum')->group(function () {
         ->whereNumber('allocation');
     Route::get('/reschedule-requests', [RescheduleRequestController::class, 'index']);
 
+    // ---------- Read-only fleet views for administrators and staff ----------
+    // Staff may view the trip schedule and its related fleet details, but all writes
+    // remain inside the administrator-only group below.
+    Route::middleware('role:administrator,staff')->group(function () {
+        Route::get('/trips', [TripController::class, 'index']);
+        Route::get('/trips/{trip}', [TripController::class, 'show'])->whereNumber('trip');
+        Route::get('/drivers', [DriverController::class, 'index']);
+        Route::get('/vehicles', [VehicleController::class, 'index']);
+        Route::get('/vehicles/{vehicle}/status', [VehicleController::class, 'status']);
+    });
+
     // ---------- Faculty only ----------
     Route::middleware('role:faculty')->group(function () {
         Route::post('/vehicle-requests', [VehicleRequestController::class, 'store']);
@@ -55,17 +66,15 @@ Route::middleware('auth:sanctum')->group(function () {
         // Accounts
         Route::post('/register', [AuthController::class, 'register']);
         Route::get('/users', [UserController::class, 'index']);
+        Route::put('/users/{user}', [UserController::class, 'update'])->whereNumber('user');
+        Route::delete('/users/{user}', [UserController::class, 'requestDeletion'])->whereNumber('user');
+        Route::post('/users/{user}/cancel-deletion', [UserController::class, 'cancelDeletion'])->whereNumber('user');
 
         // Vehicle request approval
         Route::patch('/vehicle-requests/{vehicleRequest}/status', [VehicleRequestController::class, 'updateStatus']);
 
         // Approved requests waiting to be scheduled ('whereNumber' on the show route keeps "approved" from being read as an ID).
         Route::get('/vehicle-requests/approved', [VehicleRequestController::class, 'approved']);
-
-        // Trips are read-only here. New trips are created through allocations (see below).
-        Route::get('/trips', [TripController::class, 'index']);
-        Route::get('/trips/{trip}', [TripController::class, 'show'])
-            ->whereNumber('trip');
 
         // Vehicle-driver allocation
         // A pending request is approved and assigned in one step: POST /allocations with approve_request = true.
@@ -90,13 +99,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/admins', [TripRequestShareController::class, 'admins']);
         Route::get('/trip-request-shares', [TripRequestShareController::class, 'index']);
         Route::post('/trip-request-shares', [TripRequestShareController::class, 'store']);
-
-        // Driver list.
-        Route::get('/drivers', [DriverController::class, 'index']);
-
-        // Vehicles (the trip schedule and maintenance pages both read this).
-        Route::get('/vehicles', [VehicleController::class, 'index']);
-        Route::get('/vehicles/{vehicle}/status', [VehicleController::class, 'status']);
 
         // Maintenance Monitoring
         Route::get('/maintenance-logs', [MaintenanceLogController::class, 'index']);
