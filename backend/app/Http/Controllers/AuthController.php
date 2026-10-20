@@ -54,7 +54,18 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('campusglide')->plainTextToken;
+        // Identify this browser tab/session so a repeat login replaces only
+        // the token from this same session, not tokens on other devices.
+        $clientSession = (string) $request->header('X-Client-Session', '');
+        if ($clientSession === '' || ! preg_match('/^[a-f0-9-]{16,80}$/i', $clientSession)) {
+            throw ValidationException::withMessages([
+                'session' => ['The login session could not be identified. Please refresh the page and try again.'],
+            ]);
+        }
+
+        $tokenName = 'campusglide:' . $clientSession;
+        $user->tokens()->where('name', $tokenName)->delete();
+        $token = $user->createToken($tokenName)->plainTextToken;
 
         return response()->json([
             'token' => $token,

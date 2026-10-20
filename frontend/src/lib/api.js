@@ -1,6 +1,18 @@
 import axios from 'axios'
 
 export const TOKEN_KEY = 'cg_token'
+export const CLIENT_SESSION_KEY = 'cg_client_session'
+
+// Stable for this browser tab session; sessionStorage is cleared when the
+// session ends, so separate tabs/devices normally get independent identifiers.
+function getClientSessionId() {
+  let id = sessionStorage.getItem(CLIENT_SESSION_KEY)
+  if (!id) {
+    id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`
+    sessionStorage.setItem(CLIENT_SESSION_KEY, id)
+  }
+  return id
+}
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api',
@@ -11,6 +23,7 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
+  config.headers['X-Client-Session'] = getClientSessionId()
   const token = sessionStorage.getItem(TOKEN_KEY)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
