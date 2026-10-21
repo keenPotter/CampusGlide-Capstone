@@ -44,6 +44,7 @@ class DatabaseSeeder extends Seeder
                 VehicleRequestSeeder::class,
                 TripSeeder::class,
                 AllocationSeeder::class,
+                RescheduleRequestSeeder::class,
                 VehicleMaintenanceSeeder::class,
                 PostTravelReportSeeder::class,
                 FuelUsageRecordSeeder::class,
