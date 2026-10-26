@@ -6,12 +6,18 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Run: php artisan migrate:fresh --seed
+ * Optional bulk data for the ISO 25010 performance and capacity tests:
+ *   php artisan db:seed --class=BulkRequestSeeder
+ */
 class DatabaseSeeder extends Seeder
 {
     /**
      * Tables in dependency order (parents first).
      */
     private const TABLES = [
+        'personal_access_tokens',
         'users',
         'vehicles',
         'drivers',
@@ -45,6 +51,7 @@ class DatabaseSeeder extends Seeder
                 TripSeeder::class,
                 AllocationSeeder::class,
                 RescheduleRequestSeeder::class,
+                TripRequestShareSeeder::class,
                 VehicleMaintenanceSeeder::class,
                 PostTravelReportSeeder::class,
                 FuelUsageRecordSeeder::class,

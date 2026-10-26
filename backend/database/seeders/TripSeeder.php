@@ -6,38 +6,80 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * One trip per approved request (requests 1-9 and 13). The vehicle and driver are assigned
- * when the request is approved, so every approved request already has a trip.
- * Trips 5 and 6 are in progress today and match the vehicles (2, 6) and drivers (2, 4)
- * that are marked "in use" / unavailable in VehicleSeeder and DriverSeeder.
- * Trip 10 uses vehicle 1, which has tire service scheduled on the same date (needs reassignment).
+ * One trip per approved request. The trip details (date, times, destination, purpose)
+ * are copied from the request, so the two always match.
+ * The vehicle and driver are assigned when the request is approved,
+ * so every approved request already has a trip.
+ *
+ * Trip numbers follow the order below (1 = request 1, ... 17 = request 32).
+ * No vehicle or driver is booked twice on the same day, except the intended
+ * "needs reassignment" case (request 13: vehicle 1 has maintenance that day).
  */
 class TripSeeder extends Seeder
 {
+    /**
+     * request_id => [vehicle_id, driver_id, status, actual departure, actual return, mileage, notes]
+     */
+    private const ASSIGNMENTS = [
+        1  => [2, 2, 'completed',   '08:05:00', '15:40:00', 45,   null],
+        2  => [8, 4, 'completed',   '05:10:00', '19:30:00', 690,  'Two-day trip, overnight stay in Quezon City.'],
+        3  => [5, 3, 'completed',   '09:05:00', '14:20:00', 24,   null],
+        4  => [1, 1, 'completed',   '08:35:00', '16:40:00', 62,   null],
+        27 => [5, 6, 'completed',   '08:05:00', '14:30:00', 31,   null],
+        5  => [2, 2, 'in_progress', '07:35:00', null,       null, 'Week-long monitoring. The vehicle goes out every day.'],
+        6  => [6, 4, 'in_progress', '08:05:00', null,       null, null],
+        26 => [8, 6, 'scheduled',   null,       null,       null, 'Week-long trip. Overnight stays in Metro Manila and Baguio City.'],
+        7  => [8, 1, 'scheduled',   null,       null,       null, 'Two-day trip, overnight stay in Manila.'],
+        8  => [1, 3, 'scheduled',   null,       null,       null, null],
+        9  => [5, 3, 'scheduled',   null,       null,       null, null],
+        13 => [1, 1, 'scheduled',   null,       null,       null, null],
+        28 => [3, 2, 'scheduled',   null,       null,       null, null],
+        29 => [5, 3, 'scheduled',   null,       null,       null, null],
+        30 => [1, 4, 'scheduled',   null,       null,       null, null],
+        31 => [2, 6, 'scheduled',   null,       null,       null, null],
+        32 => [1, 1, 'scheduled',   null,       null,       null, null],
+    ];
+
     public function run(): void
     {
-        $columns = [
-            'id', 'vehicle_request_id', 'vehicle_id', 'driver_id', 'trip_date', 'departure_time',
-            'estimated_return_time', 'destination', 'purpose', 'trip_status',
-            'actual_departure_time', 'actual_return_time', 'actual_mileage', 'notes',
-            'created_at', 'updated_at',
-        ];
+        $requests = DB::table('vehicle_requests')
+            ->whereIn('id', array_keys(self::ASSIGNMENTS))
+            ->get()
+            ->keyBy('id');
 
-        $trips = [
-            [1,  1,  2, 2, '2026-09-03', '08:00:00', '16:00:00', 'NVSU Main Campus, Bayombong, Nueva Vizcaya', 'Faculty general assembly and department meeting', 'completed', '08:05:00', '15:40:00', 45, null, '2026-08-31 11:00:00', '2026-09-03 15:45:00'],
-            [2,  2,  8, 4, '2026-09-08', '05:00:00', '20:00:00', 'Office of the Congressman, House of Representatives, Quezon City, Metro Manila', 'Meeting with the congressman on the university budget and infrastructure projects', 'completed', '05:10:00', '19:30:00', 690, 'Two-day trip, overnight stay in Quezon City.', '2026-09-04 10:30:00', '2026-09-09 19:35:00'],
-            [3,  3,  5, 3, '2026-09-15', '09:00:00', '15:00:00', 'Provincial Capitol, Bayombong, Nueva Vizcaya', 'Coordination meeting with provincial officials on extension programs', 'completed', '09:05:00', '14:20:00', 24, null, '2026-09-10 15:00:00', '2026-09-15 14:25:00'],
-            [4,  4,  1, 1, '2026-09-22', '08:30:00', '17:00:00', 'Municipal Hall, Solano, Nueva Vizcaya', 'Meeting with municipal officials on community partnership', 'completed', '08:35:00', '16:40:00', 62, null, '2026-09-18 12:00:00', '2026-09-22 16:45:00'],
-            [5,  5,  2, 2, '2026-10-12', '07:30:00', '16:30:00', 'Office of the Congressman, Bayombong, Nueva Vizcaya', 'Meeting with the congressman and staff on the scholarship program', 'in_progress', '07:35:00', null, null, null, '2026-10-08 10:30:00', '2026-10-12 07:35:00'],
-            [6,  6,  6, 4, '2026-10-12', '08:00:00', '15:00:00', 'DepEd Schools Division Office, Bayombong, Nueva Vizcaya', 'Meeting with DepEd officials on the senior high school partnership', 'in_progress', '08:05:00', null, null, null, '2026-10-08 11:00:00', '2026-10-12 08:05:00'],
-            [7,  7,  8, 1, '2026-10-15', '05:00:00', '20:00:00', 'Department of Budget and Management, Manila', 'Meeting with DBM officials on the proposed university budget', 'scheduled', null, null, null, 'Two-day trip, overnight stay in Manila.', '2026-10-07 11:00:00', '2026-10-07 11:00:00'],
-            [8,  8,  1, 3, '2026-10-21', '09:00:00', '16:00:00', 'NVSU Main Campus, Bayombong, Nueva Vizcaya', 'Academic council meeting of all campus faculty', 'scheduled', null, null, null, null, '2026-10-09 10:00:00', '2026-10-09 10:00:00'],
-            [9,  9,  5, 3, '2026-10-22', '08:00:00', '17:00:00', 'Provincial Capitol, Bayombong, Nueva Vizcaya', 'Presentation of the extension program to the provincial board', 'scheduled', null, null, null, null, '2026-10-09 16:30:00', '2026-10-09 16:30:00'],
-            [10, 13, 1, 1, '2026-10-20', '08:00:00', '17:00:00', 'NVSU Main Campus, Bayombong, Nueva Vizcaya', 'Department heads meeting on the second semester schedule', 'scheduled', null, null, null, null, '2026-10-13 09:30:00', '2026-10-13 09:30:00'],
-        ];
+        $rows = [];
+        $id = 0;
 
-        DB::table('trips')->insert(
-            array_map(fn (array $row) => array_combine($columns, $row), $trips)
-        );
+        foreach (self::ASSIGNMENTS as $requestId => [$vehicleId, $driverId, $status, $departed, $returned, $mileage, $notes]) {
+            $request = $requests[$requestId];
+            $id++;
+
+            $updated = match ($status) {
+                'completed' => "{$request->trip_end_date} {$returned}",
+                'in_progress' => "{$request->trip_date} {$departed}",
+                default => $request->approved_date,
+            };
+
+            $rows[] = [
+                'id' => $id,
+                'vehicle_request_id' => $requestId,
+                'vehicle_id' => $vehicleId,
+                'driver_id' => $driverId,
+                'trip_date' => $request->trip_date,
+                'departure_time' => $request->departure_time,
+                'estimated_return_time' => $request->estimated_return_time,
+                'destination' => $request->destination,
+                'purpose' => $request->purpose,
+                'trip_status' => $status,
+                'actual_departure_time' => $departed,
+                'actual_return_time' => $returned,
+                'actual_mileage' => $mileage,
+                'notes' => $notes,
+                'created_at' => $request->approved_date,
+                'updated_at' => $updated,
+            ];
+        }
+
+        DB::table('trips')->insert($rows);
     }
 }

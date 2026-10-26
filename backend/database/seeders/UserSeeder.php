@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 
 /**
  * IDs: 1-2 administrators | 3 staff | 4-8 faculty (4 is the University President)
+ *      9-10 test accounts for the UAT account tests (edit, delete, restore, deactivated sign-in)
  * The administrators are the Chief, Motorpool and the Unit Head-GSU printed on the request form.
  * All passwords = "password"
  */
@@ -16,27 +17,34 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         $password = Hash::make('password');
-        $ts = '2026-09-01 08:00:00';
+        $ts = SeedDates::at(-55, '08:00:00');
 
         $columns = [
             'id', 'email', 'password', 'first_name', 'last_name', 'position',
-            'phone_number', 'role', 'is_active', 'created_at', 'updated_at',
+            'phone_number', 'role', 'is_active', 'deletion_requested_at', 'created_at', 'updated_at',
         ];
 
+        // [id, email, first name, last name, position, phone, role, active, days since deletion was requested]
         $users = [
-            [1, 'admin1@nvsu.edu.ph',   'Tony',            'Basatan',    'Chief, Motorpool',    '09171234501', 'administrator', true],
-            [2, 'admin2@nvsu.edu.ph',   'Jayson',          'Pimentel',   'Unit Head-GSU',       '09171234502', 'administrator', true],
-            [3, 'staff1@nvsu.edu.ph',   'Reonel',          'Makil',      'Motorpool Staff',     '09171234502', 'staff',         true],
-            [4, 'faculty1@nvsu.edu.ph', 'Faculty',         'One',       'University President', '09201234510', 'faculty',       true],
-            [5, 'faculty2@nvsu.edu.ph', 'Faculty',         'Two',        'Professor',           '09201234503', 'faculty',       true],
-            [6, 'faculty3@nvsu.edu.ph', 'Faculty',         'Three',      'Associate Professor', '09201234505', 'faculty',       true],
-            [7, 'faculty4@nvsu.edu.ph', 'Faculty',         'Four',       'Instructor',          '09201234506', 'faculty',       true],
-            [8, 'faculty5@nvsu.edu.ph', 'Faculty',         'Five',       'Instructor',          '09201234508', 'faculty',       true],
+            [1,  'tony.basatan@nvsu.edu.ph',        'Tony',     'Basatan',      'Chief, Motorpool',     '09171234501', 'administrator', true,  null],
+            [2,  'jayson.pimentel@nvsu.edu.ph',     'Jayson',   'Pimentel',     'Unit Head-GSU',        '09171234502', 'administrator', true,  null],
+            [3,  'reonel.makil@nvsu.edu.ph',        'Reonel',   'Makil',        'Motorpool Staff',      '09171234503', 'staff',         true,  null],
+            [4,  'wilfredo.dumale@nvsu.edu.ph',     'Wilfredo', 'Dumale Jr.',   'University President', '09201234510', 'faculty',      true,  null],
+            [5,  'marife.aliaga@nvsu.edu.ph',       'Marife',   'Aliaga',       'Professor',            '09201234503', 'faculty',       true,  null],
+            [6,  'krizsha.salinas@nvsu.edu.ph',     'Krizsha Ellaine',      'Salinas',   'Instructor',  '09201234505', 'faculty',       true,  null],
+            [7,  'dennis.directo@nvsu.edu.ph',      'Dennis',   'Directo',      'Professor',            '09201234506', 'faculty',       true,  null],
+            [8,  'gwen.gagasa@nvsu.edu.ph',         'Gwen Kyle','Gagasa',       'Instructor',           '09201234508', 'faculty',       true,  null],
+            // Test accounts. Use these to try Edit and Delete without touching the main accounts.
+            [9,  'testuser1@nvsu.edu.ph', 'Test',    'User One', 'Instructor I',        '09201234521', 'faculty',       true,  null],
+            // Already scheduled for deletion 5 days ago (disabled). Use it for Cancel deletion and the deactivated sign-in test.
+            [10, 'testuser2@nvsu.edu.ph', 'Test',    'User Two', 'Instructor I',        '09201234522', 'faculty',       false, -5],
         ];
 
         $rows = array_map(
             fn (array $u) => array_combine($columns, [
-                $u[0], $u[1], $password, $u[2], $u[3], $u[4], $u[5], $u[6], $u[7], $ts, $ts,
+                $u[0], $u[1], $password, $u[2], $u[3], $u[4], $u[5], $u[6], $u[7],
+                $u[8] === null ? null : SeedDates::at($u[8], '10:00:00'),
+                $ts, $ts,
             ]),
             $users
         );
