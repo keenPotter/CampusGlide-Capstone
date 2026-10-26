@@ -2,39 +2,62 @@
 
 namespace Database\Seeders;
 
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
 /**
  * One allocation record per trip: who assigned which vehicle and driver, and when.
- * The vehicle and driver here are the same as on the trip.
- * The assignment is made in the vehicle requests module when the request is approved,
- * so there are no approved requests waiting for an allocation.
+ * The vehicle and driver are the same as on the trip. The administrator and the date
+ * are the ones who approved the request.
+ * The RUV number is filled in for trips whose form was already printed
+ * (completed and in progress). The next printed form continues from the last number.
  */
 class AllocationSeeder extends Seeder
 {
+    // request_id => note
+    private const NOTES = [
+        2 => 'Overnight stay in Quezon City.',
+        7 => 'Overnight stay in Manila.',
+        8 => 'Passengers will gather at the main gate.',
+    ];
+
     public function run(): void
     {
-        $columns = [
-            'id', 'trip_id', 'vehicle_id', 'driver_id', 'allocated_by', 'allocation_date',
-            'notes', 'created_at', 'updated_at',
-        ];
+        $trips = DB::table('trips')
+            ->join('vehicle_requests as r', 'r.id', '=', 'trips.vehicle_request_id')
+            ->orderBy('trips.id')
+            ->get([
+                'trips.id', 'trips.vehicle_id', 'trips.driver_id', 'trips.trip_status',
+                'trips.vehicle_request_id', 'r.approved_by', 'r.approved_date',
+            ]);
 
-        $allocations = [
-            [1,  1,  2, 2, 1, '2026-08-31 11:00:00', null,                                          '2026-08-31 11:00:00', '2026-08-31 11:00:00'],
-            [2,  2,  8, 4, 2, '2026-09-04 10:30:00', 'Overnight stay in Quezon City.',               '2026-09-04 10:30:00', '2026-09-04 10:30:00'],
-            [3,  3,  5, 3, 1, '2026-09-10 15:00:00', null,                                          '2026-09-10 15:00:00', '2026-09-10 15:00:00'],
-            [4,  4,  1, 1, 2, '2026-09-18 12:00:00', null,                                          '2026-09-18 12:00:00', '2026-09-18 12:00:00'],
-            [5,  5,  2, 2, 1, '2026-10-08 10:30:00', null,                                          '2026-10-08 10:30:00', '2026-10-08 10:30:00'],
-            [6,  6,  6, 4, 2, '2026-10-08 11:00:00', null,                                          '2026-10-08 11:00:00', '2026-10-08 11:00:00'],
-            [7,  7,  8, 1, 1, '2026-10-07 11:00:00', 'Overnight stay in Manila.',                   '2026-10-07 11:00:00', '2026-10-07 11:00:00'],
-            [8,  8,  1, 3, 2, '2026-10-09 10:00:00', 'Passengers will gather at the main gate.',    '2026-10-09 10:00:00', '2026-10-09 10:00:00'],
-            [9,  9,  5, 3, 1, '2026-10-09 16:30:00', null,                                          '2026-10-09 16:30:00', '2026-10-09 16:30:00'],
-            [10, 10, 1, 1, 2, '2026-10-13 09:30:00', null,                                          '2026-10-13 09:30:00', '2026-10-13 09:30:00'],
-        ];
+        $year = Carbon::today()->year;
+        $printed = 0;
+        $rows = [];
 
-        DB::table('allocations')->insert(
-            array_map(fn (array $row) => array_combine($columns, $row), $allocations)
-        );
+        foreach ($trips as $trip) {
+            $ruv = null;
+
+            if (in_array($trip->trip_status, ['completed', 'in_progress'], true)) {
+                $printed++;
+                $ruv = sprintf('%d-%04d', $year, $printed);
+            }
+
+            $rows[] = [
+                'id' => $trip->id,
+                'trip_id' => $trip->id,
+                'vehicle_id' => $trip->vehicle_id,
+                'driver_id' => $trip->driver_id,
+                'allocated_by' => $trip->approved_by,
+                'allocation_date' => $trip->approved_date,
+                'notes' => self::NOTES[$trip->vehicle_request_id] ?? null,
+                'ruv_number' => $ruv,
+                'created_at' => $trip->approved_date,
+                'updated_at' => $trip->approved_date,
+            ];
+        }
+
+        DB::table('allocations')->insert($rows);
     }
 }

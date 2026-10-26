@@ -22,88 +22,68 @@ class PreventiveMaintenanceChecklistSeeder extends Seeder
 
     public function run(): void
     {
-        $records = [
-            [
-                'id' => 1, 'vehicle_id' => 1, 'pmuv_no' => 'PMUV-2026-001', 'inspection_date' => '2026-08-10',
-                'inspector_mechanic' => 'Rodel Quiambao', 'current_mileage' => 84500,
-                'last_oil_change' => '2026-08-10', 'last_air_filter_change' => '2026-08-10',
-                'last_cabin_filter_change' => '2026-02-10', 'last_oil_filter_change' => '2026-08-10',
-                'last_engine_tune_up' => '2026-02-10',
-                'ratings' => ['good', 'good', 'excellent', 'good', 'good', 'excellent', 'good', 'excellent', 'excellent', 'good', 'good', 'good', 'good', 'excellent', 'good'],
-                'other_parts' => null,
-                'remarks' => 'Vehicle in good overall condition.',
-                'supervisor_recommendation' => 'Continue regular maintenance schedule.',
-                'created_at' => '2026-08-10 15:30:00', 'updated_at' => '2026-08-10 15:30:00',
-            ],
-            [
-                'id' => 2, 'vehicle_id' => 2, 'pmuv_no' => 'PMUV-2026-002', 'inspection_date' => '2026-07-15',
-                'inspector_mechanic' => 'Rodel Quiambao', 'current_mileage' => 61200,
-                'last_oil_change' => '2026-05-15', 'last_air_filter_change' => '2026-05-15',
-                'last_cabin_filter_change' => '2026-01-15', 'last_oil_filter_change' => '2026-05-15',
-                'last_engine_tune_up' => '2026-01-15',
-                'ratings' => ['good', 'good', 'good', 'excellent', 'poor', 'good', 'good', 'good', 'good', 'excellent', 'good', 'excellent', 'excellent', 'good', 'good'],
-                'other_parts' => null,
-                'remarks' => 'Wipers worn out; tires newly replaced.',
-                'supervisor_recommendation' => 'Replace wiper blades at next opportunity.',
-                'created_at' => '2026-07-15 16:30:00', 'updated_at' => '2026-07-15 16:30:00',
-            ],
-            [
-                'id' => 3, 'vehicle_id' => 3, 'pmuv_no' => 'PMUV-2026-003', 'inspection_date' => '2026-06-20',
-                'inspector_mechanic' => 'Rodel Quiambao', 'current_mileage' => 102300,
-                'last_oil_change' => '2026-03-20', 'last_air_filter_change' => '2025-12-20',
-                'last_cabin_filter_change' => null, 'last_oil_filter_change' => '2026-03-20',
-                'last_engine_tune_up' => '2025-12-20',
-                'ratings' => ['good', 'poor', 'good', 'poor', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'poor', 'good', 'good', 'good'],
-                'other_parts' => 'Radiator hose slightly cracked',
-                'remarks' => 'Hoses and air conditioning need attention.',
-                'supervisor_recommendation' => 'Replace radiator hose and schedule AC servicing.',
-                'created_at' => '2026-06-20 12:30:00', 'updated_at' => '2026-06-20 12:30:00',
-            ],
-            [
-                'id' => 4, 'vehicle_id' => 4, 'pmuv_no' => 'PMUV-2026-004', 'inspection_date' => '2026-09-25',
-                'inspector_mechanic' => 'Efren Dela Cruz', 'current_mileage' => 156800,
-                'last_oil_change' => '2026-04-18', 'last_air_filter_change' => '2026-04-18',
-                'last_cabin_filter_change' => '2025-10-18', 'last_oil_filter_change' => '2026-04-18',
-                'last_engine_tune_up' => '2025-10-18',
-                'ratings' => ['poor', 'good', 'poor', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'poor'],
-                'other_parts' => 'Clutch assembly worn',
-                'remarks' => 'Unit undergoing clutch replacement. Belts and engine need follow-up check.',
-                'supervisor_recommendation' => 'Do not release unit until repairs are completed and re-inspected.',
-                'created_at' => '2026-09-25 11:00:00', 'updated_at' => '2026-09-25 11:00:00',
-            ],
-            [
-                'id' => 5, 'vehicle_id' => 5, 'pmuv_no' => 'PMUV-2026-005', 'inspection_date' => '2026-09-05',
-                'inspector_mechanic' => 'Rodel Quiambao', 'current_mileage' => 38900,
-                'last_oil_change' => '2026-09-05', 'last_air_filter_change' => '2026-09-05',
-                'last_cabin_filter_change' => '2026-03-05', 'last_oil_filter_change' => '2026-09-05',
-                'last_engine_tune_up' => '2026-03-05',
-                'ratings' => ['excellent', 'excellent', 'excellent', 'excellent', 'good', 'excellent', 'excellent', 'excellent', 'excellent', 'excellent', 'excellent', 'good', 'excellent', 'excellent', 'excellent'],
-                'other_parts' => null,
-                'remarks' => 'Excellent condition.',
-                'supervisor_recommendation' => 'No action needed.',
-                'created_at' => '2026-09-05 15:30:00', 'updated_at' => '2026-09-05 15:30:00',
-            ],
-            [
-                'id' => 6, 'vehicle_id' => 7, 'pmuv_no' => 'PMUV-2026-006', 'inspection_date' => '2026-03-10',
-                'inspector_mechanic' => 'Efren Dela Cruz', 'current_mileage' => 189000,
-                'last_oil_change' => '2025-11-02', 'last_air_filter_change' => '2025-06-02',
-                'last_cabin_filter_change' => null, 'last_oil_filter_change' => '2025-11-02',
-                'last_engine_tune_up' => '2025-06-02',
-                'ratings' => ['poor', 'poor', 'poor', 'poor', 'poor', 'poor', 'good', 'poor', 'good', 'poor', 'poor', 'poor', 'poor', 'poor', 'poor'],
-                'other_parts' => 'Chassis corrosion',
-                'remarks' => 'Vehicle beyond economical repair.',
-                'supervisor_recommendation' => 'Recommend retirement of unit.',
-                'created_at' => '2026-03-10 16:30:00', 'updated_at' => '2026-03-10 16:30:00',
-            ],
+        $rows = [
+            $this->record(1, 1, -78, 'Rodel Quiambao', 84500, [0, 0, -180, 0, -180],
+                ['good', 'good', 'excellent', 'good', 'good', 'excellent', 'good', 'excellent', 'excellent', 'good', 'good', 'good', 'good', 'excellent', 'good'],
+                null, 'Vehicle in good overall condition.', 'Continue regular maintenance schedule.'),
+            $this->record(2, 2, -103, 'Rodel Quiambao', 61200, [-61, -61, -181, -61, -181],
+                ['good', 'good', 'good', 'excellent', 'poor', 'good', 'good', 'good', 'good', 'excellent', 'good', 'excellent', 'excellent', 'good', 'good'],
+                null, 'Wipers worn out; tires newly replaced.', 'Replace wiper blades at next opportunity.'),
+            $this->record(3, 3, -128, 'Rodel Quiambao', 102300, [-92, -182, null, -92, -182],
+                ['good', 'poor', 'good', 'poor', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'poor', 'good', 'good', 'good'],
+                'Radiator hose slightly cracked', 'Hoses and air conditioning need attention.', 'Replace radiator hose and schedule AC servicing.'),
+            $this->record(4, 4, -31, 'Efren Dela Cruz', 156800, [-160, -160, -342, -160, -342],
+                ['poor', 'good', 'poor', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'good', 'poor'],
+                'Clutch assembly worn', 'Unit undergoing clutch replacement. Belts and engine need follow-up check.', 'Do not release unit until repairs are completed and re-inspected.'),
+            $this->record(5, 5, -50, 'Rodel Quiambao', 38900, [0, 0, -184, 0, -184],
+                ['excellent', 'excellent', 'excellent', 'excellent', 'good', 'excellent', 'excellent', 'excellent', 'excellent', 'excellent', 'excellent', 'good', 'excellent', 'excellent', 'excellent'],
+                null, 'Excellent condition.', 'No action needed.'),
+            $this->record(6, 7, -230, 'Efren Dela Cruz', 189000, [-128, -281, null, -128, -281],
+                ['poor', 'poor', 'poor', 'poor', 'poor', 'poor', 'good', 'poor', 'good', 'poor', 'poor', 'poor', 'poor', 'poor', 'poor'],
+                'Chassis corrosion', 'Vehicle beyond economical repair.', 'Recommend retirement of unit.'),
         ];
 
-        $rows = array_map(function (array $record) {
-            $ratings = $record['ratings'];
-            unset($record['ratings']);
-
-            return $record + array_combine(self::RATING_COLUMNS, $ratings);
-        }, $records);
-
         DB::table('preventive_maintenance_checklists')->insert($rows);
+    }
+
+    /**
+     * @param  int  $day  inspection day, counted from today
+     * @param  array  $services  days before or after the inspection for: oil change, air filter,
+     *                           cabin filter, oil filter, engine tune-up (null = never done)
+     */
+    private function record(
+        int $id,
+        int $vehicle,
+        int $day,
+        string $inspector,
+        int $mileage,
+        array $services,
+        array $ratings,
+        ?string $otherParts,
+        string $remarks,
+        string $recommendation,
+    ): array {
+        $date = fn (?int $shift) => $shift === null ? null : SeedDates::date($day + $shift);
+        $filed = SeedDates::at($day, '15:30:00');
+
+        return [
+            'id' => $id,
+            'vehicle_id' => $vehicle,
+            'pmuv_no' => sprintf('PMUV-%s-%03d', substr(SeedDates::date($day), 0, 4), $id),
+            'inspection_date' => SeedDates::date($day),
+            'inspector_mechanic' => $inspector,
+            'current_mileage' => $mileage,
+            'last_oil_change' => $date($services[0]),
+            'last_air_filter_change' => $date($services[1]),
+            'last_cabin_filter_change' => $date($services[2]),
+            'last_oil_filter_change' => $date($services[3]),
+            'last_engine_tune_up' => $date($services[4]),
+        ] + array_combine(self::RATING_COLUMNS, $ratings) + [
+            'other_parts' => $otherParts,
+            'remarks' => $remarks,
+            'supervisor_recommendation' => $recommendation,
+            'created_at' => $filed,
+            'updated_at' => $filed,
+        ];
     }
 }
