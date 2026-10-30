@@ -8,8 +8,13 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Run: php artisan migrate:fresh --seed
+ *
+ * UatTesterSeeder adds the extra accounts and spare records so that 4 or more testers
+ * can test each role (administrator, staff, faculty) at the same time.
+ *
  * Optional bulk data for the ISO 25010 performance and capacity tests:
  *   php artisan db:seed --class=BulkRequestSeeder
+ * Do not load the bulk data during the UAT. It is for the performance tests only.
  */
 class DatabaseSeeder extends Seeder
 {
@@ -56,6 +61,7 @@ class DatabaseSeeder extends Seeder
                 PostTravelReportSeeder::class,
                 FuelUsageRecordSeeder::class,
                 PreventiveMaintenanceChecklistSeeder::class,
+                UatTesterSeeder::class,
             ]);
         });
     }

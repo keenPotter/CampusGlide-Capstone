@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\DB;
  * Covers every status shown on the Maintenance page:
  * in progress (3), upcoming (1, 2, 5, 6, 8, 9, 11), overdue (4), cancelled (10), completed (7).
  * Record 9 is on the same date as trip 13 (request 13), which needs reassignment.
+ * Records 12-16 are extra scheduled records on vehicle 4. That vehicle is not used in any trip,
+ * so they never block a trip. Together with records 3, 9 and 11 there are enough
+ * records for each administrator tester to mark one as completed (TC-AD-15).
  */
 class VehicleMaintenanceSeeder extends Seeder
 {
@@ -36,6 +39,12 @@ class VehicleMaintenanceSeeder extends Seeder
             [9,  1, 'tire_service', 'Tire rotation and balancing',                14,   null, null,     null, null,                             'scheduled',   null, null],
             [10, 3, 'other',        'Air conditioning servicing',                 -175, null, null,     null, null,                             'cancelled',   'Rescheduled due to parts unavailability.', -175],
             [11, 6, 'inspection',   'Pre-long-trip safety inspection',            9,    null, null,     null, 'NVSU Motor Pool Mechanic',       'scheduled',   null, null],
+            // Extra records for the testers (vehicle 4 is never assigned to a trip).
+            [12, 4, 'inspection',   'Post-repair safety inspection',              12,   null, null,     null, 'NVSU Motor Pool Mechanic',       'scheduled',   null, null],
+            [13, 4, 'tire_service', 'Tire replacement and wheel alignment',       16,   null, null,     null, 'Bayombong Tire Center',          'scheduled',   null, null],
+            [14, 4, 'oil_change',   'Engine oil and filter replacement',          21,   null, null,     null, 'Toyota Santiago Service Center', 'scheduled',   null, null],
+            [15, 4, 'other',        'Air conditioning servicing',                 27,   null, null,     null, 'Dela Cruz Auto Repair',          'scheduled',   null, null],
+            [16, 4, 'inspection',   'Monthly safety inspection',                  33,   null, null,     null, 'NVSU Motor Pool Mechanic',       'scheduled',   null, null],
         ];
 
         $rows = array_map(function (array $r) use ($columns, $d) {
