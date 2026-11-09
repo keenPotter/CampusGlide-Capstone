@@ -72,12 +72,6 @@ const routes = [
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {
-    path: '/preventive-maintenance',
-    name: 'preventiveMaintenance',
-    component: () => import('@/views/maintenance/PreventiveMaintenanceView.vue'),
-    meta: { requiresAuth: true, roles: ['administrator'] },
-  },
-  {
     path: '/users',
     name: 'users.index',
     component: () => import('@/views/users/UsersView.vue'),
@@ -85,8 +79,7 @@ const routes = [
   },
   {
     path: '/users/new',
-    name: 'users.create',
-    component: () => import('@/views/users/CreateUserView.vue'),
+    redirect: { name: 'users.index' },
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {

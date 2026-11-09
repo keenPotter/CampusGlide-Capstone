@@ -41,11 +41,11 @@ const emit = defineEmits(['close'])
             </button>
           </header>
 
-          <div class="p-card">
+          <div class="modal-body p-card">
             <slot />
           </div>
 
-          <footer v-if="$slots.footer" class="flex justify-end gap-3 border-t border-line px-card py-card">
+          <footer v-if="$slots.footer" class="modal-footer flex justify-end gap-3 border-t border-line px-card py-card">
             <slot name="footer" />
           </footer>
         </div>
@@ -53,3 +53,14 @@ const emit = defineEmits(['close'])
     </Transition>
   </Teleport>
 </template>
+
+<style scoped>
+.modal-body :deep(button),
+.modal-footer :deep(button) {
+  height: 2rem;
+  padding-right: 0.5rem;
+  padding-left: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+</style>

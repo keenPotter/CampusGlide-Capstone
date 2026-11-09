@@ -6,6 +6,7 @@ import { useNotificationStore } from '@/stores/notifications'
 import { formatDate } from '@/lib/format'
 import { canPrint, canReassign, passengerText, requestNumber, whenText } from '@/lib/allocations'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
@@ -47,12 +48,14 @@ const {
 } = useAllocations()
 
 const PAGE_SIZE = 10
+const DATE_CHANGE_PAGE_SIZE = 10
 
 const search = ref('')
 const typeFilter = ref('')
 const monthFilter = ref('') // '' = all months, '01' to '12'
 const yearFilter = ref('') // '' = all years, for example '2026'
 const page = ref(1)
+const dateChangePage = ref(1)
 
 const modalOpen = ref(false)
 const editing = ref(null)
@@ -170,6 +173,19 @@ const pageRows = computed(() =>
   visibleRows.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE),
 )
 
+const dateChangePages = computed(() => Math.max(1, Math.ceil(pendingDateChanges.value.length / DATE_CHANGE_PAGE_SIZE)))
+const pagedDateChanges = computed(() =>
+  pendingDateChanges.value.slice(
+    (dateChangePage.value - 1) * DATE_CHANGE_PAGE_SIZE,
+    dateChangePage.value * DATE_CHANGE_PAGE_SIZE,
+  ),
+)
+const dateChangePaginationMeta = computed(() => ({
+  current_page: dateChangePage.value,
+  last_page: dateChangePages.value,
+  total: pendingDateChanges.value.length,
+}))
+
 const paginationMeta = computed(() => ({
   current_page: page.value,
   last_page: pageCount.value,
@@ -186,6 +202,10 @@ watch(pageCount, (count) => {
   if (page.value > count) page.value = count
 })
 
+watch(dateChangePages, (count) => {
+  if (dateChangePage.value > count) dateChangePage.value = count
+})
+
 /* ================= ACTIONS ================= */
 
 // Reload the page data and the menu badges.
@@ -199,9 +219,9 @@ function openEdit(allocation) {
   modalOpen.value = true
 }
 
-function onSaved() {
+async function onSaved() {
   modalOpen.value = false
-  reload()
+  await reload()
   toast.success('Allocation updated.')
 }
 
@@ -241,10 +261,10 @@ function closeDecision() {
   decisionAction.value = ''
 }
 
-function onDecided(message) {
+async function onDecided(message) {
   closeDecision()
+  await reload()
   toast.success(message)
-  reload()
 }
 
 // The requested date is already booked: close the decision window and show the conflicts.
@@ -265,7 +285,7 @@ function onDecisionConflict(found) {
           are flagged automatically.
         </p>
       </div>
-      <BaseButton variant="outline" size="sm" :disabled="loading" @click="reload">Refresh</BaseButton>
+      <RefreshButton :loading="loading" label="Refresh allocations" @click="reload" />
     </div>
 
     <LoadError :message="loadError" @retry="reload" />
@@ -363,13 +383,16 @@ function onDecisionConflict(found) {
 
     <!-- Date change requests from faculty -->
     <BaseCard
-      v-if="pendingDateChanges.length"
+      v-if="loading || pendingDateChanges.length"
       title="Date change requests"
       :subtitle="`${pendingDateChanges.length} waiting for your decision`"
     >
-      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div v-if="loading" class="flex justify-center p-8" aria-label="Loading date change requests">
+        <div class="h-7 w-7 animate-spin rounded-full border-2 border-line border-t-primary" />
+      </div>
+      <div v-else class="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <RescheduleRequestCard
-          v-for="item in pendingDateChanges"
+          v-for="item in pagedDateChanges"
           :key="item.id"
           :item="item"
           is-admin
@@ -377,6 +400,11 @@ function onDecisionConflict(found) {
           @disapprove="decide($event, 'disapprove')"
         />
       </div>
+      <PaginationBar
+        v-if="!loading"
+        :meta="dateChangePaginationMeta"
+        @change="(value) => (dateChangePage = value)"
+      />
     </BaseCard>
 
     <!-- Allocation summary -->
@@ -385,7 +413,7 @@ function onDecisionConflict(found) {
         <BaseInput
           v-model="search"
           type="search"
-          placeholder="Search by destination, requester, driver or plate..."
+          placeholder="Search allocations..."
         />
         <SegmentedControl v-model="typeFilter" :options="typeOptions" label="Trip type" />
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -478,7 +506,7 @@ function onDecisionConflict(found) {
           </div>
 
           <!-- Actions -->
-          <div class="flex flex-wrap gap-2 lg:justify-end">
+          <div class="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-end">
             <template v-if="row.kind === 'allocation'">
               <!-- Reassign is for scheduled trips only. It turns red when there is a conflict. -->
               <BaseButton

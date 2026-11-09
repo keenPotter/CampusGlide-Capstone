@@ -58,6 +58,8 @@ async function loadOptions() {
         params: {
           start_date: request.trip_date,
           end_date: request.trip_end_date || request.trip_date,
+          start_time: String(request.departure_time || '').slice(0, 5),
+          end_time: String(request.estimated_return_time || '').slice(0, 5),
         },
       }),
     )

@@ -1,13 +1,27 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { Check, Eye, X } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
-import { formatDate, formatTime, fullName, STATUS_LABELS, TRIP_TYPE_LABELS } from '@/lib/format'
+import api, { errorMessage, unwrap } from '@/lib/api'
+import {
+  formatDate,
+  formatDateTime,
+  formatTime,
+  fullName,
+  MONTH_OPTIONS,
+  STATUS_LABELS,
+  TRIP_TYPE_LABELS,
+  YEAR_OPTIONS,
+} from '@/lib/format'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
@@ -18,6 +32,10 @@ const auth = useAuthStore()
 const store = useVehicleRequestStore()
 const router = useRouter()
 const toast = useToast()
+const search = ref('')
+const selectedRequest = ref(null)
+const detailRequest = ref(null)
+const detailLoading = ref(false)
 
 // Same style of filter as the Maintenance page: dropdowns with an "All" choice.
 const statusOptions = ['pending', 'approved', 'disapproved'].map((value) => ({
@@ -33,9 +51,37 @@ const typeOptions = ['inclusive', 'exclusive'].map((value) => ({
 const disapproving = ref(null)
 // The pending request that is being approved. The assign window is open while this is set.
 const approving = ref(null)
+const canEditSelectedRequest = computed(
+  () => auth.isFaculty && ['pending', 'approved'].includes(detailRequest.value?.status),
+)
+const requestDetailRows = computed(() => {
+  const request = detailRequest.value
+  if (!request) return []
+
+  return [
+    { label: 'Requesting official', value: fullName(request.requested_by) },
+    { label: 'Destination', value: request.destination },
+    { label: 'Purpose', value: request.purpose },
+    { label: 'Date of travel', value: formatDate(request.trip_date) },
+    { label: 'End of travel', value: formatDate(request.trip_end_date) },
+    { label: 'Days of travel', value: request.travel_days ?? '—' },
+    { label: 'Trip type', value: request.trip_type },
+    { label: 'Time of departure', value: formatTime(request.departure_time) },
+    { label: 'Estimated return', value: formatTime(request.return_time) },
+    { label: 'Authorized passengers', value: request.passengers },
+    { label: 'Number of passengers', value: request.number_of_passengers ?? '—' },
+    { label: 'Date requested', value: formatDateTime(request.created_at) },
+    { label: 'Approved on', value: request.approved_date ? formatDateTime(request.approved_date) : '—' },
+  ]
+})
 
 // Reset the filters too, because the store is shared with other pages.
-onMounted(() => store.fetch({ status: '', trip_type: '', page: 1 }))
+onMounted(() => store.fetch({ status: '', trip_type: '', month: '', year: '', search: '', page: 1 }))
+
+watch(search, (_, __, onCleanup) => {
+  const timeout = setTimeout(() => store.fetch({ search: search.value, page: 1 }), 250)
+  onCleanup(() => clearTimeout(timeout))
+})
 
 function changeStatus(value) {
   store.fetch({ status: value, page: 1 })
@@ -45,14 +91,39 @@ function changeType(value) {
   store.fetch({ trip_type: value, page: 1 })
 }
 
-// True when the row already shows a button besides "View"
-// (Approve/Disapprove for pending requests, administrators only).
-function hasOtherActions(request) {
-  return auth.isAdministrator && request.status === 'pending'
+function changeMonth(value) {
+  store.fetch({ month: value, page: 1 })
+}
+
+function changeYear(value) {
+  store.fetch({ year: value, page: 1 })
 }
 
 function openRequest(request) {
-  router.push({ name: 'requests.show', params: { id: request.id } })
+  selectedRequest.value = request
+  detailRequest.value = request
+  detailLoading.value = true
+
+  api.get(`/vehicle-requests/${request.id}`)
+    .then((response) => {
+      if (selectedRequest.value?.id === request.id) detailRequest.value = unwrap(response)
+    })
+    .catch((error) => toast.error(errorMessage(error, 'Unable to load this request.')))
+    .finally(() => {
+      if (selectedRequest.value?.id === request.id) detailLoading.value = false
+    })
+}
+
+function closeRequest() {
+  selectedRequest.value = null
+  detailRequest.value = null
+  detailLoading.value = false
+}
+
+function editSelectedRequest() {
+  const request = detailRequest.value
+  closeRequest()
+  if (request) router.push({ name: 'requests.edit', params: { id: request.id } })
 }
 
 // Clicking anywhere on a row or card opens the request.
@@ -64,6 +135,7 @@ function onRowClick(event, request) {
 
 // Approve opens the assign window. The request is approved only after the vehicle and driver are saved.
 function openApprove(request) {
+  closeRequest()
   approving.value = request
 }
 
@@ -75,6 +147,7 @@ function onApproved() {
 }
 
 function openDisapprove(request) {
+  closeRequest()
   disapproving.value = request
 }
 
@@ -87,7 +160,7 @@ function onDisapproved() {
 <template>
   <div class="flex flex-col gap-page">
     <!-- Page Header -->
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h1 class="text-page-title">
           {{ auth.isFaculty ? 'My vehicle requests' : 'Vehicle requests' }}
@@ -95,14 +168,23 @@ function onDisapproved() {
         <p class="mt-1 text-small text-ink-muted">Request for Use of Vehicle (NVSU-FR-PPS-13-02)</p>
       </div>
 
-      <BaseButton v-if="auth.isFaculty" block @click="router.push({ name: 'requests.create' })">
-        New request
-      </BaseButton>
+      <div class="flex items-center justify-end gap-2">
+        <RefreshButton :loading="store.loading" label="Refresh vehicle requests" @click="store.fetch()" />
+        <BaseButton v-if="auth.isFaculty" size="sm" @click="router.push({ name: 'requests.create' })">
+          New request
+        </BaseButton>
+      </div>
     </div>
 
     <!-- Filters -->
     <BaseCard>
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <BaseInput
+          v-model="search"
+          class="sm:col-span-2 lg:col-span-4"
+          type="search"
+          placeholder="Search requests..."
+        />
         <BaseSelect
           :model-value="store.filters.status"
           :options="statusOptions"
@@ -116,6 +198,20 @@ function onDisapproved() {
           placeholder="All types"
           allow-empty
           @update:model-value="changeType"
+        />
+        <BaseSelect
+          :model-value="store.filters.month"
+          :options="MONTH_OPTIONS"
+          placeholder="All months"
+          allow-empty
+          @update:model-value="changeMonth"
+        />
+        <BaseSelect
+          :model-value="store.filters.year"
+          :options="YEAR_OPTIONS"
+          placeholder="All years"
+          allow-empty
+          @update:model-value="changeYear"
         />
       </div>
     </BaseCard>
@@ -141,13 +237,14 @@ function onDisapproved() {
       >
         <div class="card-row-header">
           <div class="min-w-0 flex-1">
-            <RouterLink
-              :to="{ name: 'requests.show', params: { id: request.id } }"
-              class="card-row-value block truncate hover:text-primary md:text-section-title"
+            <button
+              type="button"
+              class="card-row-value block truncate text-left hover:text-primary md:text-section-title"
               :title="request.destination"
+              @click="openRequest(request)"
             >
               {{ request.destination }}
-            </RouterLink>
+            </button>
             <p class="mt-0.5 truncate text-small text-ink-muted md:text-body">{{ request.purpose }}</p>
           </div>
           <StatusBadge :status="request.status" class="shrink-0" />
@@ -181,23 +278,25 @@ function onDisapproved() {
           </div>
         </div>
 
-        <div class="mt-auto flex gap-2 border-t border-line pt-3">
+        <div class="mt-auto border-t border-line pt-3">
           <template v-if="auth.isAdministrator && request.status === 'pending'">
-            <BaseButton size="sm" class="flex-1" @click="openApprove(request)">
-              Approve
-            </BaseButton>
-            <BaseButton size="sm" variant="outline" class="flex-1" @click="openDisapprove(request)">
-              Disapprove
-            </BaseButton>
+            <div class="flex items-center gap-2">
+              <BaseButton size="sm" class="flex-1" @click="openApprove(request)">
+                <Check :size="16" aria-hidden="true" /> Approve
+              </BaseButton>
+              <BaseButton size="sm" variant="outline" class="flex-1" @click="openDisapprove(request)">
+                <X :size="16" aria-hidden="true" /> Disapprove
+              </BaseButton>
+            </div>
           </template>
 
           <BaseButton
             size="sm"
             variant="ghost"
-            :class="hasOtherActions(request) ? '' : 'w-full'"
+            class="mt-2 w-full"
             @click="openRequest(request)"
           >
-            View
+            <Eye :size="16" aria-hidden="true" /> View
           </BaseButton>
         </div>
       </div>
@@ -211,13 +310,13 @@ function onDisapproved() {
       <table class="w-full table-fixed border-collapse">
         <thead class="table-head">
           <tr>
-            <th class="w-[18%] px-2 py-3 xl:px-card">Destination</th>
-            <th class="w-[13%] px-2 py-3 xl:px-card">Requested by</th>
-            <th class="w-[14%] px-2 py-3 xl:px-card">Travel</th>
-            <th class="w-[6%] px-2 py-3 xl:px-card">Pax</th>
+            <th class="w-[16%] px-2 py-3 xl:px-card">Destination</th>
+            <th class="w-[12%] px-2 py-3 xl:px-card">Requested by</th>
+            <th class="w-[13%] px-2 py-3 xl:px-card">Travel</th>
+            <th class="w-[5%] px-2 py-3 xl:px-card">Pax</th>
             <th class="w-[12%] px-2 py-3 xl:px-card">Status</th>
             <th class="w-[17%] px-2 py-3 xl:px-card">Reason</th>
-            <th class="w-[20%] px-2 py-3 text-right xl:px-card">Actions</th>
+            <th class="w-[25%] px-2 py-3 text-right xl:px-card">Actions</th>
           </tr>
         </thead>
 
@@ -231,12 +330,13 @@ function onDisapproved() {
             @keydown.enter="onRowClick($event, request)"
           >
             <td class="px-2 py-3 align-top xl:px-card">
-              <RouterLink
-                :to="{ name: 'requests.show', params: { id: request.id } }"
-                class="font-medium hover:text-primary"
+              <button
+                type="button"
+                class="text-left font-medium hover:text-primary"
+                @click="openRequest(request)"
               >
                 {{ request.destination }}
-              </RouterLink>
+              </button>
               <p class="truncate text-small text-ink-muted">{{ request.purpose }}</p>
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
@@ -266,18 +366,18 @@ function onDisapproved() {
               </p>
             </td>
             <td class="px-2 py-3 align-top xl:px-card">
-              <div class="flex flex-wrap justify-end gap-1.5">
+              <div class="flex flex-nowrap items-center justify-end gap-1.5">
                 <template v-if="auth.isAdministrator && request.status === 'pending'">
                   <BaseButton size="sm" @click="openApprove(request)">
-                    Approve
+                    <Check :size="16" aria-hidden="true" /> Approve
                   </BaseButton>
                   <BaseButton size="sm" variant="outline" @click="openDisapprove(request)">
-                    Disapprove
+                    <X :size="16" aria-hidden="true" /> Disapprove
                   </BaseButton>
                 </template>
 
                 <BaseButton size="sm" variant="ghost" @click="openRequest(request)">
-                  View
+                  <Eye :size="16" aria-hidden="true" /> View
                 </BaseButton>
               </div>
             </td>
@@ -295,6 +395,63 @@ function onDisapproved() {
     >
       <PaginationBar :meta="store.meta" @change="(page) => store.fetch({ page })" />
     </div>
+
+    <BaseModal
+      :open="Boolean(selectedRequest)"
+      :title="selectedRequest ? `Vehicle request #${selectedRequest.id}` : 'Vehicle request'"
+      :subtitle="detailRequest?.destination ?? selectedRequest?.destination ?? ''"
+      @close="closeRequest"
+    >
+      <div v-if="detailLoading" class="flex justify-center p-8" aria-label="Loading request details">
+        <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
+      </div>
+
+      <template v-else-if="detailRequest">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <StatusBadge :status="detailRequest.status" />
+        </div>
+
+        <div
+          v-if="detailRequest.disapproval_reason"
+          class="mb-3 rounded-card border border-red-200 bg-red-50 p-3 text-small text-red-800"
+        >
+          <p class="font-medium">Disapproved</p>
+          <p class="mt-1">{{ detailRequest.disapproval_reason }}</p>
+        </div>
+
+        <div
+          v-if="detailRequest.edit_reason && detailRequest.status === 'pending'"
+          class="mb-3 rounded-card border-l-4 border-secondary bg-secondary-50 p-3 text-small text-secondary-700"
+        >
+          <p class="font-medium">Edited after approval</p>
+          <p class="mt-1">Reason: {{ detailRequest.edit_reason }}</p>
+        </div>
+
+        <dl class="divide-y divide-line">
+          <div
+            v-for="row in requestDetailRows"
+            :key="row.label"
+            class="grid grid-cols-1 gap-1 py-3 sm:grid-cols-3 sm:gap-4"
+          >
+            <dt class="text-small text-ink-muted">{{ row.label }}</dt>
+            <dd class="text-body sm:col-span-2 sm:capitalize">{{ row.value || '—' }}</dd>
+          </div>
+        </dl>
+      </template>
+
+      <template #footer>
+        <BaseButton variant="outline" @click="closeRequest">Close</BaseButton>
+        <BaseButton v-if="canEditSelectedRequest" variant="outline" @click="editSelectedRequest">
+          Edit
+        </BaseButton>
+        <template v-if="auth.isAdministrator && detailRequest?.status === 'pending'">
+          <BaseButton @click="openApprove(detailRequest)">Approve</BaseButton>
+          <BaseButton variant="outline" @click="openDisapprove(detailRequest)">
+            Disapprove
+          </BaseButton>
+        </template>
+      </template>
+    </BaseModal>
 
     <ApproveAssignModal :request="approving" @close="approving = null" @done="onApproved" />
 

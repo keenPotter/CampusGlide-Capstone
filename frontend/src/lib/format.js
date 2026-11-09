@@ -1,6 +1,18 @@
 const LOCALE = 'en-PH'
 const DATE_OPTIONS = { year: 'numeric', month: 'short', day: 'numeric' }
 
+export const MONTH_OPTIONS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+].map((label, index) => ({
+  value: String(index + 1).padStart(2, '0'),
+  label,
+}))
+
+export const YEAR_OPTIONS = Array.from({ length: 47 }, (_, offset) =>
+  String(new Date().getFullYear() + 10 - offset),
+).map((year) => ({ value: year, label: year }))
+
 /** Local date as "YYYY-MM-DD". (toISOString shifts the day for users ahead of UTC.) */
 export function toDateString(date) {
   const year = date.getFullYear()
