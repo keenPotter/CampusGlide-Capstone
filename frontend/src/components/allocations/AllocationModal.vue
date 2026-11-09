@@ -112,7 +112,13 @@ async function loadOptions() {
   try {
     const data = unwrap(
       await api.get('/allocation-options', {
-        params: { start_date: range.start, end_date: range.end, ignore_trip_id: current.trip.id },
+        params: {
+          start_date: range.start,
+          end_date: range.end,
+          start_time: String(current.trip.departure_time || '').slice(0, 5),
+          end_time: String(current.trip.estimated_return_time || '').slice(0, 5),
+          ignore_trip_id: current.trip.id,
+        },
       }),
     )
     vehicleItems.value = data.vehicles

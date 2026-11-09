@@ -50,6 +50,31 @@ class AllocationController extends Controller
             $query->whereHas('trip', fn ($q) => $q->where('trip_status', $status));
         }
 
+        if ($request->filled('search')) {
+            $pattern = '%' . trim($request->query('search')) . '%';
+            $query->where(function ($searchQuery) use ($pattern) {
+                $searchQuery
+                    ->whereHas('trip', function ($tripQuery) use ($pattern) {
+                        $tripQuery->where('destination', 'like', $pattern)
+                            ->orWhere('purpose', 'like', $pattern);
+                    })
+                    ->orWhereHas('vehicle', function ($vehicleQuery) use ($pattern) {
+                        $vehicleQuery->where('vehicle_model', 'like', $pattern)
+                            ->orWhere('plate_number', 'like', $pattern);
+                    })
+                    ->orWhereHas('driver', function ($driverQuery) use ($pattern) {
+                        $driverQuery->where('first_name', 'like', $pattern)
+                            ->orWhere('last_name', 'like', $pattern)
+                            ->orWhere('contact_number', 'like', $pattern);
+                    })
+                    ->orWhereHas('trip.vehicleRequest.requester', function ($requesterQuery) use ($pattern) {
+                        $requesterQuery->where('first_name', 'like', $pattern)
+                            ->orWhere('last_name', 'like', $pattern)
+                            ->orWhere('email', 'like', $pattern);
+                    });
+            });
+        }
+
         $perPage = min(max((int) $request->query('per_page', 20), 1), 100);
 
         return AllocationResource::collection(
@@ -90,11 +115,16 @@ class AllocationController extends Controller
      */
     public function options(Request $request): JsonResponse
     {
-        $this->allocations->completeFinishedTrips();
+        $request->validate(['skip_completion' => ['sometimes', 'boolean']]);
+        if (! $request->boolean('skip_completion')) {
+            $this->allocations->completeFinishedTrips();
+        }
 
         $request->validate([
             'start_date' => ['nullable', 'date_format:Y-m-d'],
             'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'start_time' => ['nullable', 'date_format:H:i'],
+            'end_time' => ['nullable', 'date_format:H:i', 'after:start_time'],
             'ignore_trip_id' => ['nullable', 'integer'],
         ]);
 
@@ -102,7 +132,9 @@ class AllocationController extends Controller
         $end = $request->query('end_date') ?: $start;
         $ignore = $request->filled('ignore_trip_id') ? (int) $request->query('ignore_trip_id') : null;
 
-        $busy = $this->allocations->unavailable($start, $end, $ignore);
+        $startTime = $request->query('start_time');
+        $endTime = $request->query('end_time');
+        $busy = $this->allocations->unavailable($start, $end, $ignore, $startTime, $endTime);
         $driversOnTrips = Trip::whereIn('trip_status', AllocationService::ACTIVE)->pluck('driver_id');
 
         $requests = VehicleRequest::with('requester')

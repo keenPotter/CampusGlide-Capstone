@@ -19,7 +19,7 @@ class VehicleRequestController extends Controller
     /**
      * GET /api/vehicle-requests
      * Administrators see all. Faculty see only their own.
-     * Query params: ?status=pending, ?trip_type=inclusive
+        * Query params: ?status=pending, ?trip_type=inclusive, ?month=1, ?year=2026
      *
      * Order: pending requests first, with the soonest travel date on top.
      * All other requests follow, newest first.
@@ -27,6 +27,13 @@ class VehicleRequestController extends Controller
      */
     public function index(Request $request)
     {
+        $request->validate([
+            'month' => ['nullable', 'integer', 'between:1,12'],
+            'year' => ['nullable', 'integer', 'between:1900,2200'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'per_page' => ['nullable', 'integer', 'between:1,100'],
+        ]);
+
         $user = $request->user();
 
         $query = VehicleRequest::with('requester')
@@ -49,7 +56,40 @@ class VehicleRequestController extends Controller
             $query->where('trip_type', $tripType);
         }
 
-        return VehicleRequestResource::collection($query->paginate(20));
+        if ($request->filled('year')) {
+            $query->whereYear('trip_date', $request->query('year'));
+        }
+
+        if ($request->filled('month')) {
+            $query->whereMonth('trip_date', $request->query('month'));
+        }
+
+        if ($request->filled('search')) {
+            $terms = preg_split('/\s+/', trim($request->query('search')));
+            $query->where(function ($searchQuery) use ($terms) {
+                foreach ($terms as $term) {
+                    $searchQuery->where(function ($termQuery) use ($term) {
+                        $pattern = "%{$term}%";
+                        $termQuery
+                            ->where('destination', 'like', $pattern)
+                            ->orWhere('purpose', 'like', $pattern)
+                            ->orWhere('disapproval_reason', 'like', $pattern)
+                            ->orWhereHas('requester', function ($requesterQuery) use ($pattern) {
+                                $requesterQuery
+                                    ->where('first_name', 'like', $pattern)
+                                    ->orWhere('last_name', 'like', $pattern)
+                                    ->orWhere('email', 'like', $pattern);
+                            });
+                    });
+                }
+            });
+        }
+
+        $perPage = $request->integer('per_page', 10);
+
+        return VehicleRequestResource::collection(
+            $query->paginate($perPage)->appends($request->query())
+        );
     }
 
     /**

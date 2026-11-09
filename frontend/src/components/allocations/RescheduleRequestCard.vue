@@ -1,4 +1,5 @@
 <script setup>
+import { Check, X } from 'lucide-vue-next'
 import { formatDate } from '@/lib/format'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
@@ -29,9 +30,13 @@ defineEmits(['approve', 'disapprove'])
       Administrator's note: {{ item.admin_reason }}
     </p>
 
-    <div v-if="isAdmin && item.status === 'pending'" class="mt-3 flex justify-end gap-2">
-      <BaseButton size="sm" variant="outline" @click="$emit('disapprove', item)">Disapprove</BaseButton>
-      <BaseButton size="sm" @click="$emit('approve', item)">Approve</BaseButton>
+    <div v-if="isAdmin && item.status === 'pending'" class="mt-3 flex items-center justify-end gap-2">
+      <BaseButton size="sm" variant="outline" @click="$emit('disapprove', item)">
+        <X :size="16" aria-hidden="true" /> Disapprove
+      </BaseButton>
+      <BaseButton size="sm" @click="$emit('approve', item)">
+        <Check :size="16" aria-hidden="true" /> Approve
+      </BaseButton>
     </div>
   </article>
 </template>

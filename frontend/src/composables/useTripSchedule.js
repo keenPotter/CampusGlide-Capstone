@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import api, { errorMessage } from '@/lib/api'
 import { formatDate, formatTime, parseDate, toDateString, TRIP_TYPE_LABELS } from '@/lib/format'
 import {
@@ -42,6 +42,7 @@ function monthShort(date) {
 }
 
 export function useTripSchedule() {
+  const PAGE_SIZE = 10
   const currentView = ref('month')
   const currentTripType = ref('inclusive')
   const currentDate = ref(new Date())
@@ -51,7 +52,16 @@ export function useTripSchedule() {
   const activeTrip = ref(null)
   const activeTrips = ref([])
   const activeDateLabel = ref('')
-  const loading = ref(false)
+  const listSearch = ref('')
+  const listStatus = ref('')
+  const listMonth = ref('')
+  const listYear = ref('')
+  const listPage = ref(1)
+  const tripListItems = ref([])
+  const tripListMeta = ref({ current_page: 1, last_page: 1, total: 0 })
+  const tripListLoading = ref(false)
+  const tripListError = ref('')
+  const loading = ref(true)
   const loadError = ref('')
 
   const viewedIds = ref(getStoredIds(VIEWED_KEY))
@@ -123,6 +133,51 @@ export function useTripSchedule() {
       (a, b) => parseDate(getTripStartDate(a)) - parseDate(getTripStartDate(b)),
     ),
   )
+
+  async function fetchTripList() {
+    tripListLoading.value = true
+    tripListError.value = ''
+
+    try {
+      const { data } = await api.get('/trips', {
+        params: {
+          per_page: PAGE_SIZE,
+          page: listPage.value,
+          trip_type: currentTripType.value,
+          status: listStatus.value || undefined,
+          month: listMonth.value || undefined,
+          year: listYear.value || undefined,
+          search: listSearch.value.trim() || undefined,
+        },
+      })
+
+      tripListItems.value = (data?.data ?? []).map((trip) => ({
+        ...trip,
+        vehicle_request: trip?.vehicle_request || trip?.vehicleRequest || null,
+      }))
+      tripListMeta.value = data?.meta ?? { current_page: 1, last_page: 1, total: 0 }
+    } catch (error) {
+      tripListError.value = errorMessage(error, 'Unable to load scheduled trips.')
+    } finally {
+      tripListLoading.value = false
+    }
+  }
+
+  watch([currentView, currentTripType, listSearch, listStatus, listMonth, listYear], () => {
+    if (listPage.value !== 1) {
+      listPage.value = 1
+    } else if (currentView.value === 'list') {
+      fetchTripList()
+    }
+  })
+
+  watch(listPage, (nextPage, previousPage) => {
+    if (nextPage !== previousPage && currentView.value === 'list') fetchTripList()
+  })
+
+  function changeTripListPage(page) {
+    listPage.value = page
+  }
 
   const upcomingTripCount = computed(() => {
     const today = parseDate(toDateString(new Date()))
@@ -306,6 +361,16 @@ export function useTripSchedule() {
     exclusiveTripCount,
     inclusiveTripCount,
     scheduledTripList,
+    listSearch,
+    listStatus,
+    listMonth,
+    listYear,
+    tripListItems,
+    tripListMeta,
+    tripListLoading,
+    tripListError,
+    fetchTripList,
+    changeTripListPage,
     upcomingTripCount,
     newTripCount,
     monthName,

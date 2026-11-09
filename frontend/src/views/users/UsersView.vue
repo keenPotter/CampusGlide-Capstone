@@ -1,39 +1,97 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import api, { errorMessage } from '@/lib/api'
+import { onMounted, reactive, ref, watch } from 'vue'
+import api, { errorMessage, validationErrors } from '@/lib/api'
 import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import PaginationBar from '@/components/ui/PaginationBar.vue'
+import LoadError from '@/components/ui/LoadError.vue'
 import { formatDateTime, fullName, ROLE_LABELS } from '@/lib/format'
 
 const toast = useToast()
 const users = ref([])
-const loading = ref(false)
+const paginationMeta = ref(null)
+const loading = ref(true)
+const loadError = ref('')
 const search = ref('')
+const page = ref(1)
+const roleFilter = ref('')
+const deletionFilter = ref('')
 const editing = ref(null)
 const editForm = ref(null)
 const confirmDeleteUser = ref(null)
 const saving = ref(false)
+const showCreate = ref(false)
+const createErrors = ref({})
+const createForm = reactive({ first_name: '', last_name: '', email: '', position: '', phone_number: '', role: '', password: '', password_confirmation: '' })
+const createRoleOptions = [
+  { value: 'administrator', label: 'Administrator' },
+  { value: 'faculty', label: 'User' },
+  { value: 'staff', label: 'Staff' },
+]
 const roleOptions = [
   { value: 'faculty', label: 'User' },
   { value: 'staff', label: 'Staff' },
   { value: 'administrator', label: 'Administrator' },
 ]
-const filteredUsers = computed(() => users.value.filter((u) =>
-  `${fullName(u)} ${u.email} ${ROLE_LABELS[u.role] ?? u.role}`.toLowerCase().includes(search.value.toLowerCase()),
-))
+const deletionOptions = [{ value: 'pending', label: 'Pending deletion' }]
 
 async function loadUsers() {
   loading.value = true
+  loadError.value = ''
   try {
-    const response = await api.get('/users')
-    users.value = response.data?.data ?? response.data ?? []
+    const response = await api.get('/users', {
+      params: {
+        page: page.value,
+        search: search.value || undefined,
+        role: roleFilter.value || undefined,
+        deletion_status: deletionFilter.value || undefined,
+      },
+    })
+    users.value = response.data?.data ?? []
+    paginationMeta.value = response.data?.meta ?? null
   } catch (error) {
-    toast.error(errorMessage(error, 'Unable to load users.'))
+    loadError.value = errorMessage(error, 'Unable to load users.')
   } finally { loading.value = false }
+}
+
+function changePage(value) {
+  page.value = value
+  loadUsers()
+}
+
+watch(search, (_, __, onCleanup) => {
+  page.value = 1
+  const timeout = setTimeout(loadUsers, 250)
+  onCleanup(() => clearTimeout(timeout))
+})
+
+watch([roleFilter, deletionFilter], () => {
+  page.value = 1
+  loadUsers()
+})
+
+function openCreate() {
+  Object.assign(createForm, { first_name: '', last_name: '', email: '', position: '', phone_number: '', role: '', password: '', password_confirmation: '' })
+  createErrors.value = {}
+  showCreate.value = true
+}
+async function createUser() {
+  saving.value = true
+  createErrors.value = {}
+  try {
+    await api.post('/register', { ...createForm })
+    showCreate.value = false
+    toast.success('User created successfully.')
+    await loadUsers()
+  } catch (error) {
+    createErrors.value = validationErrors(error)
+    if (!Object.keys(createErrors.value).length) toast.error(errorMessage(error, 'Unable to create the user.'))
+  } finally { saving.value = false }
 }
 function startEdit(user) {
   editing.value = user.id
@@ -61,6 +119,10 @@ async function requestDelete() {
     toast.success('Account disabled and scheduled for deletion in 30 days. It can be restored during that period.')
     confirmDeleteUser.value = null
     await loadUsers()
+    if (!users.value.length && page.value > 1) {
+      page.value -= 1
+      await loadUsers()
+    }
   } catch (error) { toast.error(errorMessage(error, 'Unable to schedule account deletion.')) }
   finally { saving.value = false }
 }
@@ -78,27 +140,43 @@ onMounted(loadUsers)
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-6xl flex-col gap-page">
-    <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+  <div class="flex flex-col gap-page">
+    <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 class="text-page-title">User accounts</h1>
         <p class="mt-1 text-small text-ink-muted">View and manage CampusGlide accounts. Administrator accounts cannot be scheduled for deletion.</p>
       </div>
-      <RouterLink to="/users/new" class="inline-flex h-control items-center justify-center gap-2 rounded-card px-4 text-body font-medium transition bg-primary text-white hover:bg-primary-600 active:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 md:px-5">Create user</RouterLink>
+      <div class="flex items-center gap-2">
+        <RefreshButton :loading="loading" label="Refresh users" @click="loadUsers" />
+        <BaseButton size="sm" @click="openCreate">+ Create user</BaseButton>
+      </div>
     </div>
 
     <BaseCard>
-      <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="font-semibold">All accounts <span class="text-small font-normal text-ink-muted">({{ filteredUsers.length }})</span></div>
-        <div class="flex gap-2">
-          <input v-model="search" class="field-control sm:w-72" placeholder="Search name, email, or role" aria-label="Search users" />
-          <BaseButton variant="outline" size="sm" :disabled="loading" @click="loadUsers">Refresh</BaseButton>
+      <div class="mb-4 flex flex-col gap-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="font-semibold">Accounts <span class="text-small font-normal text-ink-muted">({{ paginationMeta?.total ?? 0 }})</span></div>
+          <div class="flex min-w-0 flex-1">
+            <BaseInput
+              v-model="search"
+              class="min-w-0 flex-1 sm:w-72 sm:flex-none"
+              type="search"
+              placeholder="Search users..."
+            />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <BaseSelect v-model="roleFilter" :options="roleOptions" placeholder="All roles" allow-empty />
+          <BaseSelect v-model="deletionFilter" :options="deletionOptions" placeholder="All account statuses" allow-empty />
         </div>
       </div>
-      <div v-if="loading" class="py-8 text-center text-ink-muted">Loading accounts…</div>
-      <div v-else-if="!filteredUsers.length" class="py-8 text-center text-ink-muted">No user accounts found.</div>
+      <div v-if="loading" class="flex justify-center p-12" aria-label="Loading accounts">
+        <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
+      </div>
+      <LoadError v-else-if="loadError" :message="loadError" @retry="loadUsers" />
+      <div v-else-if="!users.length" class="py-8 text-center text-ink-muted">No user accounts found.</div>
       <div v-else class="space-y-3">
-        <article v-for="user in filteredUsers" :key="user.id" class="rounded-card border border-line p-4 transition hover:border-primary-200 hover:shadow-sm">
+        <article v-for="user in users" :key="user.id" class="rounded-card border border-line p-4 transition hover:border-primary-200 hover:shadow-sm">
           <template v-if="editing === user.id">
             <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="saveEdit(user)">
               <BaseInput v-model="editForm.first_name" label="First name" required />
@@ -109,8 +187,8 @@ onMounted(loadUsers)
               <BaseInput v-model="editForm.phone_number" label="Phone number" />
               <div class="sm:col-span-2"><BaseInput v-model="editForm.password" label="New password (optional)" type="password" hint="Leave blank to keep the current password." /></div>
               <div class="flex flex-wrap justify-end gap-2 sm:col-span-2">
-                <BaseButton type="button" variant="outline" @click="cancelEdit">Cancel</BaseButton>
-                <BaseButton type="submit" :loading="saving">Confirm changes</BaseButton>
+                <BaseButton type="button" size="sm" variant="outline" @click="cancelEdit">Cancel</BaseButton>
+                <BaseButton type="submit" size="sm" :loading="saving">Confirm changes</BaseButton>
               </div>
             </form>
           </template>
@@ -127,7 +205,7 @@ onMounted(loadUsers)
                 <p v-if="user.position || user.phone_number" class="mt-1 text-small text-ink-muted">{{ [user.position, user.phone_number].filter(Boolean).join(' · ') }}</p>
                 <p v-if="user.deletion_requested_at" class="mt-2 text-small text-red-700">Requested {{ formatDateTime(user.deletion_requested_at) }}. Deletion processing after {{ formatDateTime(user.deletion_due_at) }}. Historical requests, allocations, and trips will be retained.</p>
               </div>
-              <div class="flex shrink-0 flex-wrap gap-2">
+              <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <BaseButton v-if="user.deletion_requested_at" variant="outline" size="sm" :loading="saving" @click="cancelDeletion(user)">Cancel deletion</BaseButton>
                 <template v-else-if="user.role !== 'administrator'">
                   <BaseButton variant="outline" size="sm" @click="startEdit(user)">Edit</BaseButton>
@@ -139,7 +217,25 @@ onMounted(loadUsers)
           </template>
         </article>
       </div>
+      <PaginationBar v-if="!loading" :meta="paginationMeta" @change="changePage" />
     </BaseCard>
+
+    <BaseModal :open="showCreate" title="Create user account" subtitle="Add an administrator, user, or staff account" @close="showCreate = false">
+      <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="createUser">
+        <BaseInput v-model="createForm.first_name" label="First name" :error="createErrors.first_name" required />
+        <BaseInput v-model="createForm.last_name" label="Last name" :error="createErrors.last_name" required />
+        <div class="sm:col-span-2"><BaseInput v-model="createForm.email" label="Email" type="email" :error="createErrors.email" required /></div>
+        <BaseInput v-model="createForm.position" label="Position / designation" :error="createErrors.position" />
+        <BaseInput v-model="createForm.phone_number" label="Phone number" type="tel" :error="createErrors.phone_number" />
+        <BaseSelect v-model="createForm.role" label="Role" :options="createRoleOptions" :error="createErrors.role" required />
+        <BaseInput v-model="createForm.password" label="Password" type="password" :error="createErrors.password" required />
+        <BaseInput v-model="createForm.password_confirmation" label="Confirm password" type="password" :error="createErrors.password_confirmation" required />
+        <div class="flex justify-end gap-2 sm:col-span-2">
+          <BaseButton type="button" variant="outline" @click="showCreate = false">Cancel</BaseButton>
+          <BaseButton type="submit" :loading="saving">Create user</BaseButton>
+        </div>
+      </form>
+    </BaseModal>
 
     <BaseModal :open="!!confirmDeleteUser" title="Delete User Account?" @close="confirmDeleteUser = null">
       <template v-if="confirmDeleteUser">

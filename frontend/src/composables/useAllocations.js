@@ -52,7 +52,7 @@ export function useAllocations() {
 
       if (canManage.value) {
         calls.push(
-          api.get('/allocation-options'),
+          api.get('/allocation-options', { params: { skip_completion: 1 } }),
           api.get('/trip-request-shares'),
           api.get('/admins'),
         )

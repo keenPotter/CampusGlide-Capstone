@@ -1,4 +1,6 @@
 <script setup>
+import { Search } from 'lucide-vue-next'
+
 defineProps({
   modelValue: { type: [String, Number], default: '' },
   label: { type: String, default: '' },
@@ -25,20 +27,28 @@ defineEmits(['update:modelValue'])
       <span v-if="required" class="text-red-500">*</span>
     </label>
 
-    <input
-      :type="type"
-      :value="modelValue"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      :min="min"
-      :max="max"
-      :step="step"
-      :autocomplete="autocomplete"
-      :name="name"
-      class="field-control"
-      :class="{ 'field-error': error }"
-      @input="$emit('update:modelValue', $event.target.value)"
-    />
+    <div :class="type === 'search' ? 'relative' : ''">
+      <Search
+        v-if="type === 'search'"
+        :size="16"
+        class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+        aria-hidden="true"
+      />
+      <input
+        :type="type"
+        :value="modelValue"
+        :placeholder="placeholder"
+        :disabled="disabled"
+        :min="min"
+        :max="max"
+        :step="step"
+        :autocomplete="autocomplete"
+        :name="name"
+        class="field-control"
+        :class="[{ 'field-error': error }, type === 'search' ? 'pl-10' : '']"
+        @input="$emit('update:modelValue', $event.target.value)"
+      />
+    </div>
 
     <p v-if="error" class="mt-1 text-small text-red-600">{{ error }}</p>
     <p v-else-if="hint" class="mt-1 text-small text-ink-muted">{{ hint }}</p>

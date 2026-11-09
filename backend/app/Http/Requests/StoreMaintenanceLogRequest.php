@@ -18,6 +18,7 @@ class StoreMaintenanceLogRequest extends FormRequest
         return [
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
             'type' => ['required', Rule::in(VehicleMaintenance::TYPES)],
+            'maintenance_category' => ['sometimes', Rule::in(['preventive', 'corrective'])],
             'description' => ['nullable', 'string', 'max:500'],
             'date_performed' => ['required', 'date'],
             'cost' => ['nullable', 'numeric', 'min:0'],

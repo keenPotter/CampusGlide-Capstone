@@ -29,6 +29,7 @@ class UpdateMaintenanceLogRequest extends FormRequest
         return [
             'vehicle_id' => ['sometimes', 'integer', 'exists:vehicles,id'],
             'type' => ['sometimes', Rule::in(VehicleMaintenance::TYPES)],
+            'maintenance_category' => ['sometimes', Rule::in(['preventive', 'corrective'])],
             'description' => ['nullable', 'string', 'max:500'],
             'date_performed' => ['sometimes', 'date'],
             'cost' => ['nullable', 'numeric', 'min:0'],
