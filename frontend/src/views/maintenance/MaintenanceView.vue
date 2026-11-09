@@ -491,18 +491,18 @@ async function markCompleted(log) {
           <table class="w-full table-fixed border-collapse">
             <thead class="table-head">
               <tr>
-                <th class="w-[13%] px-2 py-3 xl:px-card">Vehicle</th>
-                <th class="w-[19%] px-2 py-3 xl:px-card">Description</th>
-                <th class="w-[9%] px-2 py-3 xl:px-card">Date</th>
-                <th class="w-[9%] px-2 py-3 xl:px-card">Next due</th>
-                <th class="w-[9%] px-2 py-3 xl:px-card">Odometer</th>
-                <th class="w-[8%] px-2 py-3 xl:px-card">Cost</th>
-                <th class="w-[9%] px-2 py-3 xl:px-card">Status</th>
-                <th class="w-[24%] px-2 py-3 text-right xl:px-card">Actions</th>
+                <th scope="col" class="w-[13%] px-2 py-3 xl:px-card">Vehicle</th>
+                <th scope="col" class="w-[19%] px-2 py-3 xl:px-card">Description</th>
+                <th scope="col" class="w-[9%] px-2 py-3 xl:px-card">Date</th>
+                <th scope="col" class="w-[9%] px-2 py-3 xl:px-card">Next due</th>
+                <th scope="col" class="w-[9%] px-2 py-3 xl:px-card">Odometer</th>
+                <th scope="col" class="w-[8%] px-2 py-3 xl:px-card">Cost</th>
+                <th scope="col" class="w-[9%] px-2 py-3 xl:px-card">Status</th>
+                <th scope="col" class="w-[24%] px-2 py-3 text-right xl:px-card">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-line">
-              <tr v-for="log in pageItems" :key="log.id" class="cursor-pointer hover:bg-neutral-50" tabindex="0"
+              <tr v-for="log in pageItems" :key="log.id" class="table-row-interactive" tabindex="0"
                 @click="onRowClick($event, log)" @keydown.enter="onRowClick($event, log)">
                 <td class="px-2 py-3 align-top xl:px-card">
                   <p class="font-medium text-ink">{{ log.vehicle?.plate_number ?? '—' }}</p>

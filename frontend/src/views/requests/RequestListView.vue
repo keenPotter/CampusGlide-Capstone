@@ -239,7 +239,7 @@ function onDisapproved() {
           <div class="min-w-0 flex-1">
             <button
               type="button"
-              class="card-row-value block truncate text-left hover:text-primary md:text-section-title"
+              class="card-row-value block truncate text-left md:text-section-title"
               :title="request.destination"
               @click="openRequest(request)"
             >
@@ -310,13 +310,13 @@ function onDisapproved() {
       <table class="w-full table-fixed border-collapse">
         <thead class="table-head">
           <tr>
-            <th class="w-[16%] px-2 py-3 xl:px-card">Destination</th>
-            <th class="w-[12%] px-2 py-3 xl:px-card">Requested by</th>
-            <th class="w-[13%] px-2 py-3 xl:px-card">Travel</th>
-            <th class="w-[5%] px-2 py-3 xl:px-card">Pax</th>
-            <th class="w-[12%] px-2 py-3 xl:px-card">Status</th>
-            <th class="w-[17%] px-2 py-3 xl:px-card">Reason</th>
-            <th class="w-[25%] px-2 py-3 text-right xl:px-card">Actions</th>
+            <th scope="col" class="w-[16%] px-2 py-3 xl:px-card">Destination</th>
+            <th scope="col" class="w-[12%] px-2 py-3 xl:px-card">Requested by</th>
+            <th scope="col" class="w-[13%] px-2 py-3 xl:px-card">Travel</th>
+            <th scope="col" class="w-[5%] px-2 py-3 xl:px-card">Pax</th>
+            <th scope="col" class="w-[12%] px-2 py-3 xl:px-card">Status</th>
+            <th scope="col" class="w-[17%] px-2 py-3 xl:px-card">Reason</th>
+            <th scope="col" class="w-[25%] px-2 py-3 text-right xl:px-card">Actions</th>
           </tr>
         </thead>
 
@@ -324,7 +324,7 @@ function onDisapproved() {
           <tr
             v-for="request in store.items"
             :key="request.id"
-            class="cursor-pointer hover:bg-neutral-50"
+            class="table-row-interactive"
             tabindex="0"
             @click="onRowClick($event, request)"
             @keydown.enter="onRowClick($event, request)"
@@ -332,7 +332,7 @@ function onDisapproved() {
             <td class="px-2 py-3 align-top xl:px-card">
               <button
                 type="button"
-                class="text-left font-medium hover:text-primary"
+                class="text-left font-medium"
                 @click="openRequest(request)"
               >
                 {{ request.destination }}

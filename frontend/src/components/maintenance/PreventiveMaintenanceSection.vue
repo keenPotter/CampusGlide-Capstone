@@ -294,10 +294,10 @@ async function printAssessment() {
         <table class="w-full table-fixed border-collapse">
           <thead class="table-head">
             <tr>
-              <th class="w-[25%] px-2 py-3 xl:px-card">Plate number</th>
-              <th class="w-[30%] px-2 py-3 xl:px-card">Model</th>
-              <th class="w-[25%] px-2 py-3 xl:px-card">Last inspection</th>
-              <th class="w-[20%] px-2 py-3 text-right xl:px-card">Actions</th>
+              <th scope="col" class="w-[25%] px-2 py-3 xl:px-card">Plate number</th>
+              <th scope="col" class="w-[30%] px-2 py-3 xl:px-card">Model</th>
+              <th scope="col" class="w-[25%] px-2 py-3 xl:px-card">Last inspection</th>
+              <th scope="col" class="w-[20%] px-2 py-3 text-right xl:px-card">Actions</th>
             </tr>
           </thead>
 
@@ -305,7 +305,7 @@ async function printAssessment() {
             <tr
               v-for="vehicle in pageItems"
               :key="vehicle.id"
-              class="cursor-pointer hover:bg-neutral-50"
+              class="table-row-interactive"
               tabindex="0"
               @click="onRowClick($event, vehicle)"
               @keydown.enter="onRowClick($event, vehicle)"
