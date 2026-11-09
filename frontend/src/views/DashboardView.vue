@@ -213,7 +213,7 @@ watch(pageCount, (count) => {
     </div>
 
     <!-- Upcoming Trips Card -->
-    <BaseCard title="Upcoming vehicle requests" subtitle="Vehicle requests ordered by requested trip date. Approval does not mean a trip has been scheduled.">
+    <BaseCard title="Upcoming vehicle requests" subtitle="Vehicle requests ordered by requested trip date. Approval does not mean a trip has been scheduled." :padded="false">
       <template #actions>
         <RouterLink
           v-if="!auth.isStaff"
@@ -224,7 +224,7 @@ watch(pageCount, (count) => {
         </RouterLink>
       </template>
 
-      <div class="mb-4">
+      <div class="px-card pt-card pb-4">
         <BaseInput v-model="search" type="search" placeholder="Search requests..." />
       </div>
 
@@ -239,14 +239,10 @@ watch(pageCount, (count) => {
       />
 
       <ul v-else class="flex flex-col divide-y divide-line">
-        <li
-          v-for="request in pagedUpcoming"
-          :key="request.id"
-          class="first:pt-0 last:pb-0"
-        >
+        <li v-for="request in pagedUpcoming" :key="request.id">
           <button
             type="button"
-            class="flex w-full flex-col gap-2 py-3 text-left hover:bg-neutral-50"
+            class="flex w-full flex-col gap-2 px-card py-3 text-left transition-colors hover:bg-neutral-50 hover:filter-none"
             @click="openRequest(request)"
           >
             <div class="flex w-full flex-wrap items-center justify-between gap-2">
