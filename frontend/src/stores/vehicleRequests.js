@@ -12,6 +12,9 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
     filters: {
       status: '',
       trip_type: '',
+      month: '',
+      year: '',
+      search: '',
       page: 1,
     },
   }),
@@ -29,6 +32,9 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
           params: {
             status: this.filters.status || undefined,
             trip_type: this.filters.trip_type || undefined,
+            month: this.filters.month || undefined,
+            year: this.filters.year || undefined,
+            search: this.filters.search || undefined,
             page: this.filters.page,
           },
         })
@@ -74,19 +80,30 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
     // Numbers and upcoming trips for the dashboard.
     // Counts come from meta.total, so they include every page.
     // This does not touch `items` or `filters`, which belong to the list page.
-    async fetchSummary() {
+    async fetchSummary(search = '') {
       const [pending, approved, disapproved] = await Promise.all(
         ['pending', 'approved', 'disapproved'].map((status) =>
-          api.get('/vehicle-requests', { params: { status } }),
+          api.get('/vehicle-requests', { params: { status, per_page: 20 } }),
         ),
       )
 
       const total = (response) => response.data?.meta?.total ?? response.data?.data?.length ?? 0
       const today = todayIso()
 
+      let upcomingPending = pending
+      let upcomingApproved = approved
+      if (search.trim()) {
+        [upcomingPending, upcomingApproved] = await Promise.all(
+          ['pending', 'approved'].map((status) =>
+            api.get('/vehicle-requests', {
+              params: { status, search: search.trim(), per_page: 100 },
+            }),
+          ),
+        )
+      }
+
       // Upcoming = pending or approved requests whose trip has not ended yet, soonest first.
-      // Only the newest page of each status is checked.
-      const upcoming = [...(pending.data?.data ?? []), ...(approved.data?.data ?? [])]
+      const upcoming = [...(upcomingPending.data?.data ?? []), ...(upcomingApproved.data?.data ?? [])]
         .filter((item) => (item.trip_end_date || item.trip_date) >= today)
         .sort((a, b) => String(a.trip_date).localeCompare(String(b.trip_date)))
         .slice(0, 5)

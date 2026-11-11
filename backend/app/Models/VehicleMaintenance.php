@@ -32,6 +32,7 @@ class VehicleMaintenance extends Model
     protected $fillable = [
         'vehicle_id',
         'maintenance_type',
+        'maintenance_category',
         'description',
         'maintenance_date',
         'completion_date',

@@ -16,9 +16,9 @@ use Illuminate\Validation\ValidationException;
  * Three rules from the capstone (Chapter III):
  * 1. Driver availability  2. Vehicle readiness  3. Assignment conflicts
  *
- * Availability is checked by DATE. A vehicle or driver is unavailable when another
- * scheduled or in-progress trip overlaps any day of the trip being assigned
- * (a multi-day trip uses its whole date range).
+ * Availability is checked using the full trip interval (start date/time through end date/time).
+ * A multi-day trip blocks the entire interval, while two trips on the same day may be
+ * assigned to the same vehicle or driver when their time ranges do not overlap.
  *
  * When an ACTIVE trip is reassigned, the vehicle or driver that is not being
  * replaced is not checked for "readiness" again. They are already marked
@@ -199,7 +199,9 @@ class AllocationService
             (int) $trip->driver_id,
             $startDate,
             $endDate,
-            $trip->id
+            $trip->id,
+            substr((string) $trip->departure_time, 0, 5),
+            substr((string) $trip->estimated_return_time, 0, 5)
         );
 
         return $this->shiftTripDate($trip, $newDate);
@@ -254,7 +256,15 @@ class AllocationService
 
         // Conflicts first (so the conflict modal shows up first), then readiness.
         // The vehicle and the driver are checked together, so every conflict is reported at once.
-        $this->assertNoConflicts((int) $vehicle->id, (int) $driver->id, $startDate, $endDate, $ignoreTripId);
+        $this->assertNoConflicts(
+            (int) $vehicle->id,
+            (int) $driver->id,
+            $startDate,
+            $endDate,
+            $ignoreTripId,
+            substr((string) $vehicleRequest->departure_time, 0, 5),
+            substr((string) $vehicleRequest->estimated_return_time, 0, 5)
+        );
 
         if (! $currentTrip || (int) $vehicle->id !== (int) $currentTrip->vehicle_id) {
             $this->assertVehicleReady($vehicle);
@@ -292,7 +302,13 @@ class AllocationService
      *
      * @return array{vehicles: array<int,string>, drivers: array<int,string>}  id => reason
      */
-    public function unavailable(string $startDate, string $endDate, ?int $ignoreTripId = null): array
+    public function unavailable(
+        string $startDate,
+        string $endDate,
+        ?int $ignoreTripId = null,
+        ?string $startTime = null,
+        ?string $endTime = null
+    ): array
     {
         $vehicles = [];
         $drivers = [];
@@ -306,12 +322,46 @@ class AllocationService
             }
         };
 
-        foreach ($this->busyTrips($startDate, $endDate, $ignoreTripId)->get() as $trip) {
+        $busyTrips = $this->busyTrips($startDate, $endDate, $ignoreTripId)
+            ->with('vehicleRequest')
+            ->get();
+
+        if ($startTime && $endTime) {
+            $busyTrips = $busyTrips->filter(fn (Trip $trip) => $this->timeRangesOverlap(
+                $trip, $startDate, $endDate, $startTime, $endTime
+            ));
+        }
+
+        foreach ($busyTrips as $trip) {
             $mark($vehicles, (int) $trip->vehicle_id, $trip);
             $mark($drivers, (int) $trip->driver_id, $trip);
         }
 
         return ['vehicles' => $vehicles, 'drivers' => $drivers];
+    }
+
+    /**
+     * Compare two complete trip intervals. Adjacent trips are allowed when one
+     * returns at exactly the time the next one departs.
+     */
+    protected function timeRangesOverlap(
+        Trip $existingTrip,
+        string $requestedStartDate,
+        string $requestedEndDate,
+        string $requestedStartTime,
+        string $requestedEndTime
+    ): bool {
+        $existingEndDate = $existingTrip->vehicleRequest?->trip_end_date?->toDateString()
+            ?? Carbon::parse($existingTrip->trip_date)->toDateString();
+        $existingStartTime = substr((string) $existingTrip->departure_time, 0, 5);
+        $existingEndTime = substr((string) ($existingTrip->estimated_return_time ?: '23:59:59'), 0, 8);
+
+        $existingStart = Carbon::parse(Carbon::parse($existingTrip->trip_date)->toDateString() . ' ' . $existingStartTime);
+        $existingEnd = Carbon::parse($existingEndDate . ' ' . $existingEndTime);
+        $requestedStart = Carbon::parse($requestedStartDate . ' ' . $requestedStartTime);
+        $requestedEnd = Carbon::parse($requestedEndDate . ' ' . $requestedEndTime);
+
+        return $existingStart->lt($requestedEnd) && $existingEnd->gt($requestedStart);
     }
 
     protected function assertRequestIsApproved(VehicleRequest $vehicleRequest, bool $allowPending = false): void
@@ -381,7 +431,7 @@ class AllocationService
 
     /**
      * Checks the vehicle AND the driver together and reports every conflict in one 422 response.
-     * A conflict is any active trip that shares at least one day with the given date range.
+     * Candidate trips are first selected by overlapping dates, then filtered by exact start/end times.
      *
      * The response has:
      *  - "conflicts": the full list (one entry for each conflicting trip and subject)
@@ -392,7 +442,9 @@ class AllocationService
         int $driverId,
         string $startDate,
         string $endDate,
-        ?int $ignoreTripId
+        ?int $ignoreTripId,
+        ?string $startTime = null,
+        ?string $endTime = null
     ): void {
         $conflicts = [];
 
@@ -401,6 +453,12 @@ class AllocationService
                 ->where("trips.{$column}", $id)
                 ->with(['vehicle', 'driver', 'vehicleRequest'])
                 ->get();
+
+            if ($startTime && $endTime) {
+                $trips = $trips->filter(fn (Trip $trip) => $this->timeRangesOverlap(
+                    $trip, $startDate, $endDate, $startTime, $endTime
+                ));
+            }
 
             foreach ($trips as $trip) {
                 $conflicts[] = $this->conflictDetails($column, $id, $trip);
