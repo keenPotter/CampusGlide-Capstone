@@ -11,11 +11,47 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $filters = $request->validate([
+            'role' => ['nullable', Rule::in(['administrator', 'faculty', 'staff'])],
+            'deletion_status' => ['nullable', Rule::in(['pending'])],
+        ]);
+
+        $query = User::query();
+
+        if (!empty($filters['role'])) {
+            $query->where('role', $filters['role']);
+        }
+
+        if (($filters['deletion_status'] ?? null) === 'pending') {
+            $query->whereNotNull('deletion_requested_at');
+        }
+
+        if ($request->filled('search')) {
+            $terms = preg_split('/\s+/', trim($request->query('search')));
+            $query->where(function ($searchQuery) use ($terms) {
+                foreach ($terms as $term) {
+                    $searchQuery->where(function ($termQuery) use ($term) {
+                        $pattern = "%{$term}%";
+                        $roleTerm = str_contains('user', strtolower($term)) ? 'faculty' : $term;
+                        $termQuery
+                            ->where('first_name', 'like', $pattern)
+                            ->orWhere('last_name', 'like', $pattern)
+                            ->orWhere('email', 'like', $pattern)
+                            ->orWhere('role', 'like', "%{$roleTerm}%")
+                            ->orWhere('position', 'like', $pattern)
+                            ->orWhere('phone_number', 'like', $pattern);
+                    });
+                }
+            });
+        }
+
         return UserResource::collection(
-            User::orderByRaw('deletion_requested_at IS NOT NULL')
-                ->orderBy('last_name')->orderBy('first_name')->get()
+            $query->orderByRaw('deletion_requested_at IS NOT NULL')
+                ->orderBy('last_name')->orderBy('first_name')
+                ->paginate(10)
+                ->appends($request->query())
         );
     }
 

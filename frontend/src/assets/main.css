@@ -93,7 +93,11 @@
   }
 
   .table-head {
-    @apply bg-neutral-50 text-left text-small font-semibold uppercase tracking-wide text-ink-muted;
+    @apply border-b border-line bg-neutral-50 text-left text-small font-semibold uppercase tracking-wide text-ink-muted;
+  }
+
+  .table-row-interactive {
+    @apply cursor-pointer transition-colors duration-150 hover:bg-neutral-50 focus-visible:bg-neutral-50;
   }
 
   /* Mobile-friendly card view for tables */

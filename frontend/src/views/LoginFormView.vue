@@ -19,6 +19,10 @@ const loading = ref(false)
 
 if (!role.value) router.replace({ name: 'login' })
 
+function focusPassword(event) {
+  event.target.form?.elements.namedItem('cg-login-password')?.focus()
+}
+
 async function submit() {
   if (!role.value) {
     router.replace({ name: 'login' })
@@ -51,7 +55,7 @@ async function submit() {
       <p class="mt-2 text-sm leading-6 text-ink-muted">Sign in with your NVSU account to continue.</p>
     </div>
     <form class="flex flex-col gap-4" autocomplete="off" @submit.prevent="submit">
-      <BaseInput v-model="form.email" label="Username (University Email)" type="email" placeholder="name@nvsu.edu.ph" name="cg-login-username" :error="errors.email" required autocomplete="off" />
+      <BaseInput v-model="form.email" label="Username (University Email)" type="email" placeholder="name@nvsu.edu.ph" name="cg-login-username" :error="errors.email" required autocomplete="off" @keydown.enter.prevent="focusPassword" />
       <BaseInput v-model="form.password" label="Password" type="password" placeholder="Enter your password" name="cg-login-password" :error="errors.password" required autocomplete="new-password" />
       <p v-if="errors.role" class="text-sm text-red-600">{{ errors.role }}</p>
       <BaseButton type="submit" :loading="loading" block class="mt-2 bg-primary-800! font-bold hover:bg-primary-900! active:bg-primary-900!">Sign in</BaseButton>

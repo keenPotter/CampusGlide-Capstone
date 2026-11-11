@@ -1,25 +1,33 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import api, { errorMessage, unwrap } from '@/lib/api'
+import { onMounted, ref, watch } from 'vue'
+import api, { errorMessage } from '@/lib/api'
 import { formatDate, formatTime } from '@/lib/format'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadError from '@/components/ui/LoadError.vue'
+import PaginationBar from '@/components/ui/PaginationBar.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import TripTypeBadge from '@/components/ui/TripTypeBadge.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 
 const allocations = ref([])
 const search = ref('')
-const loading = ref(false)
+const paginationMeta = ref(null)
+const page = ref(1)
+const loading = ref(true)
 const loadError = ref('')
 
 async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    allocations.value = unwrap(await api.get('/allocations', { params: { per_page: 100 } }))
+    const response = await api.get('/allocations', {
+      params: { per_page: 10, page: page.value, search: search.value || undefined },
+    })
+    allocations.value = response.data?.data ?? []
+    paginationMeta.value = response.data?.meta ?? null
   } catch (error) {
     loadError.value = errorMessage(error, 'Unable to load allocations.')
   } finally {
@@ -29,19 +37,22 @@ async function load() {
 
 onMounted(load)
 
-const visibleAllocations = computed(() => {
-  const query = search.value.trim().toLowerCase()
-  return allocations.value.filter((item) => {
-    if (!query) return true
-    return [
-      item.trip?.destination,
-      item.vehicle_request?.requester,
-      item.vehicle?.vehicle_model,
-      item.vehicle?.plate_number,
-      item.driver?.name,
-      item.status,
-    ].join(' ').toLowerCase().includes(query)
-  })
+function changePage(value) {
+  page.value = value
+  load()
+}
+
+watch(search, (_, __, onCleanup) => {
+  page.value = 1
+  const timeout = setTimeout(load, 250)
+  onCleanup(() => clearTimeout(timeout))
+})
+
+watch(paginationMeta, (meta) => {
+  if (meta && page.value > meta.last_page) {
+    page.value = meta.last_page
+    load()
+  }
 })
 </script>
 
@@ -52,23 +63,23 @@ const visibleAllocations = computed(() => {
         <h1 class="text-page-title">Allocations</h1>
         <p class="mt-1 text-small text-ink-muted">View assigned vehicles, drivers, and scheduled trips. Staff accounts cannot change allocations.</p>
       </div>
-      <BaseButton variant="outline" size="sm" :disabled="loading" @click="load">Refresh</BaseButton>
+      <RefreshButton :loading="loading" label="Refresh allocations" @click="load" />
     </div>
 
     <LoadError :message="loadError" @retry="load" />
 
     <BaseCard title="Allocation records" subtitle="Read-only view">
-      <BaseInput v-model="search" type="search" placeholder="Search destination, requester, vehicle, driver, or status..." />
-      <div v-if="loading" class="flex justify-center p-10">
+      <BaseInput v-model="search" type="search" placeholder="Search allocations..." />
+      <div v-if="loading" class="flex justify-center p-12">
         <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
       </div>
       <EmptyState
-        v-else-if="!visibleAllocations.length"
+        v-else-if="!allocations.length"
         title="No allocations found"
         message="Assigned trips will appear here when available."
       />
       <ul v-else class="mt-4 divide-y divide-line">
-        <li v-for="item in visibleAllocations" :key="item.id" class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <li v-for="item in allocations" :key="item.id" class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <p class="font-semibold text-ink">{{ item.trip?.destination || 'Destination not provided' }}</p>
@@ -89,6 +100,7 @@ const visibleAllocations = computed(() => {
           </div>
         </li>
       </ul>
+      <PaginationBar v-if="!loading" :meta="paginationMeta" @change="changePage" />
     </BaseCard>
   </div>
 </template>

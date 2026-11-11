@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { ClipboardCheck } from 'lucide-vue-next'
 import api, { errorMessage, unwrap, validationErrors } from '@/lib/api'
 import { formatDate, todayIso } from '@/lib/format'
 import { printHtml } from '@/lib/printHtml'
@@ -13,14 +14,18 @@ import BaseModal from '@/components/ui/BaseModal.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
 
-// The maintenance checklist: every vehicle of the motorpool is listed.
-// The administrator clicks "Assess" on a vehicle, fills in the checklist and prints it.
+// The checklist can show the motorpool vehicles or focus on one vehicle opened from a maintenance record.
+// The administrator assesses the vehicle, fills in the checklist and prints it.
 // Printing saves the checklist as a record first (so the history is kept),
 // then the form goes back to blank so it can be used again for the next assessment.
 const props = defineProps({
   vehicles: { type: Array, default: () => [] },
+  selectedVehicleId: { type: [String, Number], default: null },
+  autoAssess: { type: Boolean, default: false },
+  modalOnly: { type: Boolean, default: false },
 })
 
+const emit = defineEmits(['close'])
 const toast = useToast()
 
 const PAGE_SIZE = 10
@@ -91,13 +96,21 @@ const form = ref(emptyForm())
 
 /* ================= DATA ================= */
 
-onMounted(loadRecords)
+onMounted(() => {
+  loadRecords()
+  if (props.autoAssess) {
+    const vehicle = props.vehicles.find((item) => String(item.id) === String(props.selectedVehicleId))
+    if (vehicle) openAssess(vehicle)
+  }
+})
 
 async function loadRecords() {
   loading.value = true
   loadError.value = ''
   try {
-    const response = await api.get('/preventive-maintenance-checklists')
+    const response = await api.get('/preventive-maintenance-checklists', {
+      params: props.selectedVehicleId ? { vehicle_id: props.selectedVehicleId } : {},
+    })
     const payload = unwrap(response)
     records.value = Array.isArray(payload) ? payload : []
   } catch (error) {
@@ -128,6 +141,7 @@ const filtered = computed(() => {
   const query = search.value.trim().toLowerCase()
 
   return props.vehicles
+    .filter((vehicle) => !props.selectedVehicleId || String(vehicle.id) === String(props.selectedVehicleId))
     .map((vehicle) => ({ ...vehicle, lastInspection: lastInspection.value[vehicle.id] ?? null }))
     .filter((vehicle) => {
       if (!query) return true
@@ -173,6 +187,7 @@ function onRowClick(event, vehicle) {
 function closeForm() {
   showForm.value = false
   assessing.value = null
+  emit('close')
 }
 
 // Saves the checklist, prints it, and resets the form so it can be used again.
@@ -219,12 +234,13 @@ async function printAssessment() {
 
 <template>
   <BaseCard
+    v-if="!modalOnly"
     title="Maintenance checklist"
     subtitle="Click a vehicle to assess it, then print the monthly checklist"
     :padded="false"
   >
     <div class="border-b border-line p-card">
-      <BaseInput v-model="search" type="search" placeholder="Search by plate number or model..." />
+      <BaseInput v-model="search" type="search" placeholder="Search vehicles..." />
     </div>
 
     <div v-if="loadError" class="m-card rounded-card bg-red-50 p-3 text-small text-red-700">
@@ -266,7 +282,9 @@ async function printAssessment() {
           </dl>
 
           <div class="flex justify-end gap-2">
-            <BaseButton size="sm" variant="primary" @click="openAssess(vehicle)">Assess</BaseButton>
+            <BaseButton size="sm" variant="primary" @click="openAssess(vehicle)">
+              <ClipboardCheck :size="16" aria-hidden="true" /> Assess
+            </BaseButton>
           </div>
         </li>
       </ul>
@@ -276,10 +294,10 @@ async function printAssessment() {
         <table class="w-full table-fixed border-collapse">
           <thead class="table-head">
             <tr>
-              <th class="w-[25%] px-2 py-3 xl:px-card">Plate number</th>
-              <th class="w-[30%] px-2 py-3 xl:px-card">Model</th>
-              <th class="w-[25%] px-2 py-3 xl:px-card">Last inspection</th>
-              <th class="w-[20%] px-2 py-3 text-right xl:px-card">Actions</th>
+              <th scope="col" class="w-[25%] px-2 py-3 xl:px-card">Plate number</th>
+              <th scope="col" class="w-[30%] px-2 py-3 xl:px-card">Model</th>
+              <th scope="col" class="w-[25%] px-2 py-3 xl:px-card">Last inspection</th>
+              <th scope="col" class="w-[20%] px-2 py-3 text-right xl:px-card">Actions</th>
             </tr>
           </thead>
 
@@ -287,7 +305,7 @@ async function printAssessment() {
             <tr
               v-for="vehicle in pageItems"
               :key="vehicle.id"
-              class="cursor-pointer hover:bg-neutral-50"
+              class="table-row-interactive"
               tabindex="0"
               @click="onRowClick($event, vehicle)"
               @keydown.enter="onRowClick($event, vehicle)"
@@ -301,7 +319,9 @@ async function printAssessment() {
               </td>
               <td class="px-2 py-3 align-top xl:px-card">
                 <div class="flex flex-wrap justify-end gap-1.5">
-                  <BaseButton size="sm" variant="primary" @click="openAssess(vehicle)">Assess</BaseButton>
+                  <BaseButton size="sm" variant="primary" @click="openAssess(vehicle)">
+                    <ClipboardCheck :size="16" aria-hidden="true" /> Assess
+                  </BaseButton>
                 </div>
               </td>
             </tr>
@@ -311,8 +331,9 @@ async function printAssessment() {
     </template>
 
     <PaginationBar v-if="!loading" :meta="paginationMeta" @change="(value) => (page = value)" />
+  </BaseCard>
 
-    <BaseModal
+  <BaseModal
       :open="showForm"
       title="Assess vehicle"
       :subtitle="assessing ? `${assessing.plate_number} — ${modelOf(assessing)}` : ''"
@@ -396,6 +417,5 @@ async function printAssessment() {
         <BaseButton variant="outline" @click="closeForm">Cancel</BaseButton>
         <BaseButton :loading="saving" @click="printAssessment">Print</BaseButton>
       </template>
-    </BaseModal>
-  </BaseCard>
+  </BaseModal>
 </template>

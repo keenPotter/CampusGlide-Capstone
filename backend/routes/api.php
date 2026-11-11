@@ -7,6 +7,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\FuelUsageRecordController;
 use App\Http\Controllers\MaintenanceLogController;
+use App\Http\Controllers\NotificationSummaryController;
 use App\Http\Controllers\PostTravelReportController;
 use App\Http\Controllers\PreventiveMaintenanceChecklistController;
 use App\Http\Controllers\PreventiveMaintenanceChecklistPrintController;
@@ -89,6 +90,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---------- Administrator only ----------
     Route::middleware('role:administrator')->group(function () {
+        // Sidebar numbers. One small call instead of four list calls on every page change.
+        Route::get('/notifications/summary', [NotificationSummaryController::class, 'summary']);
+
         // Accounts
         Route::post('/register', [AuthController::class, 'register']);
         Route::get('/users', [UserController::class, 'index']);

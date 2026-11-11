@@ -22,6 +22,7 @@ class MaintenanceLogResource extends JsonResource
                 'mileage' => $this->vehicle->mileage,
             ],
             'type' => $this->maintenance_type,
+            'maintenance_category' => $this->maintenance_category ?? ($this->maintenance_type === 'repair' ? 'corrective' : 'preventive'),
             'description' => $this->description,
             'status' => $this->status,
             'date_performed' => $this->maintenance_date?->format('Y-m-d'),

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useAllocations } from '@/composables/useAllocations'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import RefreshButton from '@/components/ui/RefreshButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadError from '@/components/ui/LoadError.vue'
@@ -101,7 +102,7 @@ function onRescheduleSaved(message) {
           The vehicle and driver assigned to your approved requests.
         </p>
       </div>
-      <BaseButton variant="outline" size="sm" :disabled="loading" @click="load">Refresh</BaseButton>
+      <RefreshButton :loading="loading" label="Refresh allocations" @click="load" />
     </div>
 
     <LoadError :message="loadError" @retry="load" />
@@ -121,7 +122,7 @@ function onRescheduleSaved(message) {
     <SegmentedControl v-model="typeFilter" :options="typeOptions" label="Trip type" />
 
     <BaseCard title="My allocations" :subtitle="`${visible.length} shown`">
-      <div v-if="loading" class="flex justify-center p-8">
+      <div v-if="loading" class="flex justify-center p-12">
         <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
       </div>
 

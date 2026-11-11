@@ -64,13 +64,7 @@ const navigation = computed(() => {
         icon: 'wrench',
         badge: notifications.openMaintenance,
       },
-      {
-        name: 'Preventive Maintenance',
-        to: { name: 'preventiveMaintenance' },
-        icon: 'wrench',
-      },
       { name: 'Users', to: { name: 'users.index' }, icon: 'users' },
-      { name: 'Create User', to: { name: 'users.create' }, icon: 'user-plus' },
     )
   }
 
