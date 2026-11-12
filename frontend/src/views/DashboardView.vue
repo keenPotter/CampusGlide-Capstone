@@ -17,6 +17,7 @@ import LoadError from '@/components/ui/LoadError.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
 import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
+import VehicleRequestModal from '@/components/requests/VehicleRequestModal.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -35,6 +36,7 @@ const detailRequest = ref(null)
 const detailLoading = ref(false)
 const approving = ref(null)
 const disapproving = ref(null)
+const showNewRequest = ref(false)
 
 const requestDetailRows = computed(() => {
   const request = detailRequest.value
@@ -171,6 +173,11 @@ function editSelectedRequest() {
   if (request) router.push({ name: 'requests.edit', params: { id: request.id } })
 }
 
+async function onRequestSubmitted() {
+  showNewRequest.value = false
+  await load()
+}
+
 // If the list gets shorter (for example after a reload), stay on a page that exists.
 watch(pageCount, (count) => {
   if (page.value > count) page.value = count
@@ -192,9 +199,8 @@ watch(pageCount, (count) => {
       </div>
     </div>
 
-    <!-- Quick Action Button (Mobile) -->
-    <div v-if="auth.isFaculty" class="md:hidden">
-      <BaseButton block @click="router.push({ name: 'requests.create' })">
+    <div v-if="auth.isFaculty" class="flex justify-end">
+      <BaseButton @click="showNewRequest = true">
         New request
       </BaseButton>
     </div>
@@ -327,6 +333,11 @@ watch(pageCount, (count) => {
       :request="disapproving"
       @close="disapproving = null"
       @done="onDisapproved"
+    />
+    <VehicleRequestModal
+      :open="showNewRequest"
+      @close="showNewRequest = false"
+      @submitted="onRequestSubmitted"
     />
   </div>
 </template>

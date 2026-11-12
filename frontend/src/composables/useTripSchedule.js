@@ -15,21 +15,6 @@ import {
   vehicleName,
 } from '@/lib/trips'
 
-const VIEWED_KEY = 'campusglide_trip_schedule_viewed'
-
-function getStoredIds(key) {
-  try {
-    const value = JSON.parse(localStorage.getItem(key) || '[]')
-    return Array.isArray(value) ? value.map(Number) : []
-  } catch {
-    return []
-  }
-}
-
-function storeIds(key, ids) {
-  localStorage.setItem(key, JSON.stringify([...new Set(ids.map(Number))]))
-}
-
 function getSunday(date) {
   const result = new Date(date)
   result.setHours(0, 0, 0, 0)
@@ -64,7 +49,7 @@ export function useTripSchedule() {
   const loading = ref(true)
   const loadError = ref('')
 
-  const viewedIds = ref(getStoredIds(VIEWED_KEY))
+  const viewedIds = ref([])
 
   const currentTripTypeLabel = computed(() => TRIP_TYPE_LABELS[currentTripType.value])
 
@@ -74,7 +59,10 @@ export function useTripSchedule() {
     loading.value = true
     loadError.value = ''
     try {
-      const { data: payload } = await api.get('/trips')
+      const [{ data: payload }, { data: viewPayload }] = await Promise.all([
+        api.get('/trips'),
+        api.get('/trip-views'),
+      ])
       const rows = Array.isArray(payload)
         ? payload
         : Array.isArray(payload?.data)
@@ -87,6 +75,12 @@ export function useTripSchedule() {
         loadError.value = 'The trips API returned an unexpected response format.'
         return
       }
+      if (!Array.isArray(viewPayload?.trip_ids)) {
+        loadError.value = 'The trip views API returned an unexpected response format.'
+        return
+      }
+
+      viewedIds.value = viewPayload.trip_ids.map(Number)
 
       scheduledTrips.value = rows.map((trip) => ({
         ...trip,
@@ -194,10 +188,14 @@ export function useTripSchedule() {
 
   function markTripViewed(trip) {
     if (!trip?.id) return
-    if (!viewedIds.value.includes(Number(trip.id))) {
-      viewedIds.value = [...viewedIds.value, Number(trip.id)]
-      storeIds(VIEWED_KEY, viewedIds.value)
-    }
+    const tripId = Number(trip.id)
+    if (viewedIds.value.includes(tripId)) return
+
+    viewedIds.value = [...viewedIds.value, tripId]
+    api.post(`/trips/${tripId}/view`).catch((error) => {
+      viewedIds.value = viewedIds.value.filter((id) => id !== tripId)
+      loadError.value = errorMessage(error, 'Unable to record that you viewed this trip.')
+    })
   }
 
   /* ================= MONTH ================= */
@@ -385,6 +383,7 @@ export function useTripSchedule() {
     changeWeek,
     isToday,
     isSelectedDate,
+    getCalendarDateForDay: dateForDay,
     isScheduled,
     getTripCountForDate,
     hasNewTripOnDate,

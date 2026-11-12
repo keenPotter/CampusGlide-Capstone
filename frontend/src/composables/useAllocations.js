@@ -143,8 +143,8 @@ export function useAllocations() {
 
   /* ================= SUMMARY (administrators and staff) ================= */
 
-  // One list for the summary: allocations, approved requests that still need
-  // a vehicle and driver, and trip requests sent by other administrators.
+  // One list for the summary: allocations, pending or approved requests without
+  // a trip, and trip requests sent by other administrators.
   // Sorted by group: needs allocation, in progress, scheduled, completed.
   // Inside a group, the soonest date comes first. Completed trips show the newest first.
   const summaryRows = computed(() => {

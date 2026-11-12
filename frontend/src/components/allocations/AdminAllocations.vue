@@ -4,11 +4,19 @@ import { useAllocations } from '@/composables/useAllocations'
 import { useToast } from '@/composables/useToast'
 import { useNotificationStore } from '@/stores/notifications'
 import { formatDate } from '@/lib/format'
-import { canPrint, canReassign, passengerText, requestNumber, whenText } from '@/lib/allocations'
+import {
+  allocationStatusLabel,
+  canPrint,
+  canReassign,
+  passengerText,
+  requestNumber,
+  whenText,
+} from '@/lib/allocations'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadError from '@/components/ui/LoadError.vue'
@@ -52,6 +60,7 @@ const DATE_CHANGE_PAGE_SIZE = 10
 
 const search = ref('')
 const typeFilter = ref('')
+const statusFilter = ref('')
 const monthFilter = ref('') // '' = all months, '01' to '12'
 const yearFilter = ref('') // '' = all years, for example '2026'
 const page = ref(1)
@@ -59,6 +68,7 @@ const dateChangePage = ref(1)
 
 const modalOpen = ref(false)
 const editing = ref(null)
+const viewTarget = ref(null)
 // Conflicts found when a date change request was approved (vehicle and driver together).
 const pageConflicts = ref([])
 const printTarget = ref(null)
@@ -77,10 +87,10 @@ const tones = {
 }
 
 const stats = computed(() => [
-  { label: 'Scheduled', value: counts.value.scheduled, tone: 'primary' },
-  { label: 'Ongoing', value: counts.value.in_progress, tone: 'secondary' },
-  { label: 'Done', value: counts.value.completed, tone: 'primary' },
-  { label: 'Needs allocation', value: waiting.value.length, tone: 'secondary' },
+  { label: 'Scheduled trips', value: counts.value.scheduled, tone: 'primary' },
+  { label: 'Ongoing trips', value: counts.value.in_progress, tone: 'secondary' },
+  { label: 'Completed trips', value: counts.value.completed, tone: 'primary' },
+  { label: 'Requests needing allocation', value: waiting.value.length, tone: 'secondary' },
 ])
 
 // Availability is for today.
@@ -88,7 +98,7 @@ const dotClass = { green: 'bg-primary', orange: 'bg-secondary', red: 'bg-red-500
 const dotLabel = { green: 'Available', orange: 'Scheduled today', red: 'On a trip now' }
 
 const kindLabel = {
-  allocation: 'Allocation',
+  allocation: 'Trip',
   waiting: 'Needs allocation',
   received: 'Received request',
 }
@@ -142,6 +152,20 @@ const typeOptions = computed(() => [
   { value: 'exclusive', label: `Exclusive (${countOf('exclusive')})`, dot: 'bg-secondary' },
 ])
 
+const statusOptions = computed(() => {
+  const countOfStatus = (status) =>
+    dateRows.value.filter((row) =>
+      row.kind === 'waiting' ? status === 'waiting' : (row.allocation?.status ?? 'scheduled') === status,
+    ).length
+
+  return [
+    { value: 'waiting', label: `Needs allocation (${countOfStatus('waiting')})` },
+    { value: 'scheduled', label: `Scheduled (${countOfStatus('scheduled')})` },
+    { value: 'in_progress', label: `Ongoing (${countOfStatus('in_progress')})` },
+    { value: 'completed', label: `Completed (${countOfStatus('completed')})` },
+  ]
+})
+
 // The trip type is the one the faculty member chose on the request form.
 // The order of the rows is set in useAllocations.
 const visibleRows = computed(() => {
@@ -149,6 +173,8 @@ const visibleRows = computed(() => {
 
   return dateRows.value.filter((row) => {
     if (typeFilter.value && row.tripType !== typeFilter.value) return false
+    const rowStatus = row.kind === 'waiting' ? 'waiting' : (row.allocation?.status ?? 'scheduled')
+    if (statusFilter.value && rowStatus !== statusFilter.value) return false
     if (!query) return true
 
     const item = row.allocation
@@ -193,7 +219,7 @@ const paginationMeta = computed(() => ({
 }))
 
 // Go back to the first page when the search or filter changes.
-watch([search, typeFilter, monthFilter, yearFilter], () => {
+watch([search, typeFilter, statusFilter, monthFilter, yearFilter], () => {
   page.value = 1
 })
 
@@ -230,14 +256,20 @@ function openPrint(allocation, notice = '') {
   printTarget.value = allocation
 }
 
-// Clicking anywhere on a row opens the View / Print window (when printing is allowed).
-// Clicks on a button or link keep doing their own job.
+function openView(row) {
+  viewTarget.value = row
+}
+
+function openRequestForm(row) {
+  viewTarget.value = null
+  openPrint(row.allocation)
+}
+
+// Clicking a trip row opens its details; buttons keep doing their own job.
 function onRowClick(event, row) {
   if (event.target.closest('a, button')) return
 
-  if (canPrint(row.allocation)) {
-    openPrint(row.allocation)
-  }
+  if (row.allocation) openView(row)
 }
 
 function onQuickAdded({ kind, item }) {
@@ -281,8 +313,8 @@ function onDecisionConflict(found) {
       <div class="page-header-copy">
         <h1 class="text-page-title">Vehicle-Driver Allocation</h1>
         <p class="mt-1 text-small text-ink-muted">
-          A vehicle and driver are assigned when a vehicle request is approved. Scheduling conflicts
-          are flagged automatically.
+          Needs allocation counts pending requests and approved requests without a trip. Pending
+          requests still need approval on the Vehicle Requests page.
         </p>
       </div>
       <div class="page-actions">
@@ -370,19 +402,6 @@ function onDecisionConflict(found) {
       </span>
     </p>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <div v-for="stat in stats" :key="stat.label" class="stat-card">
-        <span
-          class="inline-flex rounded-full px-2 py-0.5 text-small font-medium"
-          :class="tones[stat.tone]"
-        >
-          {{ stat.label }}
-        </span>
-        <p class="mt-2 text-2xl font-bold">{{ stat.value }}</p>
-      </div>
-    </div>
-
     <!-- Date change requests from faculty -->
     <BaseCard
       v-if="loading || pendingDateChanges.length"
@@ -409,6 +428,19 @@ function onDecisionConflict(found) {
       />
     </BaseCard>
 
+    <!-- Trip status summary -->
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div v-for="stat in stats" :key="stat.label" class="stat-card">
+        <span
+          class="inline-flex rounded-full px-2 py-0.5 text-small font-medium"
+          :class="tones[stat.tone]"
+        >
+          {{ stat.label }}
+        </span>
+        <p class="mt-2 text-2xl font-bold">{{ stat.value }}</p>
+      </div>
+    </div>
+
     <!-- Allocated trip details -->
     <BaseCard title="Allocated Trip Details" :padded="false">
       <div class="flex flex-col gap-3 border-b border-line p-card">
@@ -418,7 +450,7 @@ function onDecisionConflict(found) {
           placeholder="Search allocations..."
         />
         <SegmentedControl v-model="typeFilter" :options="typeOptions" label="Trip type" />
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <BaseSelect
             v-model="monthFilter"
             label="Month"
@@ -433,6 +465,13 @@ function onDecisionConflict(found) {
             allow-empty
             :options="yearOptions"
           />
+          <BaseSelect
+            v-model="statusFilter"
+            label="Status"
+            placeholder="All statuses"
+            allow-empty
+            :options="statusOptions"
+          />
         </div>
       </div>
 
@@ -444,9 +483,9 @@ function onDecisionConflict(found) {
         v-else-if="!visibleRows.length"
         title="Nothing found"
         :message="
-          typeFilter || search || monthFilter || yearFilter
-            ? 'No requests match your filters.'
-            : 'Approved requests and allocations will appear here.'
+          typeFilter || statusFilter || search || monthFilter || yearFilter
+            ? 'No trips or requests match your filters.'
+            : 'Pending requests and approved requests without an assigned trip will appear here.'
         "
       />
 
@@ -482,7 +521,12 @@ function onDecisionConflict(found) {
             <div class="mt-1.5 flex flex-wrap items-center gap-2">
               <span class="text-small text-ink-muted">{{ kindLabel[row.kind] }}</span>
               <TripTypeBadge :type="row.tripType" />
-              <StatusBadge v-if="row.allocation" :status="row.allocation.status ?? 'scheduled'" />
+              <StatusBadge
+                v-if="row.allocation"
+                :status="row.allocation.status ?? 'scheduled'"
+                :label="allocationStatusLabel(row.allocation.status ?? 'scheduled')"
+              />
+              <StatusBadge v-else-if="row.request" :status="row.request.status" />
             </div>
           </div>
 
@@ -530,14 +574,8 @@ function onDecisionConflict(found) {
               >
                 Reassign
               </BaseButton>
-              <!-- Printing is available only for an approved request with a vehicle and driver assigned. -->
-              <BaseButton
-                v-if="canPrint(row.allocation)"
-                size="sm"
-                variant="ghost"
-                @click="openPrint(row.allocation)"
-              >
-                View / Print
+              <BaseButton size="sm" variant="ghost" @click="openView(row)">
+                View
               </BaseButton>
             </template>
 
@@ -555,6 +593,69 @@ function onDecisionConflict(found) {
 
       <PaginationBar v-if="!loading" :meta="paginationMeta" @change="(value) => (page = value)" />
     </BaseCard>
+
+    <BaseModal
+      :open="Boolean(viewTarget)"
+      title="Trip details"
+      subtitle="Allocated trip information"
+      @close="viewTarget = null"
+    >
+      <div v-if="viewTarget" class="grid grid-cols-1 gap-4 text-small sm:grid-cols-2">
+        <div>
+          <p class="text-ink-muted">Request</p>
+          <p class="font-medium">{{ requestNumber(viewTarget.requestId) }}</p>
+        </div>
+        <div>
+          <p class="text-ink-muted">Status</p>
+          <StatusBadge
+            :status="viewTarget.allocation.status ?? 'scheduled'"
+            :label="allocationStatusLabel(viewTarget.allocation.status ?? 'scheduled')"
+          />
+        </div>
+        <div>
+          <p class="text-ink-muted">Destination</p>
+          <p class="font-medium">{{ viewTarget.destination ?? '—' }}</p>
+        </div>
+        <div>
+          <p class="text-ink-muted">Requester</p>
+          <p class="font-medium">{{ viewTarget.requester ?? '—' }}</p>
+        </div>
+        <div>
+          <p class="text-ink-muted">Date and time</p>
+          <p class="font-medium">{{ whenText(viewTarget.date, viewTarget.time) }}</p>
+        </div>
+        <div>
+          <p class="text-ink-muted">Passengers</p>
+          <p class="font-medium">{{ passengerText(viewTarget.passengers) }}</p>
+        </div>
+        <div>
+          <p class="text-ink-muted">Vehicle</p>
+          <p class="font-medium">
+            {{ viewTarget.allocation.vehicle?.vehicle_model ?? '—' }} ·
+            {{ viewTarget.allocation.vehicle?.plate_number ?? '—' }}
+          </p>
+        </div>
+        <div>
+          <p class="text-ink-muted">Driver</p>
+          <p class="font-medium">{{ viewTarget.allocation.driver?.name ?? '—' }}</p>
+        </div>
+        <div class="sm:col-span-2">
+          <p class="text-ink-muted">Purpose</p>
+          <p class="font-medium">{{ viewTarget.allocation.trip?.purpose ?? '—' }}</p>
+        </div>
+      </div>
+      <template #footer>
+        <BaseButton
+          v-if="viewTarget && canPrint(viewTarget.allocation)"
+          size="sm"
+          variant="outline"
+          @click="openRequestForm(viewTarget)"
+        >
+          View / Print request
+        </BaseButton>
+        <BaseButton size="sm" @click="viewTarget = null">Close</BaseButton>
+      </template>
+    </BaseModal>
 
     <AllocationModal
       :open="modalOpen"

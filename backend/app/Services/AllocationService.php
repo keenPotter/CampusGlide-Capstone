@@ -29,13 +29,14 @@ class AllocationService
     /** Trip statuses that block double-booking. */
     public const ACTIVE = ['scheduled', 'in_progress'];
 
-    /** Shape of an approved request in the allocation dropdown. */
+    /** Shape of a request that still needs a trip assignment. */
     public static function requestOption(VehicleRequest $r): array
     {
         $tripDate = $r->trip_date->toDateString();
 
         return [
             'id' => $r->id,
+            'status' => $r->status,
             'label' => "#{$r->id} · {$r->destination} · {$tripDate} " . substr((string) $r->departure_time, 0, 5),
             'destination' => $r->destination,
             'purpose' => $r->purpose,
@@ -93,8 +94,8 @@ class AllocationService
      * so a multi-day trip is not completed on its first day.
      * A trip with no estimated return time is left alone, because its end is not known.
      *
-     * There is no scheduler. This runs when a page loads or is refreshed
-     * (allocation list and trip schedule).
+     * The scheduler runs this once a minute; allocation and trip list requests
+     * also call it so newly finished trips are reflected immediately.
      *
      * @return int number of trips that were completed
      */
