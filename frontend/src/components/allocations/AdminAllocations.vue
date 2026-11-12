@@ -277,15 +277,17 @@ function onDecisionConflict(found) {
 <template>
   <div class="flex flex-col gap-page">
     <!-- Header -->
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">Vehicle-Driver Allocation</h1>
         <p class="mt-1 text-small text-ink-muted">
           A vehicle and driver are assigned when a vehicle request is approved. Scheduling conflicts
           are flagged automatically.
         </p>
       </div>
-      <RefreshButton :loading="loading" label="Refresh allocations" @click="reload" />
+      <div class="page-actions">
+        <RefreshButton :loading="loading" label="Refresh allocations" @click="reload" />
+      </div>
     </div>
 
     <LoadError :message="loadError" @retry="reload" />

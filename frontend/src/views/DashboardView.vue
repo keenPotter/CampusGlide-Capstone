@@ -180,14 +180,16 @@ watch(pageCount, (count) => {
 <template>
   <div class="flex flex-col gap-page">
     <!-- Greeting -->
-    <div class="flex items-start justify-between gap-3">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">Hello, {{ auth.user?.first_name }}</h1>
         <p class="mt-1 text-small text-ink-muted">
           Signed in as {{ ROLE_LABELS[auth.role] ?? auth.role }}
         </p>
       </div>
-      <RefreshButton :loading="loading" label="Refresh dashboard" @click="load" />
+      <div class="page-actions">
+        <RefreshButton :loading="loading" label="Refresh dashboard" @click="load" />
+      </div>
     </div>
 
     <!-- Quick Action Button (Mobile) -->
@@ -245,9 +247,9 @@ watch(pageCount, (count) => {
             class="flex w-full flex-col gap-2 px-card py-3 text-left transition-colors hover:bg-neutral-50 hover:filter-none"
             @click="openRequest(request)"
           >
-            <div class="flex w-full flex-wrap items-center justify-between gap-2">
-              <span class="text-body font-medium text-ink">{{ request.destination }}</span>
-              <StatusBadge :status="request.status" />
+            <div class="flex w-full flex-wrap items-start justify-between gap-2">
+              <span class="min-w-0 flex-1 break-words text-body font-medium text-ink">{{ request.destination }}</span>
+              <StatusBadge :status="request.status" class="shrink-0" />
             </div>
             <span class="text-small text-ink-muted">
               {{ formatDate(request.trip_date) }} · {{ formatTime(request.departure_time) }}

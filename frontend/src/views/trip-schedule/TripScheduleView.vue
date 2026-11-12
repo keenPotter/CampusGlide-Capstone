@@ -83,12 +83,14 @@ const {
 
 <template>
   <div class="flex flex-col gap-page">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">Trip Schedule</h1>
         <p class="mt-1 text-small text-ink-muted">View scheduled trips and allocation details</p>
       </div>
-      <RefreshButton :loading="loading" label="Refresh trip schedule" @click="fetchTrips" />
+      <div class="page-actions">
+        <RefreshButton :loading="loading" label="Refresh trip schedule" @click="fetchTrips" />
+      </div>
     </div>
 
     <SegmentedControl v-model="currentTripType" :options="typeOptions" label="Trip type" />

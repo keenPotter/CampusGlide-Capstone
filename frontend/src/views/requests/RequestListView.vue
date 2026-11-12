@@ -160,15 +160,15 @@ function onDisapproved() {
 <template>
   <div class="flex flex-col gap-page">
     <!-- Page Header -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">
           {{ auth.isFaculty ? 'My vehicle requests' : 'Vehicle requests' }}
         </h1>
         <p class="mt-1 text-small text-ink-muted">Request for Use of Vehicle (NVSU-FR-PPS-13-02)</p>
       </div>
 
-      <div class="flex items-center justify-end gap-2">
+      <div class="page-actions">
         <RefreshButton :loading="store.loading" label="Refresh vehicle requests" @click="store.fetch()" />
         <BaseButton v-if="auth.isFaculty" size="sm" @click="router.push({ name: 'requests.create' })">
           New request
@@ -227,19 +227,19 @@ function onDisapproved() {
       message="Try a different filter, or create a new request."
     />
 
-    <!-- Mobile + Tablet Card View (1 column on mobile, 2 columns on tablet) -->
-    <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:hidden">
+    <!-- Card view keeps request details and actions readable until a wide table fits. -->
+    <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 2xl:hidden">
       <div
         v-for="request in store.items"
         :key="request.id"
         class="card-row !mb-0 flex cursor-pointer flex-col transition active:bg-neutral-50"
         @click="onRowClick($event, request)"
       >
-        <div class="card-row-header">
-          <div class="min-w-0 flex-1">
+        <div class="card-row-header w-full flex-col md:flex-row">
+          <div class="min-w-0 w-full flex-1 md:w-auto">
             <button
               type="button"
-              class="card-row-value block truncate text-left md:text-section-title"
+              class="card-row-value block w-full truncate text-left md:text-section-title"
               :title="request.destination"
               @click="openRequest(request)"
             >
@@ -247,32 +247,32 @@ function onDisapproved() {
             </button>
             <p class="mt-0.5 truncate text-small text-ink-muted md:text-body">{{ request.purpose }}</p>
           </div>
-          <StatusBadge :status="request.status" class="shrink-0" />
+          <StatusBadge :status="request.status" class="shrink-0 self-start" />
         </div>
 
         <div class="mb-3 space-y-1.5 md:space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="card-row-label md:text-body">Requested by</span>
-            <span class="text-small text-ink md:text-body">{{ fullName(request.requested_by) }}</span>
+          <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+            <span class="card-row-label shrink-0 md:text-body">Requested by</span>
+            <span class="min-w-0 flex-1 break-words text-right text-small text-ink md:text-body">{{ fullName(request.requested_by) }}</span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="card-row-label md:text-body">Travel date</span>
-            <span class="text-small text-ink md:text-body">{{ formatDate(request.trip_date) }}</span>
+          <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+            <span class="card-row-label shrink-0 md:text-body">Travel date</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ formatDate(request.trip_date) }}</span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="card-row-label md:text-body">Departure</span>
-            <span class="text-small text-ink md:text-body">{{ formatTime(request.departure_time) }}</span>
+          <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+            <span class="card-row-label shrink-0 md:text-body">Departure</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ formatTime(request.departure_time) }}</span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="card-row-label md:text-body">Passengers</span>
-            <span class="text-small text-ink md:text-body">{{ request.number_of_passengers ?? '—' }}</span>
+          <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+            <span class="card-row-label shrink-0 md:text-body">Passengers</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ request.number_of_passengers ?? '—' }}</span>
           </div>
           <div
             v-if="request.status === 'disapproved' && request.disapproval_reason"
             class="flex items-start justify-between gap-3"
           >
             <span class="card-row-label shrink-0 md:text-body">Reason</span>
-            <span class="text-right text-small text-red-700 md:text-body">
+            <span class="min-w-0 flex-1 break-words text-right text-small text-red-700 md:text-body">
               {{ request.disapproval_reason }}
             </span>
           </div>
@@ -302,10 +302,10 @@ function onDisapproved() {
       </div>
     </div>
 
-    <!-- Laptop Table View (fits the screen, no side scrolling) -->
+    <!-- Wide-screen table view. -->
     <div
       v-if="!store.loading && store.items.length"
-      class="hidden overflow-hidden rounded-card border border-line bg-white shadow-card lg:block"
+      class="hidden overflow-hidden rounded-card border border-line bg-white shadow-card 2xl:block"
     >
       <table class="w-full table-fixed border-collapse">
         <thead class="table-head">
@@ -332,7 +332,7 @@ function onDisapproved() {
             <td class="px-2 py-3 align-top xl:px-card">
               <button
                 type="button"
-                class="text-left font-medium"
+                class="break-words text-left font-medium"
                 @click="openRequest(request)"
               >
                 {{ request.destination }}
@@ -340,7 +340,7 @@ function onDisapproved() {
               <p class="truncate text-small text-ink-muted">{{ request.purpose }}</p>
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
-              {{ fullName(request.requested_by) }}
+              <span class="break-words">{{ fullName(request.requested_by) }}</span>
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
               <p>
@@ -388,10 +388,10 @@ function onDisapproved() {
       <PaginationBar :meta="store.meta" @change="(page) => store.fetch({ page })" />
     </div>
 
-    <!-- Pagination for the card view (mobile + tablet) -->
+    <!-- Pagination for the card view. -->
     <div
       v-if="!store.loading && store.items.length"
-      class="overflow-hidden rounded-card border border-line bg-white lg:hidden"
+      class="overflow-hidden rounded-card border border-line bg-white 2xl:hidden"
     >
       <PaginationBar :meta="store.meta" @change="(page) => store.fetch({ page })" />
     </div>

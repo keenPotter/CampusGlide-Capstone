@@ -51,13 +51,30 @@
 }
 
 @layer base {
+  html {
+    min-width: 320px;
+  }
+
   body {
     @apply bg-surface text-body text-ink antialiased;
     font-family: var(--font-sans);
+    min-width: 320px;
+    min-height: 100vh;
+  }
+
+  #app {
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   h1 { @apply text-page-title; }
   h2 { @apply text-section-title; }
+
+  input,
+  select,
+  textarea {
+    min-width: 0;
+  }
 
   *:focus-visible {
     @apply outline-none ring-2 ring-primary-400 ring-offset-2 ring-offset-white;
@@ -129,6 +146,22 @@
   /* Mobile-first stat card */
   .stat-card {
     @apply rounded-card border border-line bg-white p-card shadow-sm;
+  }
+
+  .page-header {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
+  }
+
+  .page-header-copy {
+    @apply min-w-0;
+  }
+
+  .page-actions {
+    @apply flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end;
+  }
+
+  .page-actions > * {
+    @apply min-w-0 flex-1 sm:flex-none;
   }
 }
 
