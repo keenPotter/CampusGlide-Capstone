@@ -154,7 +154,7 @@ async function submit() {
         </div>
       </BaseCard>
 
-      <div class="flex justify-end">
+      <div class="page-actions sm:justify-end">
         <BaseButton type="submit" :loading="loading">Create user</BaseButton>
       </div>
     </form>

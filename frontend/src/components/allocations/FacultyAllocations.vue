@@ -95,14 +95,16 @@ function onRescheduleSaved(message) {
 
 <template>
   <div class="flex flex-col gap-page">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">My Allocations</h1>
         <p class="mt-1 text-small text-ink-muted">
           The vehicle and driver assigned to your approved requests.
         </p>
       </div>
-      <RefreshButton :loading="loading" label="Refresh allocations" @click="load" />
+      <div class="page-actions">
+        <RefreshButton :loading="loading" label="Refresh allocations" @click="load" />
+      </div>
     </div>
 
     <LoadError :message="loadError" @retry="load" />

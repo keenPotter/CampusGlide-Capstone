@@ -141,12 +141,12 @@ onMounted(loadUsers)
 
 <template>
   <div class="flex flex-col gap-page">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">User accounts</h1>
         <p class="mt-1 text-small text-ink-muted">View and manage CampusGlide accounts. Administrator accounts cannot be scheduled for deletion.</p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh users" @click="loadUsers" />
         <BaseButton size="sm" @click="openCreate">+ Create user</BaseButton>
       </div>
