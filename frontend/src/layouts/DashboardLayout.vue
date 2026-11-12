@@ -27,7 +27,6 @@ const navigation = computed(() => {
         also: ['requests.show', 'requests.edit'],
       },
       { name: 'New Request', to: { name: 'requests.create' }, icon: 'plus' },
-      { name: 'My Allocations', to: { name: 'allocations' }, icon: 'car' },
       {
         name: 'My Trip Schedule',
         to: { name: 'facultyTripSchedule' },

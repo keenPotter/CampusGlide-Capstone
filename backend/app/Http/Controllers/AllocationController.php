@@ -103,7 +103,7 @@ class AllocationController extends Controller
     /**
      * GET /api/allocation-options
      * Fills the dropdowns for assigning a vehicle and driver. Administrators only (route middleware).
-     * - requests: approved requests that do not have a trip yet
+     * - requests: pending or approved requests that do not have a trip yet
      * - vehicles and drivers: every usable vehicle and every driver, each with
      *   `available` and `unavailable_reason` for the chosen dates
      *
@@ -138,7 +138,7 @@ class AllocationController extends Controller
         $driversOnTrips = Trip::whereIn('trip_status', AllocationService::ACTIVE)->pluck('driver_id');
 
         $requests = VehicleRequest::with('requester')
-            ->where('status', 'approved')
+            ->whereIn('status', ['pending', 'approved'])
             ->whereDoesntHave('trip')
             ->orderBy('trip_date')
             ->orderBy('departure_time')

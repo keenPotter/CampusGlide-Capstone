@@ -12,7 +12,7 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const role = computed(() => ['faculty', 'administrator', 'staff'].includes(route.query.role) ? route.query.role : '')
-const roleLabel = computed(() => role.value === 'faculty' ? 'User' : role.value === 'staff' ? 'Staff' : 'Admin')
+const roleLabel = computed(() => role.value === 'faculty' ? 'Employee' : role.value === 'staff' ? 'Staff' : 'Admin')
 const form = reactive({ email: '', password: '' })
 const errors = ref({})
 const loading = ref(false)
@@ -31,8 +31,8 @@ async function submit() {
   loading.value = true
   errors.value = {}
   try {
-    const user = await auth.login({ ...form, role: role.value })
-    toast.success(`Welcome back, ${user.first_name}.`)
+    await auth.login({ ...form, role: role.value })
+    toast.success('Welcome')
     router.push(route.query.redirect ?? { name: 'dashboard' })
   } catch (error) {
     errors.value = validationErrors(error)
@@ -51,7 +51,7 @@ async function submit() {
     </button>
     <div class="mb-7">
       <p class="text-sm font-semibold text-primary-800">{{ roleLabel }} account</p>
-      <h1 class="mt-2 text-3xl font-bold text-ink">Welcome back!</h1>
+      <h1 class="mt-2 text-3xl font-bold text-ink">Welcome</h1>
       <p class="mt-2 text-sm leading-6 text-ink-muted">Sign in with your NVSU account to continue.</p>
     </div>
     <form class="flex flex-col gap-4" autocomplete="off" @submit.prevent="submit">

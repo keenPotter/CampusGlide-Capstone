@@ -30,7 +30,7 @@ const routes = [
   {
     path: '/requests/new',
     name: 'requests.create',
-    component: () => import('@/views/requests/RequestFormView.vue'),
+    redirect: { name: 'requests.index', query: { create: '1' } },
     meta: { requiresAuth: true, roles: ['faculty'] },
   },
   {
@@ -45,13 +45,12 @@ const routes = [
     component: () => import('@/views/requests/RequestFormView.vue'),
     meta: { requiresAuth: true, roles: ['faculty'] },
   },
-  // Administrators manage allocations here. Faculty see their own allocations.
-  // Changed: the page now lives in views/allocations (it was in modules/vehicle-driver-allocation).
+  // Administrators and staff manage allocations here.
   {
     path: '/allocations',
     name: 'allocations',
     component: () => import('@/views/allocations/AllocationsView.vue'),
-    meta: { requiresAuth: true, roles: ['administrator', 'faculty', 'staff'] },
+    meta: { requiresAuth: true, roles: ['administrator', 'staff'] },
   },
   {
     path: '/trip-schedule',

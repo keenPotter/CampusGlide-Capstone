@@ -4,6 +4,7 @@ import { STATUS_LABELS } from '@/lib/format'
 
 const props = defineProps({
   status: { type: String, required: true },
+  label: { type: String, default: '' },
 })
 
 const primary = 'bg-primary-50 text-primary-700 ring-primary-200'
@@ -25,7 +26,7 @@ const styles = {
 
 const fallback = 'bg-neutral-100 text-ink-muted ring-line'
 
-const label = computed(() => STATUS_LABELS[props.status] ?? props.status)
+const label = computed(() => props.label || STATUS_LABELS[props.status] || props.status)
 const classes = computed(() => styles[props.status] ?? fallback)
 </script>
 

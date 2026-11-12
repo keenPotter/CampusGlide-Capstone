@@ -29,3 +29,8 @@ Artisan::command('users:process-deletions', function () {
     }
     $this->info($users->count() . ' expired account deletion request(s) processed. Historical records were preserved.');
 })->purpose('Anonymize accounts whose 30-day deletion period has expired');
+
+Artisan::command('trips:complete-finished', function () {
+    $count = app(\App\Services\AllocationService::class)->completeFinishedTrips();
+    $this->info("{$count} finished trip(s) marked completed.");
+})->purpose('Complete trips after their scheduled return time');

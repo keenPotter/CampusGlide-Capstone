@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { Check, Eye, X } from 'lucide-vue-next'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
 import api, { errorMessage, unwrap } from '@/lib/api'
@@ -27,15 +27,26 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
 import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
+import VehicleRequestModal from '@/components/requests/VehicleRequestModal.vue'
 
 const auth = useAuthStore()
 const store = useVehicleRequestStore()
 const router = useRouter()
+const route = useRoute()
 const toast = useToast()
 const search = ref('')
 const selectedRequest = ref(null)
 const detailRequest = ref(null)
 const detailLoading = ref(false)
+const showNewRequest = ref(false)
+
+watch(
+  () => route.query.create,
+  (value) => {
+    if (value === '1') showNewRequest.value = true
+  },
+  { immediate: true },
+)
 
 // Same style of filter as the Maintenance page: dropdowns with an "All" choice.
 const statusOptions = ['pending', 'approved', 'disapproved'].map((value) => ({
@@ -84,19 +95,19 @@ watch(search, (_, __, onCleanup) => {
 })
 
 function changeStatus(value) {
-  store.fetch({ status: value, page: 1 })
+  store.fetch({ status: value, search: search.value, page: 1 })
 }
 
 function changeType(value) {
-  store.fetch({ trip_type: value, page: 1 })
+  store.fetch({ trip_type: value, search: search.value, page: 1 })
 }
 
 function changeMonth(value) {
-  store.fetch({ month: value, page: 1 })
+  store.fetch({ month: value, search: search.value, page: 1 })
 }
 
 function changeYear(value) {
-  store.fetch({ year: value, page: 1 })
+  store.fetch({ year: value, search: search.value, page: 1 })
 }
 
 function openRequest(request) {
@@ -118,6 +129,20 @@ function closeRequest() {
   selectedRequest.value = null
   detailRequest.value = null
   detailLoading.value = false
+}
+
+function closeNewRequest() {
+  showNewRequest.value = false
+  if (route.query.create === '1') router.replace({ name: 'requests.index' })
+}
+
+async function onRequestSubmitted() {
+  closeNewRequest()
+  try {
+    await store.fetch({ page: 1 })
+  } catch (error) {
+    toast.error(errorMessage(error, 'Request submitted, but the list could not be refreshed.'))
+  }
 }
 
 function editSelectedRequest() {
@@ -170,7 +195,7 @@ function onDisapproved() {
 
       <div class="flex items-center justify-end gap-2">
         <RefreshButton :loading="store.loading" label="Refresh vehicle requests" @click="store.fetch()" />
-        <BaseButton v-if="auth.isFaculty" size="sm" @click="router.push({ name: 'requests.create' })">
+        <BaseButton v-if="auth.isFaculty" size="sm" @click="showNewRequest = true">
           New request
         </BaseButton>
       </div>
@@ -454,11 +479,15 @@ function onDisapproved() {
     </BaseModal>
 
     <ApproveAssignModal :request="approving" @close="approving = null" @done="onApproved" />
-
     <DisapproveRequestModal
       :request="disapproving"
       @close="disapproving = null"
       @done="onDisapproved"
+    />
+    <VehicleRequestModal
+      :open="showNewRequest"
+      @close="closeNewRequest"
+      @submitted="onRequestSubmitted"
     />
   </div>
 </template>
