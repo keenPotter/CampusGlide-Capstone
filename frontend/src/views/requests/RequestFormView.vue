@@ -131,7 +131,7 @@ async function save() {
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-3xl flex-col gap-page">
+  <div class="mx-auto flex min-w-0 max-w-3xl flex-col gap-page">
     <div>
       <h1 class="text-page-title">{{ isEdit ? 'Edit request' : 'Request for use of vehicle' }}</h1>
       <p class="mt-0.5 text-small text-ink-muted">
@@ -253,9 +253,9 @@ async function save() {
         />
       </BaseCard>
 
-      <div class="flex justify-end gap-3">
-        <BaseButton variant="outline" @click="router.back()">Cancel</BaseButton>
-        <BaseButton type="submit" :loading="(submitting && !confirmOpen) || loading">
+      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
+        <BaseButton class="w-full sm:w-auto" variant="outline" @click="router.back()">Cancel</BaseButton>
+        <BaseButton class="w-full sm:w-auto" type="submit" :loading="(submitting && !confirmOpen) || loading">
           {{ isEdit ? 'Save changes' : 'Submit request' }}
         </BaseButton>
       </div>

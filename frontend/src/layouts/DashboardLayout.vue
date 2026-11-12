@@ -27,7 +27,6 @@ const navigation = computed(() => {
         also: ['requests.show', 'requests.edit'],
       },
       { name: 'New Request', to: { name: 'requests.create' }, icon: 'plus' },
-      { name: 'My Allocations', to: { name: 'allocations' }, icon: 'car' },
       {
         name: 'My Trip Schedule',
         to: { name: 'facultyTripSchedule' },
@@ -120,9 +119,12 @@ function closeSidebar() {
       <button
         type="button"
         class="relative rounded-card p-2 text-ink-muted hover:bg-neutral-100"
+        :aria-label="sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'"
+        :aria-expanded="sidebarOpen"
+        aria-controls="primary-navigation"
         @click="sidebarOpen = !sidebarOpen"
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 6h16M4 12h16M4 18h16" />
         </svg>
         <!-- Dot: something needs attention inside the menu -->
@@ -132,11 +134,13 @@ function closeSidebar() {
         />
       </button>
 
-      <div class="flex h-8 w-8 items-center justify-center rounded-card bg-primary text-white text-small font-semibold">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 17V9l2-4h9l3 4h4v8" />
-        </svg>
-      </div>
+      <img
+        src="/icon-192x192.png"
+        srcset="/icon-192x192.png 192w, /icon-512x512.png 512w"
+        sizes="2rem"
+        alt="CampusGlide logo"
+        class="h-8 w-8 shrink-0 object-contain"
+      />
 
       <button
         type="button"
@@ -166,15 +170,18 @@ function closeSidebar() {
 
     <!-- Sidebar (always visible on laptop and up) -->
     <aside
-      class="fixed inset-y-0 left-0 z-40 w-64 border-r border-line bg-white transition-transform"
+      id="primary-navigation"
+      class="fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto overscroll-contain border-r border-line bg-white transition-transform"
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
     >
       <div class="flex h-16 items-center gap-2 border-b border-line px-card">
-        <div class="flex h-8 w-8 items-center justify-center rounded-card bg-primary text-white">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 17V9l2-4h9l3 4h4v8" />
-          </svg>
-        </div>
+        <img
+          src="/icon-192x192.png"
+          srcset="/icon-192x192.png 192w, /icon-512x512.png 512w"
+          sizes="2rem"
+          alt="CampusGlide logo"
+          class="h-8 w-8 shrink-0 object-contain"
+        />
         <div>
           <p class="text-small font-semibold leading-tight">CampusGlide</p>
           <p class="text-xs text-ink-muted">NVSU Motorpool</p>
@@ -211,7 +218,7 @@ function closeSidebar() {
     </aside>
 
     <!-- Main Content -->
-    <div class="lg:pl-64">
+    <div class="min-w-0 lg:pl-64">
       <!-- Desktop Header -->
       <header class="sticky top-0 z-20 hidden lg:flex h-16 items-center justify-between gap-4 border-b border-line bg-white px-page">
         <div class="ml-auto flex items-center gap-3">
@@ -235,7 +242,7 @@ function closeSidebar() {
         </div>
       </header>
 
-      <main class="p-page pb-20 lg:pb-page">
+      <main class="min-w-0 p-page pb-20 lg:pb-page">
         <slot />
       </main>
     </div>

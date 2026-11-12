@@ -30,11 +30,11 @@ const createErrors = ref({})
 const createForm = reactive({ first_name: '', last_name: '', email: '', position: '', phone_number: '', role: '', password: '', password_confirmation: '' })
 const createRoleOptions = [
   { value: 'administrator', label: 'Administrator' },
-  { value: 'faculty', label: 'User' },
+  { value: 'faculty', label: 'Employee' },
   { value: 'staff', label: 'Staff' },
 ]
 const roleOptions = [
-  { value: 'faculty', label: 'User' },
+  { value: 'faculty', label: 'Employee' },
   { value: 'staff', label: 'Staff' },
   { value: 'administrator', label: 'Administrator' },
 ]
@@ -141,12 +141,12 @@ onMounted(loadUsers)
 
 <template>
   <div class="flex flex-col gap-page">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">User accounts</h1>
         <p class="mt-1 text-small text-ink-muted">View and manage CampusGlide accounts. Administrator accounts cannot be scheduled for deletion.</p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh users" @click="loadUsers" />
         <BaseButton size="sm" @click="openCreate">+ Create user</BaseButton>
       </div>
@@ -220,7 +220,7 @@ onMounted(loadUsers)
       <PaginationBar v-if="!loading" :meta="paginationMeta" @change="changePage" />
     </BaseCard>
 
-    <BaseModal :open="showCreate" title="Create user account" subtitle="Add an administrator, user, or staff account" @close="showCreate = false">
+    <BaseModal :open="showCreate" title="Create user account" subtitle="Add an administrator, employee, or staff account" @close="showCreate = false">
       <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="createUser">
         <BaseInput v-model="createForm.first_name" label="First name" :error="createErrors.first_name" required />
         <BaseInput v-model="createForm.last_name" label="Last name" :error="createErrors.last_name" required />
@@ -228,8 +228,10 @@ onMounted(loadUsers)
         <BaseInput v-model="createForm.position" label="Position / designation" :error="createErrors.position" />
         <BaseInput v-model="createForm.phone_number" label="Phone number" type="tel" :error="createErrors.phone_number" />
         <BaseSelect v-model="createForm.role" label="Role" :options="createRoleOptions" :error="createErrors.role" required />
-        <BaseInput v-model="createForm.password" label="Password" type="password" :error="createErrors.password" required />
-        <BaseInput v-model="createForm.password_confirmation" label="Confirm password" type="password" :error="createErrors.password_confirmation" required />
+        <div class="grid gap-4 sm:col-span-2 sm:grid-cols-2">
+          <BaseInput v-model="createForm.password" label="Password" type="password" :error="createErrors.password" required />
+          <BaseInput v-model="createForm.password_confirmation" label="Confirm password" type="password" :error="createErrors.password_confirmation" required />
+        </div>
         <div class="flex justify-end gap-2 sm:col-span-2">
           <BaseButton type="button" variant="outline" @click="showCreate = false">Cancel</BaseButton>
           <BaseButton type="submit" :loading="saving">Create user</BaseButton>

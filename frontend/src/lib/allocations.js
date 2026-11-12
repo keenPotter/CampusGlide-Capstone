@@ -3,6 +3,12 @@ import { formatDate, formatTime, parseDate, toDateString } from '@/lib/format'
 /** Trip statuses that still block a vehicle or driver. */
 export const ACTIVE_STATUSES = ['scheduled', 'in_progress']
 
+export function allocationStatusLabel(status) {
+  if (status === 'in_progress') return 'Ongoing'
+  if (status === 'completed') return 'Completed'
+  return status === 'scheduled' ? 'Scheduled' : (status ?? '—')
+}
+
 // First and last day of a trip. A one-day trip ends on the day it starts.
 function tripRange(allocation) {
   const start = allocation.trip?.trip_date

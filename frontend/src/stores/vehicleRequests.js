@@ -9,6 +9,7 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
     current: null,
     meta: null,
     loading: false,
+    fetchSequence: 0,
     filters: {
       status: '',
       trip_type: '',
@@ -24,27 +25,31 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
 
   actions: {
     async fetch(overrides = {}) {
+      const requestId = ++this.fetchSequence
       this.loading = true
       this.filters = { ...this.filters, ...overrides }
+      const filters = { ...this.filters }
 
       try {
         const { data } = await api.get('/vehicle-requests', {
           params: {
-            status: this.filters.status || undefined,
-            trip_type: this.filters.trip_type || undefined,
-            month: this.filters.month || undefined,
-            year: this.filters.year || undefined,
-            search: this.filters.search || undefined,
-            page: this.filters.page,
+            status: filters.status || undefined,
+            trip_type: filters.trip_type || undefined,
+            month: filters.month || undefined,
+            year: filters.year || undefined,
+            search: filters.search || undefined,
+            page: filters.page,
           },
         })
 
-        // The backend filters by status and trip_type, so nothing is filtered here.
-        this.items = data.data ?? []
-        this.meta = data.meta ?? null
-        return this.items
+        if (requestId === this.fetchSequence) {
+          // The backend filters by status and trip_type, so nothing is filtered here.
+          this.items = data.data ?? []
+          this.meta = data.meta ?? null
+        }
+        return data.data ?? []
       } finally {
-        this.loading = false
+        if (requestId === this.fetchSequence) this.loading = false
       }
     },
 

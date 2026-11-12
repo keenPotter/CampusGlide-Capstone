@@ -385,12 +385,12 @@ async function markCompleted(log) {
 <template>
   <div class="flex flex-col gap-page">
     <!-- Page Header -->
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">Vehicle Maintenance</h1>
         <p class="mt-1 text-small text-ink-muted">Schedule, start, and track vehicle maintenance work</p>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh maintenance records" @click="loadAll" />
         <BaseButton size="sm" @click="openAdd">Add maintenance</BaseButton>
       </div>
@@ -440,8 +440,8 @@ async function markCompleted(log) {
       </EmptyState>
 
       <template v-else>
-        <!-- Card view (phones and tablets). -->
-        <ul class="divide-y divide-line lg:hidden">
+        <!-- Card view stays in place until the table has room for its action buttons. -->
+        <ul class="divide-y divide-line 2xl:hidden">
           <li v-for="log in pageItems" :key="log.id"
             class="flex cursor-pointer flex-col gap-2 p-card transition active:bg-neutral-50"
             @click="onRowClick($event, log)">
@@ -486,8 +486,8 @@ async function markCompleted(log) {
           </li>
         </ul>
 
-        <!-- Table view (laptops and larger). Click a row to view details. -->
-        <div class="hidden lg:block">
+        <!-- Wide-screen table view. Click a row to view details. -->
+        <div class="hidden 2xl:block">
           <table class="w-full table-fixed border-collapse">
             <thead class="table-head">
               <tr>

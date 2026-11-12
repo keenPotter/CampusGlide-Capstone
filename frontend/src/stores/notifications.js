@@ -10,7 +10,7 @@ export const useNotificationStore = defineStore('notifications', {
   state: () => ({
     pendingRequests: 0,
     openMaintenance: 0,
-    // Approved requests that still need a vehicle and driver.
+    // Pending or approved requests that do not yet have a trip.
     needsAllocation: 0,
     // Faculty requests to change the date of a trip.
     pendingDateChanges: 0,

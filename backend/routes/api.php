@@ -14,6 +14,7 @@ use App\Http\Controllers\PreventiveMaintenanceChecklistPrintController;
 use App\Http\Controllers\RescheduleRequestController;
 use App\Http\Controllers\TripController;
 use App\Http\Controllers\TripRequestShareController;
+use App\Http\Controllers\TripViewController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\VehicleRequestController;
@@ -45,6 +46,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:administrator,staff')->group(function () {
         Route::get('/trips', [TripController::class, 'index']);
         Route::get('/trips/{trip}', [TripController::class, 'show'])->whereNumber('trip');
+        Route::get('/trip-views', [TripViewController::class, 'index']);
+        Route::post('/trips/{trip}/view', [TripViewController::class, 'store'])->whereNumber('trip');
         Route::get('/drivers', [DriverController::class, 'index']);
         Route::get('/vehicles', [VehicleController::class, 'index']);
         Route::get('/vehicles/{vehicle}/status', [VehicleController::class, 'status']);

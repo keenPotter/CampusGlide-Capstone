@@ -82,18 +82,22 @@ function changePage(value) {
 
 <template>
   <div class="flex flex-col gap-page">
-    <div>
-      <h1 class="text-page-title">My Trip Schedule</h1>
-      <p class="mt-1 text-small text-ink-muted">
-        View the trips associated with your vehicle requests.
-      </p>
+    <div class="page-header">
+      <div class="page-header-copy">
+        <h1 class="text-page-title">My Trip Schedule</h1>
+        <p class="mt-1 text-small text-ink-muted">
+          View the trips associated with your vehicle requests.
+        </p>
+      </div>
+      <div class="page-actions">
+        <RefreshButton :loading="loading" label="Refresh my trips" @click="fetchTrips" />
+      </div>
     </div>
 
-    <div class="flex items-center justify-between gap-3">
+    <div>
       <p class="text-small text-ink-muted">
         {{ paginationMeta.total }} scheduled {{ paginationMeta.total === 1 ? 'trip' : 'trips' }}
       </p>
-      <RefreshButton :loading="loading" label="Refresh my trips" @click="fetchTrips" />
     </div>
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

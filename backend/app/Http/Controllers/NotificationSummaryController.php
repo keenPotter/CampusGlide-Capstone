@@ -24,8 +24,10 @@ class NotificationSummaryController extends Controller
                 'pending_requests' => VehicleRequest::where('status', 'pending')->count(),
                 // Maintenance records that are in progress.
                 'open_maintenance' => VehicleMaintenance::where('status', 'in_progress')->count(),
-                // Approved requests that still need a vehicle and driver.
-                'needs_allocation' => VehicleRequest::where('status', 'approved')->whereDoesntHave('trip')->count(),
+                // Pending or approved requests that do not yet have a trip.
+                'needs_allocation' => VehicleRequest::whereIn('status', ['pending', 'approved'])
+                    ->whereDoesntHave('trip')
+                    ->count(),
                 // Faculty requests to change the date of a trip.
                 'pending_date_changes' => RescheduleRequest::where('status', 'pending')->count(),
             ],

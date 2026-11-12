@@ -17,6 +17,7 @@ import LoadError from '@/components/ui/LoadError.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
 import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
+import VehicleRequestModal from '@/components/requests/VehicleRequestModal.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -35,6 +36,7 @@ const detailRequest = ref(null)
 const detailLoading = ref(false)
 const approving = ref(null)
 const disapproving = ref(null)
+const showNewRequest = ref(false)
 
 const requestDetailRows = computed(() => {
   const request = detailRequest.value
@@ -171,6 +173,11 @@ function editSelectedRequest() {
   if (request) router.push({ name: 'requests.edit', params: { id: request.id } })
 }
 
+async function onRequestSubmitted() {
+  showNewRequest.value = false
+  await load()
+}
+
 // If the list gets shorter (for example after a reload), stay on a page that exists.
 watch(pageCount, (count) => {
   if (page.value > count) page.value = count
@@ -180,19 +187,20 @@ watch(pageCount, (count) => {
 <template>
   <div class="flex flex-col gap-page">
     <!-- Greeting -->
-    <div class="flex items-start justify-between gap-3">
-      <div>
+    <div class="page-header">
+      <div class="page-header-copy">
         <h1 class="text-page-title">Hello, {{ auth.user?.first_name }}</h1>
         <p class="mt-1 text-small text-ink-muted">
           Signed in as {{ ROLE_LABELS[auth.role] ?? auth.role }}
         </p>
       </div>
-      <RefreshButton :loading="loading" label="Refresh dashboard" @click="load" />
+      <div class="page-actions">
+        <RefreshButton :loading="loading" label="Refresh dashboard" @click="load" />
+      </div>
     </div>
 
-    <!-- Quick Action Button (Mobile) -->
-    <div v-if="auth.isFaculty" class="md:hidden">
-      <BaseButton block @click="router.push({ name: 'requests.create' })">
+    <div v-if="auth.isFaculty" class="flex justify-end">
+      <BaseButton @click="showNewRequest = true">
         New request
       </BaseButton>
     </div>
@@ -245,9 +253,9 @@ watch(pageCount, (count) => {
             class="flex w-full flex-col gap-2 px-card py-3 text-left transition-colors hover:bg-neutral-50 hover:filter-none"
             @click="openRequest(request)"
           >
-            <div class="flex w-full flex-wrap items-center justify-between gap-2">
-              <span class="text-body font-medium text-ink">{{ request.destination }}</span>
-              <StatusBadge :status="request.status" />
+            <div class="flex w-full flex-wrap items-start justify-between gap-2">
+              <span class="min-w-0 flex-1 break-words text-body font-medium text-ink">{{ request.destination }}</span>
+              <StatusBadge :status="request.status" class="shrink-0" />
             </div>
             <span class="text-small text-ink-muted">
               {{ formatDate(request.trip_date) }} · {{ formatTime(request.departure_time) }}
@@ -325,6 +333,11 @@ watch(pageCount, (count) => {
       :request="disapproving"
       @close="disapproving = null"
       @done="onDisapproved"
+    />
+    <VehicleRequestModal
+      :open="showNewRequest"
+      @close="showNewRequest = false"
+      @submitted="onRequestSubmitted"
     />
   </div>
 </template>
