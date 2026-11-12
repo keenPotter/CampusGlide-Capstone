@@ -134,11 +134,13 @@ function closeSidebar() {
         />
       </button>
 
-      <div class="flex h-8 w-8 items-center justify-center rounded-card bg-primary text-white text-small font-semibold">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 17V9l2-4h9l3 4h4v8" />
-        </svg>
-      </div>
+      <img
+        src="/icon-192x192.png"
+        srcset="/icon-192x192.png 192w, /icon-512x512.png 512w"
+        sizes="2rem"
+        alt="CampusGlide logo"
+        class="h-8 w-8 shrink-0 object-contain"
+      />
 
       <button
         type="button"
@@ -173,11 +175,13 @@ function closeSidebar() {
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
     >
       <div class="flex h-16 items-center gap-2 border-b border-line px-card">
-        <div class="flex h-8 w-8 items-center justify-center rounded-card bg-primary text-white">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 17V9l2-4h9l3 4h4v8" />
-          </svg>
-        </div>
+        <img
+          src="/icon-192x192.png"
+          srcset="/icon-192x192.png 192w, /icon-512x512.png 512w"
+          sizes="2rem"
+          alt="CampusGlide logo"
+          class="h-8 w-8 shrink-0 object-contain"
+        />
         <div>
           <p class="text-small font-semibold leading-tight">CampusGlide</p>
           <p class="text-xs text-ink-muted">NVSU Motorpool</p>
