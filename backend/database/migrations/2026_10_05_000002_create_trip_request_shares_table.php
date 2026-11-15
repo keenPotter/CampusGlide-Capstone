@@ -12,7 +12,7 @@ return new class extends Migration
             return;
         }
 
-        // A trip request sent from one administrator to another.
+        // A trip request sent by an administrator or staff member to an administrator.
         Schema::create('trip_request_shares', function (Blueprint $table) {
             $table->id();
             $table->foreignId('allocation_id')->constrained()->cascadeOnDelete();

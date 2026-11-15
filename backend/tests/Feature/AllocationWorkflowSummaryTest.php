@@ -11,18 +11,16 @@ class AllocationWorkflowSummaryTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_needs_allocation_includes_pending_and_approved_unassigned_requests(): void
+    public function test_allocation_options_only_returns_fleet_choices(): void
     {
         /** @var User $administrator */
         $administrator = User::factory()->create(['role' => 'administrator']);
-        $approvedRequest = VehicleRequest::factory()->create(['status' => 'approved']);
-        $pendingRequest = VehicleRequest::factory()->create(['status' => 'pending']);
+        VehicleRequest::factory()->create(['status' => 'pending']);
 
         $this->actingAs($administrator, 'sanctum')
             ->getJson('/api/allocation-options?skip_completion=1')
             ->assertOk()
-            ->assertJsonCount(2, 'requests')
-            ->assertJsonFragment(['id' => $approvedRequest->id, 'status' => 'approved'])
-            ->assertJsonFragment(['id' => $pendingRequest->id, 'status' => 'pending']);
+            ->assertJsonStructure(['vehicles', 'drivers'])
+            ->assertJsonMissingPath('requests');
     }
 }

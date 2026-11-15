@@ -9,7 +9,7 @@ class DriverController extends Controller
 {
     /**
      * GET /api/drivers
-     * Administrators only (route middleware).
+     * Administrators and staff can view drivers (route middleware).
      */
     public function index()
     {

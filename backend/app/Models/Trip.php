@@ -22,6 +22,9 @@ class Trip extends Model
         'actual_return_time',
         'actual_mileage',
         'notes',
+        'cancellation_reason',
+        'cancelled_by',
+        'cancelled_at',
     ];
 
     // Added: trip_date was returned as plain text, so date methods such as
@@ -30,6 +33,7 @@ class Trip extends Model
     {
         return [
             'trip_date' => 'date:Y-m-d',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -52,5 +56,10 @@ class Trip extends Model
     public function allocation()
     {
         return $this->hasOne(Allocation::class);
+    }
+
+    public function cancelledBy()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 }

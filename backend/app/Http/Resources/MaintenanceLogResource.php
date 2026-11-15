@@ -26,6 +26,7 @@ class MaintenanceLogResource extends JsonResource
             'description' => $this->description,
             'status' => $this->status,
             'date_performed' => $this->maintenance_date?->format('Y-m-d'),
+            'completion_date' => $this->completion_date?->format('Y-m-d'),
             'cost' => $this->cost !== null ? (float) $this->cost : null,
             'next_due_date' => $this->next_due_date?->format('Y-m-d'),
             'created_at' => $this->created_at?->toISOString(),

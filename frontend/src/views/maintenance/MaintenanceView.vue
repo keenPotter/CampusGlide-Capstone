@@ -82,6 +82,8 @@ const detailsLog = ref(null)
 const rescheduling = ref(null)
 const rescheduleDate = ref('')
 const rescheduleSaving = ref(false)
+const earlyCompletionLog = ref(null)
+const completingId = ref(null)
 const checklistTarget = ref(null)
 const saving = ref(false)
 const errors = ref({})
@@ -371,13 +373,34 @@ async function startMaintenance(log) {
   }
 }
 
-async function markCompleted(log) {
+function markCompleted(log) {
+  if (log.date_performed > todayIso()) {
+    earlyCompletionLog.value = log
+    return
+  }
+
+  completeMaintenance(log)
+}
+
+async function completeMaintenance(log) {
+  if (completingId.value !== null) return
+
+  completingId.value = log.id
   try {
     await api.patch(`/maintenance-logs/${log.id}`, { status: 'completed' })
     toast.success('Marked as completed.')
+    earlyCompletionLog.value = null
     await loadAll()
   } catch (error) {
     toast.error(errorMessage(error, 'Unable to update this record.'))
+  } finally {
+    completingId.value = null
+  }
+}
+
+function confirmEarlyCompletion() {
+  if (earlyCompletionLog.value) {
+    completeMaintenance(earlyCompletionLog.value)
   }
 }
 </script>
@@ -472,7 +495,7 @@ async function markCompleted(log) {
               <BaseButton v-if="log.status === 'scheduled'" class="w-full whitespace-nowrap" size="sm" variant="primary" @click="startMaintenance(log)">
                 <Wrench :size="16" aria-hidden="true" /> Start maintenance
               </BaseButton>
-              <BaseButton v-else-if="log.status === 'in_progress'" class="w-full whitespace-nowrap" size="sm" variant="success" @click="markCompleted(log)">
+              <BaseButton v-else-if="log.status === 'in_progress'" class="w-full whitespace-nowrap" size="sm" variant="success" :loading="completingId === log.id" @click="markCompleted(log)">
                 <CheckCircle2 :size="16" aria-hidden="true" /> Complete
               </BaseButton>
               <BaseButton class="w-full whitespace-nowrap" size="sm" variant="outline" @click="openDetails(log)">
@@ -525,7 +548,7 @@ async function markCompleted(log) {
                     <BaseButton v-if="log.status === 'scheduled'" class="w-full whitespace-nowrap" size="sm" variant="primary" @click="startMaintenance(log)">
                       <Wrench :size="16" aria-hidden="true" /> Start
                     </BaseButton>
-                    <BaseButton v-else-if="log.status === 'in_progress'" class="w-full whitespace-nowrap" size="sm" variant="success" @click="markCompleted(log)">
+                    <BaseButton v-else-if="log.status === 'in_progress'" class="w-full whitespace-nowrap" size="sm" variant="success" :loading="completingId === log.id" @click="markCompleted(log)">
                       <CheckCircle2 :size="16" aria-hidden="true" /> Complete
                     </BaseButton>
                     <BaseButton class="w-full whitespace-nowrap" size="sm" variant="outline" @click="openDetails(log)">
@@ -564,6 +587,7 @@ async function markCompleted(log) {
         <div><dt class="text-small text-ink-muted">Description</dt><dd class="font-medium">{{ detailsLog.description || typeLabel(detailsLog.type) }}</dd></div>
         <div><dt class="text-small text-ink-muted">Work type</dt><dd class="font-medium">{{ typeLabel(detailsLog.type) }}</dd></div>
         <div><dt class="text-small text-ink-muted">Date</dt><dd class="font-medium">{{ formatDate(detailsLog.date_performed) }}</dd></div>
+        <div v-if="detailsLog.completion_date"><dt class="text-small text-ink-muted">Completed on</dt><dd class="font-medium">{{ formatDate(detailsLog.completion_date) }}</dd></div>
         <div><dt class="text-small text-ink-muted">Next due</dt><dd class="font-medium">{{ formatDate(detailsLog.next_due_date) }}</dd></div>
         <div><dt class="text-small text-ink-muted">Odometer</dt><dd class="font-medium">{{ formatKm(detailsLog.vehicle?.mileage) }}</dd></div>
         <div><dt class="text-small text-ink-muted">Cost</dt><dd class="font-medium">{{ formatMoney(detailsLog.cost) }}</dd></div>
@@ -585,6 +609,28 @@ async function markCompleted(log) {
       <template #footer>
         <BaseButton variant="outline" @click="rescheduling = null">Cancel</BaseButton>
         <BaseButton :loading="rescheduleSaving" @click="saveReschedule">Save date</BaseButton>
+      </template>
+    </BaseModal>
+
+    <BaseModal
+      :open="Boolean(earlyCompletionLog)"
+      title="Complete maintenance early?"
+      @close="earlyCompletionLog = null"
+    >
+      <p v-if="earlyCompletionLog">
+        Complete this maintenance early? It is scheduled for {{ formatDate(earlyCompletionLog.date_performed) }}.
+      </p>
+      <template #footer>
+        <BaseButton variant="outline" :disabled="completingId !== null" @click="earlyCompletionLog = null">
+          Cancel
+        </BaseButton>
+        <BaseButton
+          variant="success"
+          :loading="completingId === earlyCompletionLog?.id"
+          @click="confirmEarlyCompletion"
+        >
+          Complete Now
+        </BaseButton>
       </template>
     </BaseModal>
 

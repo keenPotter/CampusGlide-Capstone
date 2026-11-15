@@ -6,6 +6,7 @@ export const ACTIVE_STATUSES = ['scheduled', 'in_progress']
 export function allocationStatusLabel(status) {
   if (status === 'in_progress') return 'Ongoing'
   if (status === 'completed') return 'Completed'
+  if (status === 'cancelled') return 'Cancelled'
   return status === 'scheduled' ? 'Scheduled' : (status ?? '—')
 }
 
@@ -151,5 +152,9 @@ export function canPrint(allocation) {
  * completed can no longer be reassigned.
  */
 export function canReassign(allocation) {
+  return allocation?.status === 'scheduled'
+}
+
+export function canCancel(allocation) {
   return allocation?.status === 'scheduled'
 }

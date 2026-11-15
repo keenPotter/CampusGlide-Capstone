@@ -12,7 +12,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * Sending a printed trip request to another administrator.
- * Administrators only (route middleware).
+ * Administrators and staff can send; route middleware protects the endpoint.
  */
 class TripRequestShareController extends Controller
 {
