@@ -18,14 +18,16 @@ use Illuminate\Support\Facades\DB;
 
 class VehicleRequestController extends Controller
 {
+    public function __construct(protected AllocationService $allocations)
+    {
+    }
+
     /**
      * GET /api/vehicle-requests
      * Administrators see all. Faculty see only their own.
         * Query params: ?status=pending, ?trip_type=inclusive, ?month=1, ?year=2026
      *
-     * Order: pending requests first, with the soonest travel date on top.
-     * All other requests follow, newest first.
-     * The sorting is done here (not in the frontend) so it covers every page.
+     * Requests are shown newest first for administrators, staff, and faculty.
      */
     public function index(Request $request)
     {
@@ -38,10 +40,9 @@ class VehicleRequestController extends Controller
 
         $user = $request->user();
 
-        $query = VehicleRequest::with('requester')
-            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
-            ->orderByRaw("CASE WHEN status = 'pending' THEN trip_date END ASC")
-            ->orderByRaw("CASE WHEN status = 'pending' THEN departure_time END ASC")
+        $query = VehicleRequest::query()
+            ->select('vehicle_requests.*')
+            ->with('requester')
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
@@ -76,6 +77,9 @@ class VehicleRequestController extends Controller
                             ->where('destination', 'like', $pattern)
                             ->orWhere('purpose', 'like', $pattern)
                             ->orWhere('disapproval_reason', 'like', $pattern)
+                            ->orWhere('requester_name', 'like', $pattern)
+                            ->orWhere('requester_department', 'like', $pattern)
+                            ->orWhere('requester_contact', 'like', $pattern)
                             ->orWhereHas('requester', function ($requesterQuery) use ($pattern) {
                                 $requesterQuery
                                     ->where('first_name', 'like', $pattern)
@@ -114,6 +118,7 @@ class VehicleRequestController extends Controller
     {
         $vehicleRequest = VehicleRequest::create([
             'requester_id' => $request->user()->id,
+            'booking_source' => VehicleRequest::SOURCE_ONLINE,
             'request_date' => now(),
             'destination' => $request->destination,
             'purpose' => $request->purpose,
@@ -134,7 +139,7 @@ class VehicleRequestController extends Controller
     {
         $data = $request->validated();
 
-        $vehicleRequest = DB::transaction(function () use ($data, $request) {
+        return DB::transaction(function () use ($data, $request) {
             $vehicleRequest = VehicleRequest::create([
                 'requester_id' => null,
                 'booking_source' => VehicleRequest::SOURCE_ON_SITE,
@@ -155,52 +160,19 @@ class VehicleRequestController extends Controller
             ]);
 
             if (! empty($data['vehicle_id']) && ! empty($data['driver_id'])) {
-                $vehicle = Vehicle::findOrFail($data['vehicle_id']);
-                $driver = Driver::findOrFail($data['driver_id']);
-                $this->allocations->assertAssignable(
+                $this->allocations->allocateRequest(
                     $vehicleRequest,
-                    $vehicle,
-                    $driver,
-                    allowPending: true,
+                    Vehicle::findOrFail($data['vehicle_id']),
+                    Driver::findOrFail($data['driver_id']),
+                    (int) $request->user()->id,
+                    approvePending: true
                 );
-
-                $vehicleRequest->update([
-                    'status' => 'approved',
-                    'approved_by' => $request->user()->id,
-                    'approved_date' => now(),
-                ]);
-                $trip = Trip::create([
-                    'vehicle_request_id' => $vehicleRequest->id,
-                    'vehicle_id' => $vehicle->id,
-                    'driver_id' => $driver->id,
-                    'trip_date' => $vehicleRequest->trip_date,
-                    'departure_time' => $vehicleRequest->departure_time,
-                    'estimated_return_time' => $vehicleRequest->estimated_return_time,
-                    'destination' => $vehicleRequest->destination,
-                    'purpose' => $vehicleRequest->purpose,
-                    'trip_status' => 'scheduled',
-                ]);
-                Allocation::create([
-                    'trip_id' => $trip->id,
-                    'vehicle_id' => $vehicle->id,
-                    'driver_id' => $driver->id,
-                    'allocated_by' => $request->user()->id,
-                    'allocation_date' => now(),
-                ]);
-
-                $vehicle->update(['status' => 'in_use']);
-                $driver->update([
-                    'is_available' => false,
-                    'assigned_vehicle_id' => $vehicle->id,
-                ]);
             }
 
-            return $vehicleRequest;
+            return (new VehicleRequestResource($vehicleRequest->fresh('requester')))
+                ->response()
+                ->setStatusCode(201);
         });
-
-        return (new VehicleRequestResource($vehicleRequest->fresh('requester')))
-            ->response()
-            ->setStatusCode(201);
     }
 
     public function show(Request $request, VehicleRequest $vehicleRequest)

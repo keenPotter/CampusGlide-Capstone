@@ -9,7 +9,7 @@ class UpdateAllocationRequest extends FormRequest
     public function authorize(): bool
     {
         // Only administrators can reassign a vehicle, driver or date.
-        return $this->user()?->hasRole('administrator', 'staff')  ?? false;
+        return $this->user()?->hasRole('administrator') ?? false;
     }
 
     public function rules(): array

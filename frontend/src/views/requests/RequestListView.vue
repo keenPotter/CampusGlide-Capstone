@@ -87,6 +87,7 @@ const requestDetailRows = computed(() => {
   if (!request) return []
 
   return [
+    { label: 'Booking source', value: request.booking_source === 'on_site' ? 'On-Site' : 'Online' },
     {
       label: request.booking_source === 'on_site' ? 'Requesting personnel' : 'Requesting official',
       value: requesterName(request),
@@ -369,15 +370,23 @@ function onDisapproved() {
           <div class="min-w-0 w-full flex-1 md:w-auto">
             <button
               type="button"
-              class="card-row-value block w-full truncate text-left md:text-section-title"
+              class="card-row-value block w-full truncate text-left"
               :title="request.destination"
               @click="openRequest(request)"
             >
               {{ request.destination }}
             </button>
-            <p class="mt-0.5 truncate text-small text-ink-muted md:text-body">{{ request.purpose }}</p>
+            <p class="mt-0.5 truncate text-small text-ink-muted">{{ request.purpose }}</p>
           </div>
-          <StatusBadge :status="request.status" class="shrink-0 self-start" />
+          <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
+            <span
+              class="rounded-full px-2 py-1 text-xs font-medium"
+              :class="request.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-ink-muted'"
+            >
+              {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
+            </span>
+            <StatusBadge :status="request.status" />
+          </div>
         </div>
 
         <div class="mb-3 space-y-1.5 md:space-y-2">
@@ -386,44 +395,32 @@ function onDisapproved() {
             <span class="min-w-0 flex-1 break-words text-right text-small text-ink md:text-body">{{ requesterName(request) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0 md:text-body">Travel date</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ formatDate(request.trip_date) }}</span>
+            <span class="card-row-label shrink-0">Travel date</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ formatDate(request.trip_date) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0 md:text-body">Departure</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ formatTime(request.departure_time) }}</span>
+            <span class="card-row-label shrink-0">Departure</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ formatTime(request.departure_time) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0 md:text-body">Passengers</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ request.number_of_passengers ?? '—' }}</span>
+            <span class="card-row-label shrink-0">Passengers</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ request.number_of_passengers ?? '—' }}</span>
           </div>
           <div
             v-if="request.status === 'disapproved' && request.disapproval_reason"
             class="flex items-start justify-between gap-3"
           >
-            <span class="card-row-label shrink-0 md:text-body">Reason</span>
-            <span class="min-w-0 flex-1 break-words text-right text-small text-red-700 md:text-body">
+            <span class="card-row-label shrink-0">Reason</span>
+            <span class="min-w-0 flex-1 break-words text-right text-small text-red-700">
               {{ request.disapproval_reason }}
             </span>
           </div>
         </div>
 
-        <div class="mt-auto border-t border-line pt-3">
-          <template v-if="auth.isAdministrator && request.status === 'pending'">
-            <div class="flex items-center gap-2">
-              <BaseButton size="sm" class="flex-1" @click="openApprove(request)">
-                <Check :size="16" aria-hidden="true" /> Approve
-              </BaseButton>
-              <BaseButton size="sm" variant="outline" class="flex-1" @click="openDisapprove(request)">
-                <X :size="16" aria-hidden="true" /> Disapprove
-              </BaseButton>
-            </div>
-          </template>
-
+        <div class="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
           <BaseButton
             size="sm"
             variant="ghost"
-            class="mt-2 w-full"
             @click="openRequest(request)"
           >
             <Eye :size="16" aria-hidden="true" /> View
@@ -436,6 +433,15 @@ function onDisapproved() {
           >
             <Pencil :size="16" aria-hidden="true" /> Edit
           </BaseButton>
+
+          <template v-if="auth.isAdministrator && request.status === 'pending'">
+            <BaseButton size="sm" @click="openApprove(request)">
+              <Check :size="16" aria-hidden="true" /> Approve
+            </BaseButton>
+            <BaseButton size="sm" variant="outline" @click="openDisapprove(request)">
+              <X :size="16" aria-hidden="true" /> Disapprove
+            </BaseButton>
+          </template>
         </div>
       </div>
     </div>
@@ -491,7 +497,15 @@ function onDisapproved() {
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">{{ request.number_of_passengers ?? '—' }}</td>
             <td class="px-2 py-3 align-top xl:px-card">
-              <StatusBadge :status="request.status" />
+              <div class="flex flex-col items-start gap-1">
+                <span
+                  class="rounded-full px-2 py-1 text-xs font-medium"
+                  :class="request.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-ink-muted'"
+                >
+                  {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
+                </span>
+                <StatusBadge :status="request.status" />
+              </div>
             </td>
             <!-- Reason for disapproval. Blank when there is none. -->
             <td class="px-2 py-3 align-top text-small text-ink-muted xl:px-card">

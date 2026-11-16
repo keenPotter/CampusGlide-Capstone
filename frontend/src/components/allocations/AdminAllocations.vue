@@ -3,10 +3,13 @@ import { computed, ref, watch } from 'vue'
 import { useAllocations } from '@/composables/useAllocations'
 import { useToast } from '@/composables/useToast'
 import { useNotificationStore } from '@/stores/notifications'
-import { formatDate } from '@/lib/format'
+import { useAuthStore } from '@/stores/auth'
+import api, { errorMessage, validationErrors } from '@/lib/api'
+import { formatDate, formatDateTime } from '@/lib/format'
 import {
   allocationStatusLabel,
   canPrint,
+  canCancel,
   canReassign,
   passengerText,
   requestNumber,
@@ -18,6 +21,7 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadError from '@/components/ui/LoadError.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
@@ -35,9 +39,9 @@ import RescheduleRequestCard from '@/components/allocations/RescheduleRequestCar
 // New allocations are made when a vehicle request is approved (Vehicle Requests page).
 const toast = useToast()
 const notifications = useNotificationStore()
+const auth = useAuthStore()
 
 const {
-  waiting,
   admins,
   loading,
   loadError,
@@ -80,17 +84,22 @@ const quickAdd = ref('')
 // The faculty date change request the administrator is deciding on.
 const decisionItem = ref(null)
 const decisionAction = ref('')
+const cancelTarget = ref(null)
+const cancelReason = ref('')
+const cancelError = ref('')
+const cancelling = ref(false)
 
 const tones = {
   primary: 'bg-primary-50 text-primary-700',
   secondary: 'bg-secondary-50 text-secondary-700',
+  danger: 'bg-red-50 text-red-700',
 }
 
 const stats = computed(() => [
   { label: 'Scheduled trips', value: counts.value.scheduled, tone: 'primary' },
   { label: 'Ongoing trips', value: counts.value.in_progress, tone: 'secondary' },
   { label: 'Completed trips', value: counts.value.completed, tone: 'primary' },
-  { label: 'Requests needing allocation', value: waiting.value.length, tone: 'secondary' },
+  { label: 'Cancelled trips', value: counts.value.cancelled, tone: 'danger' },
 ])
 
 // Availability is for today.
@@ -99,8 +108,6 @@ const dotLabel = { green: 'Available', orange: 'Scheduled today', red: 'On a tri
 
 const kindLabel = {
   allocation: 'Trip',
-  waiting: 'Needs allocation',
-  received: 'Received request',
 }
 
 // The first conflicted trip that can still be reassigned (scheduled trips only).
@@ -154,15 +161,13 @@ const typeOptions = computed(() => [
 
 const statusOptions = computed(() => {
   const countOfStatus = (status) =>
-    dateRows.value.filter((row) =>
-      row.kind === 'waiting' ? status === 'waiting' : (row.allocation?.status ?? 'scheduled') === status,
-    ).length
+    dateRows.value.filter((row) => row.allocation.status === status).length
 
   return [
-    { value: 'waiting', label: `Needs allocation (${countOfStatus('waiting')})` },
     { value: 'scheduled', label: `Scheduled (${countOfStatus('scheduled')})` },
     { value: 'in_progress', label: `Ongoing (${countOfStatus('in_progress')})` },
     { value: 'completed', label: `Completed (${countOfStatus('completed')})` },
+    { value: 'cancelled', label: `Cancelled (${countOfStatus('cancelled')})` },
   ]
 })
 
@@ -173,17 +178,21 @@ const visibleRows = computed(() => {
 
   return dateRows.value.filter((row) => {
     if (typeFilter.value && row.tripType !== typeFilter.value) return false
-    const rowStatus = row.kind === 'waiting' ? 'waiting' : (row.allocation?.status ?? 'scheduled')
-    if (statusFilter.value && rowStatus !== statusFilter.value) return false
+    if (statusFilter.value && row.allocation.status !== statusFilter.value) return false
     if (!query) return true
 
     const item = row.allocation
     return [
       row.destination,
       row.requester,
+      row.requesterDepartment,
+      row.requesterContact,
+      row.bookingSource === 'on_site' ? 'on-site' : 'online',
       item?.driver?.name,
       item?.vehicle?.plate_number,
       item?.vehicle?.vehicle_model,
+      item?.trip?.cancellation_reason,
+      item?.trip?.cancelled_by,
     ]
       .join(' ')
       .toLowerCase()
@@ -304,6 +313,43 @@ function onDecisionConflict(found) {
   closeDecision()
   pageConflicts.value = found
 }
+
+function openCancel(allocation) {
+  cancelTarget.value = allocation
+  cancelReason.value = ''
+  cancelError.value = ''
+}
+
+function closeCancel() {
+  cancelTarget.value = null
+  cancelReason.value = ''
+  cancelError.value = ''
+}
+
+async function confirmCancel() {
+  if (!cancelTarget.value || cancelling.value) return
+
+  cancelError.value = ''
+  const reason = cancelReason.value.trim()
+  if (!reason) {
+    cancelError.value = 'Please provide a cancellation reason.'
+    return
+  }
+
+  cancelling.value = true
+  try {
+    await api.post(`/allocations/${cancelTarget.value.id}/cancel`, { reason })
+    closeCancel()
+    await reload()
+    toast.success('Trip cancelled.')
+  } catch (error) {
+    const errors = validationErrors(error)
+    cancelError.value =
+      errors.reason ?? errors.status ?? errorMessage(error, 'Unable to cancel this trip.')
+  } finally {
+    cancelling.value = false
+  }
+}
 </script>
 
 <template>
@@ -313,8 +359,11 @@ function onDecisionConflict(found) {
       <div class="page-header-copy">
         <h1 class="text-page-title">Vehicle-Driver Allocation</h1>
         <p class="mt-1 text-small text-ink-muted">
-          Needs allocation counts pending requests and approved requests without a trip. Pending
-          requests still need approval on the Vehicle Requests page.
+          {{
+            auth.isAdministrator
+              ? 'Manage scheduled, ongoing, completed, and cancelled trips.'
+              : 'View scheduled, ongoing, completed, and cancelled trips.'
+          }}
         </p>
       </div>
       <div class="page-actions">
@@ -332,10 +381,15 @@ function onDecisionConflict(found) {
     >
       <p class="min-w-0 flex-1 font-medium">
         {{ conflictTexts.length }} conflict{{ conflictTexts.length > 1 ? 's' : '' }} detected:
-        {{ conflictTexts.join(' · ') }}. Please resolve before confirming the schedule.
+        {{ conflictTexts.join(' · ') }}.
+        {{
+          auth.isAdministrator
+            ? 'Please resolve before confirming the schedule.'
+            : 'Please contact an administrator to resolve this conflict.'
+        }}
       </p>
       <BaseButton
-        v-if="resolvableConflict"
+        v-if="auth.isAdministrator && resolvableConflict"
         size="sm"
         variant="outline"
         @click="openEdit(resolvableConflict)"
@@ -348,7 +402,9 @@ function onDecisionConflict(found) {
     <div class="grid grid-cols-1 gap-page lg:grid-cols-2">
       <BaseCard title="Vehicles" subtitle="Availability today" :padded="false">
         <template #actions>
-          <BaseButton size="sm" @click="quickAdd = 'vehicle'">+ Add vehicle</BaseButton>
+          <BaseButton v-if="auth.isAdministrator" size="sm" @click="quickAdd = 'vehicle'">
+            + Add vehicle
+          </BaseButton>
         </template>
 
         <EmptyState v-if="!loading && !vehicleList.length" title="No vehicles found" />
@@ -372,7 +428,9 @@ function onDecisionConflict(found) {
 
       <BaseCard title="Drivers" subtitle="Availability today" :padded="false">
         <template #actions>
-          <BaseButton size="sm" @click="quickAdd = 'driver'">+ Add driver</BaseButton>
+          <BaseButton v-if="auth.isAdministrator" size="sm" @click="quickAdd = 'driver'">
+            + Add driver
+          </BaseButton>
         </template>
 
         <EmptyState v-if="!loading && !driverList.length" title="No drivers found" />
@@ -406,7 +464,11 @@ function onDecisionConflict(found) {
     <BaseCard
       v-if="loading || pendingDateChanges.length"
       title="Date change requests"
-      :subtitle="`${pendingDateChanges.length} waiting for your decision`"
+      :subtitle="
+        auth.isAdministrator
+          ? `${pendingDateChanges.length} waiting for your decision`
+          : `${pendingDateChanges.length} requests · read-only`
+      "
     >
       <div v-if="loading" class="flex justify-center p-8" aria-label="Loading date change requests">
         <div class="h-7 w-7 animate-spin rounded-full border-2 border-line border-t-primary" />
@@ -416,7 +478,7 @@ function onDecisionConflict(found) {
           v-for="item in pagedDateChanges"
           :key="item.id"
           :item="item"
-          is-admin
+          :is-admin="auth.isAdministrator"
           @approve="decide($event, 'approve')"
           @disapprove="decide($event, 'disapprove')"
         />
@@ -484,8 +546,8 @@ function onDecisionConflict(found) {
         title="Nothing found"
         :message="
           typeFilter || statusFilter || search || monthFilter || yearFilter
-            ? 'No trips or requests match your filters.'
-            : 'Pending requests and approved requests without an assigned trip will appear here.'
+            ? 'No trips match your filters.'
+            : 'Scheduled, ongoing, completed, and cancelled trips will appear here.'
         "
       />
 
@@ -515,11 +577,16 @@ function onDecisionConflict(found) {
               {{ requestNumber(row.requestId ?? row.allocation?.id) }} · {{ row.destination ?? '—' }}
             </p>
             <p class="truncate text-small text-ink-muted">
-              <template v-if="row.kind === 'received'">Sent by {{ row.share.sender.name }}</template>
-              <template v-else>{{ row.requester ?? '—' }}</template>
+              {{ row.requester ?? '—' }}
             </p>
             <div class="mt-1.5 flex flex-wrap items-center gap-2">
               <span class="text-small text-ink-muted">{{ kindLabel[row.kind] }}</span>
+              <span
+                class="rounded-full px-2 py-1 text-xs font-medium"
+                :class="row.bookingSource === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-ink-muted'"
+              >
+                {{ row.bookingSource === 'on_site' ? 'On-Site' : 'Online' }}
+              </span>
               <TripTypeBadge :type="row.tripType" />
               <StatusBadge
                 v-if="row.allocation"
@@ -567,26 +634,34 @@ function onDecisionConflict(found) {
             <template v-if="row.kind === 'allocation'">
               <!-- Reassign is for scheduled trips only. It turns red when there is a conflict. -->
               <BaseButton
-                v-if="canReassign(row.allocation)"
+                v-if="auth.isAdministrator && canReassign(row.allocation)"
                 size="sm"
                 :variant="conflicts[row.allocation.id] ? 'danger' : 'outline'"
                 @click="openEdit(row.allocation)"
               >
                 Reassign
               </BaseButton>
+              <BaseButton
+                v-if="auth.isAdministrator && canCancel(row.allocation)"
+                size="sm"
+                variant="danger"
+                @click="openCancel(row.allocation)"
+              >
+                Cancel
+              </BaseButton>
               <BaseButton size="sm" variant="ghost" @click="openView(row)">
                 View
               </BaseButton>
+              <BaseButton
+                v-if="canPrint(row.allocation)"
+                size="sm"
+                variant="ghost"
+                @click="openPrint(row.allocation)"
+              >
+                Print / Send
+              </BaseButton>
             </template>
 
-            <BaseButton
-              v-else-if="canPrint(row.allocation)"
-              size="sm"
-              variant="ghost"
-              @click="openPrint(row.allocation)"
-            >
-              View / Print
-            </BaseButton>
           </div>
         </li>
       </ul>
@@ -621,6 +696,20 @@ function onDecisionConflict(found) {
           <p class="font-medium">{{ viewTarget.requester ?? '—' }}</p>
         </div>
         <div>
+          <p class="text-ink-muted">Booking source</p>
+          <p class="font-medium">{{ viewTarget.bookingSource === 'on_site' ? 'On-Site' : 'Online' }}</p>
+        </div>
+        <template v-if="viewTarget.bookingSource === 'on_site'">
+          <div>
+            <p class="text-ink-muted">Office/Department</p>
+            <p class="font-medium">{{ viewTarget.requesterDepartment ?? '—' }}</p>
+          </div>
+          <div>
+            <p class="text-ink-muted">Contact Number</p>
+            <p class="font-medium">{{ viewTarget.requesterContact ?? '—' }}</p>
+          </div>
+        </template>
+        <div>
           <p class="text-ink-muted">Date and time</p>
           <p class="font-medium">{{ whenText(viewTarget.date, viewTarget.time) }}</p>
         </div>
@@ -643,6 +732,21 @@ function onDecisionConflict(found) {
           <p class="text-ink-muted">Purpose</p>
           <p class="font-medium">{{ viewTarget.allocation.trip?.purpose ?? '—' }}</p>
         </div>
+        <div
+          v-if="viewTarget.allocation.status === 'cancelled'"
+          class="sm:col-span-2 rounded-card border border-red-200 bg-red-50 p-3"
+        >
+          <p class="font-semibold text-red-800">Cancellation details</p>
+          <p class="mt-1 text-red-800">
+            Reason: {{ viewTarget.allocation.trip?.cancellation_reason || '—' }}
+          </p>
+          <p class="text-red-800">
+            Cancelled by: {{ viewTarget.allocation.trip?.cancelled_by || '—' }}
+          </p>
+          <p class="text-red-800">
+            Cancelled at: {{ formatDateTime(viewTarget.allocation.trip?.cancelled_at) }}
+          </p>
+        </div>
       </div>
       <template #footer>
         <BaseButton
@@ -658,15 +762,22 @@ function onDecisionConflict(found) {
     </BaseModal>
 
     <AllocationModal
+      v-if="auth.isAdministrator"
       :open="modalOpen"
       :allocation="editing"
       @close="modalOpen = false"
       @saved="onSaved"
     />
 
-    <QuickAddModal :kind="quickAdd" @close="quickAdd = ''" @created="onQuickAdded" />
+    <QuickAddModal
+      v-if="auth.isAdministrator"
+      :kind="quickAdd"
+      @close="quickAdd = ''"
+      @created="onQuickAdded"
+    />
 
     <DateChangeDecisionModal
+      v-if="auth.isAdministrator"
       :item="decisionItem"
       :action="decisionAction"
       @close="closeDecision"
@@ -681,6 +792,33 @@ function onDecisionConflict(found) {
       @close="printTarget = null"
       @sent="reload"
     />
+
+    <BaseModal
+      v-if="auth.isAdministrator"
+      :open="Boolean(cancelTarget)"
+      title="Cancel scheduled trip"
+      :subtitle="cancelTarget ? `Request #${cancelTarget.vehicle_request?.id}` : ''"
+      @close="closeCancel"
+    >
+      <p class="mb-3 text-small text-ink-muted">
+        Cancelling releases the assigned vehicle and driver. This action cannot be undone.
+      </p>
+      <BaseTextarea
+        v-model="cancelReason"
+        label="Reason for cancellation"
+        placeholder="Enter the reason for cancelling this trip."
+        :error="cancelError"
+        required
+      />
+      <template #footer>
+        <BaseButton variant="outline" :disabled="cancelling" @click="closeCancel">
+          Keep trip
+        </BaseButton>
+        <BaseButton variant="danger" :loading="cancelling" @click="confirmCancel">
+          Cancel trip
+        </BaseButton>
+      </template>
+    </BaseModal>
 
     <ConflictModal
       :conflicts="pageConflicts"

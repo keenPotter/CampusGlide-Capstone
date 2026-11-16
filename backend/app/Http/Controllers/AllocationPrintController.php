@@ -8,7 +8,7 @@ use Carbon\Carbon;
 /**
  * The one place that builds the printable "Request for Use of Vehicle" form.
  * The allocation page uses it (GET /api/allocations/{allocation}/print).
- * Administrators only (route middleware).
+ * Administrators and staff can print approved allocations (route middleware).
  */
 class AllocationPrintController extends Controller
 {
@@ -19,7 +19,8 @@ class AllocationPrintController extends Controller
 
     public function show(Allocation $allocation)
     {
-        $allocation->load(['trip.vehicleRequest.requester', 'vehicle', 'driver']);
+        $allocation->load(['trip.vehicleRequest.requester', 'trip.cancelledBy', 'vehicle', 'driver']);
+        $trip = $allocation->trip;
         $vehicleRequest = $allocation->trip?->vehicleRequest;
 
         // Only an approved request with a vehicle and driver assigned can be printed.
@@ -50,8 +51,10 @@ class AllocationPrintController extends Controller
             'logo' => $this->logo(),
             'ruvNumber' => $ruvNumber,
             'requestNo' => $vehicleRequest->id,
-            'official' => $requester ? strtoupper($requester->full_name) : '',
-            'position' => $requester?->position ?? '',
+            'official' => strtoupper($vehicleRequest->requester_name ?: ($requester?->full_name ?? '')),
+            'position' => $vehicleRequest->requester_department ?? $requester?->position ?? '',
+            'requesterContact' => $vehicleRequest->requester_contact,
+            'bookingSource' => $vehicleRequest->booking_source ?? 'online',
             'destination' => $vehicleRequest->destination,
             'purpose' => $vehicleRequest->purpose,
             'passengers' => $vehicleRequest->passengers,
@@ -64,6 +67,10 @@ class AllocationPrintController extends Controller
             // Filled in by the allocation.
             'plateNumber' => $allocation->vehicle->plate_number,
             'driverName' => $allocation->driver->full_name,
+            'isCancelled' => $trip?->trip_status === 'cancelled',
+            'cancellationReason' => $trip?->cancellation_reason,
+            'cancelledBy' => $trip?->cancelledBy?->full_name,
+            'cancelledAt' => $trip?->cancelled_at?->format('F j, Y g:i A'),
             'chiefMotorpool' => self::CHIEF_MOTORPOOL,
             'unitHeadGsu' => self::UNIT_HEAD_GSU,
         ]);
