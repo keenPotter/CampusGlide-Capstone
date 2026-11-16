@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -16,6 +17,7 @@ class User extends Authenticatable
     public const ROLE_ADMINISTRATOR = 'administrator';
     public const ROLE_FACULTY = 'faculty';
     public const ROLE_STAFF = 'staff';
+    public const MAX_ACTIVE_ADMINISTRATORS = 2;
 
     protected $fillable = [
         'email',
@@ -54,6 +56,13 @@ class User extends Authenticatable
     public function hasRole(string ...$roles): bool
     {
         return in_array($this->role, $roles, true);
+    }
+
+    public function scopeActiveAdministrators(Builder $query): Builder
+    {
+        return $query
+            ->where('role', self::ROLE_ADMINISTRATOR)
+            ->where('is_active', true);
     }
 
     public function vehicleRequests()

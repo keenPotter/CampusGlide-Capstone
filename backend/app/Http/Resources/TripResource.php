@@ -31,6 +31,9 @@ class TripResource extends JsonResource
             'actual_return_time' => $this->actual_return_time,
             'actual_mileage' => $this->actual_mileage,
             'notes' => $this->notes,
+            'cancellation_reason' => $this->cancellation_reason,
+            'cancelled_by' => $this->cancelledBy?->full_name,
+            'cancelled_at' => $this->cancelled_at?->toIso8601String(),
             'vehicle_request' => $vehicleRequest ? [
                 'id' => $vehicleRequest->id,
                 'status' => $vehicleRequest->status,
@@ -38,6 +41,10 @@ class TripResource extends JsonResource
                 'trip_date' => $vehicleRequest->trip_date?->toDateString(),
                 'trip_end_date' => $vehicleRequest->trip_end_date?->toDateString(),
                 'number_of_passengers' => $vehicleRequest->number_of_passengers,
+                'booking_source' => $vehicleRequest->booking_source ?? 'online',
+                'requester_name' => $vehicleRequest->requester_name ?: $requester?->full_name,
+                'requester_department' => $vehicleRequest->requester_department,
+                'requester_contact' => $vehicleRequest->requester_contact,
                 'requester' => $requester ? [
                     'id' => $requester->id,
                     'first_name' => $requester->first_name,

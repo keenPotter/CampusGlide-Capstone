@@ -3,6 +3,28 @@ import api, { unwrap } from '@/lib/api'
 import { todayIso } from '@/lib/format'
 import { useNotificationStore } from '@/stores/notifications'
 
+async function fetchAllByStatus(status, search) {
+  const params = {
+    status,
+    search: search.trim() || undefined,
+    page: 1,
+    per_page: 100,
+  }
+  const firstResponse = await api.get('/vehicle-requests', { params })
+  const requests = firstResponse.data?.data ?? []
+  const lastPage = Number(firstResponse.data?.meta?.last_page ?? 1)
+
+  if (lastPage <= 1) return requests
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: lastPage - 1 }, (_, index) =>
+      api.get('/vehicle-requests', { params: { ...params, page: index + 2 } }),
+    ),
+  )
+
+  return requests.concat(...remainingPages.map((response) => response.data?.data ?? []))
+}
+
 export const useVehicleRequestStore = defineStore('vehicleRequests', {
   state: () => ({
     items: [],
@@ -85,7 +107,7 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
     // Numbers and upcoming trips for the dashboard.
     // Counts come from meta.total, so they include every page.
     // This does not touch `items` or `filters`, which belong to the list page.
-    async fetchSummary(search = '') {
+    async fetchSummary(search = '', includeAllUpcoming = false) {
       const [pending, approved, disapproved] = await Promise.all(
         ['pending', 'approved', 'disapproved'].map((status) =>
           api.get('/vehicle-requests', { params: { status, per_page: 20 } }),
@@ -95,23 +117,31 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
       const total = (response) => response.data?.meta?.total ?? response.data?.data?.length ?? 0
       const today = todayIso()
 
-      let upcomingPending = pending
-      let upcomingApproved = approved
-      if (search.trim()) {
-        [upcomingPending, upcomingApproved] = await Promise.all(
+      let upcomingPending = pending.data?.data ?? []
+      let upcomingApproved = approved.data?.data ?? []
+      if (includeAllUpcoming) {
+        const [allPending, allApproved] = await Promise.all([
+          fetchAllByStatus('pending', search),
+          fetchAllByStatus('approved', search),
+        ])
+        upcomingPending = allPending
+        upcomingApproved = allApproved
+      } else if (search.trim()) {
+        const searchedUpcoming = await Promise.all(
           ['pending', 'approved'].map((status) =>
             api.get('/vehicle-requests', {
               params: { status, search: search.trim(), per_page: 100 },
             }),
           ),
         )
+        upcomingPending = searchedUpcoming[0].data?.data ?? []
+        upcomingApproved = searchedUpcoming[1].data?.data ?? []
       }
 
       // Upcoming = pending or approved requests whose trip has not ended yet, soonest first.
-      const upcoming = [...(upcomingPending.data?.data ?? []), ...(upcomingApproved.data?.data ?? [])]
+      const upcoming = [...upcomingPending, ...upcomingApproved]
         .filter((item) => (item.trip_end_date || item.trip_date) >= today)
         .sort((a, b) => String(a.trip_date).localeCompare(String(b.trip_date)))
-        .slice(0, 5)
 
       return {
         counts: {
@@ -119,7 +149,7 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
           approved: total(approved),
           disapproved: total(disapproved),
         },
-        upcoming,
+        upcoming: includeAllUpcoming ? upcoming : upcoming.slice(0, 5),
       }
     },
   },
