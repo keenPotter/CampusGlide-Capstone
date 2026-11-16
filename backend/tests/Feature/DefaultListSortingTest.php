@@ -59,6 +59,7 @@ class DefaultListSortingTest extends TestCase
             ->assertOk()
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.id', $newerFacultyRequest->id)
+            ->assertJsonPath('data.0.booking_source', VehicleRequest::SOURCE_ONLINE)
             ->assertJsonPath('data.1.id', $olderFacultyRequest->id);
     }
 

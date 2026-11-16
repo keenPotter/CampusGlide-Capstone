@@ -49,6 +49,7 @@ class AllocationResource extends JsonResource
                 'id' => $this->vehicle?->id,
                 'plate_number' => $this->vehicle?->plate_number,
                 'vehicle_model' => $this->vehicle?->vehicle_model,
+                'capacity' => $this->vehicle?->capacity,
             ],
             // A driver is a record only (no login): name, contact number and license.
             'driver' => [

@@ -93,6 +93,46 @@ export function availabilityOptions(items) {
   }))
 }
 
+export function vehicleAvailabilityOptions(items) {
+  return items.map((item) => {
+    const hasCapacity = item.capacity !== null
+      && item.capacity !== undefined
+      && String(item.capacity).trim() !== ''
+    const label = `${item.vehicle_model} (${item.plate_number}) - ${
+      hasCapacity ? `${item.capacity} seats` : 'Capacity not specified'
+    }`
+
+    return {
+      value: item.id,
+      label: item.available === false
+        ? `${label} — Unavailable (${item.unavailable_reason})`
+        : label,
+      disabled: item.available === false,
+    }
+  })
+}
+
+export function seatingCapacityWarning(passengerCount, capacity) {
+  if (
+    passengerCount === null
+    || passengerCount === undefined
+    || passengerCount === ''
+    || capacity === null
+    || capacity === undefined
+    || String(capacity).trim() === ''
+  ) {
+    return ''
+  }
+
+  const passengers = Number(passengerCount)
+  const seats = Number(capacity)
+  if (!Number.isFinite(passengers) || !Number.isFinite(seats) || seats <= 0 || passengers <= seats) {
+    return ''
+  }
+
+  return `Warning: Passenger count (${passengers}) exceeds this vehicle's seating capacity (${seats} seats). Confirm only if splitting passengers or running multiple shuttle trips.`
+}
+
 /**
  * The date range of a trip when it starts on `newStart` instead.
  * The end date moves by the same number of days.

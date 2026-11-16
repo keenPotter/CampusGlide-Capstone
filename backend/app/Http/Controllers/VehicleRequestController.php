@@ -39,7 +39,9 @@ class VehicleRequestController extends Controller
 
         $user = $request->user();
 
-        $query = VehicleRequest::with('requester')
+        $query = VehicleRequest::query()
+            ->select('vehicle_requests.*')
+            ->with('requester')
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 

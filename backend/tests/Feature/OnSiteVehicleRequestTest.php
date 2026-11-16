@@ -46,6 +46,7 @@ class OnSiteVehicleRequestTest extends TestCase
         $this->actingAs($administrator, 'sanctum')
             ->getJson('/api/vehicle-requests?search=Community%20Outreach')
             ->assertOk()
+            ->assertJsonPath('data.0.booking_source', 'on_site')
             ->assertJsonPath('data.0.requester_name', 'Jordan Lee');
     }
 

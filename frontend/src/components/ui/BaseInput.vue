@@ -13,6 +13,7 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   min: { type: [String, Number], default: undefined },
   max: { type: [String, Number], default: undefined },
+  maxLength: { type: [String, Number], default: undefined },
   step: { type: [String, Number], default: undefined },
   autocomplete: { type: String, default: undefined },
   name: { type: String, default: undefined },
@@ -56,8 +57,10 @@ function updateValue(event) {
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
+        :required="required"
         :min="min"
         :max="max"
+        :maxlength="maxLength"
         :step="step"
         :autocomplete="autocomplete"
         :name="name"
