@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use App\Models\VehicleRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,10 +12,6 @@ class VehicleRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'status' => $this->status,
-            'booking_source' => $this->booking_source ?? VehicleRequest::SOURCE_ONLINE,
-            'requester_name' => $this->requester_name ?: $this->requester?->full_name,
-            'requester_department' => $this->requester_department,
-            'requester_contact' => $this->requester_contact,
             'destination' => $this->destination,
             'purpose' => $this->purpose,
             'trip_date' => $this->trip_date?->format('Y-m-d'),
@@ -32,11 +27,11 @@ class VehicleRequestResource extends JsonResource
             'edit_reason' => $this->edit_reason,
             'approved_by' => $this->approved_by,
             'approved_date' => $this->approved_date?->toIso8601String(),
-            'requested_by' => $this->requester ? [
+            'requested_by' => [
                 'id' => $this->requester->id,
                 'first_name' => $this->requester->first_name,
                 'last_name' => $this->requester->last_name,
-            ] : null,
+            ],
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

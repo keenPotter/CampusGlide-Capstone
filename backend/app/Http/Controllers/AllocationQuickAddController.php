@@ -22,7 +22,7 @@ class AllocationQuickAddController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             // Column length is 20 in the drivers table.
-            'contact_number' => ['required', 'string', 'regex:/^09\d{9}$/'],
+            'contact_number' => ['required', 'string', 'max:20'],
             'license_number' => ['required', 'string', 'max:50', 'unique:drivers,license_number'],
             'license_expiry_date' => ['required', 'date_format:Y-m-d'],
         ]);
@@ -54,7 +54,7 @@ class AllocationQuickAddController extends Controller
             'plate_number' => ['required', 'string', 'max:20', 'unique:vehicles,plate_number'],
             'vehicle_model' => ['required', 'string', 'max:100'],
             'vehicle_type' => ['nullable', 'string', 'max:50'],
-            'capacity' => ['required', 'integer', 'min:1', 'max:100'],
+            'capacity' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $vehicle = Vehicle::create([

@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Allocation;
 use App\Models\Driver;
 use App\Models\Trip;
 use App\Models\Vehicle;
@@ -30,55 +29,26 @@ class AllocationService
     /** Trip statuses that block double-booking. */
     public const ACTIVE = ['scheduled', 'in_progress'];
 
-    public function allocateRequest(
-        VehicleRequest $vehicleRequest,
-        Vehicle $vehicle,
-        Driver $driver,
-        int $allocatedBy,
-        ?string $notes = null,
-        bool $approvePending = false
-    ): Allocation {
-        return DB::transaction(function () use ($vehicleRequest, $vehicle, $driver, $allocatedBy, $notes, $approvePending) {
-            $this->assertAssignable($vehicleRequest, $vehicle, $driver, null, null, $approvePending);
+    /** Shape of a request that still needs a trip assignment. */
+    public static function requestOption(VehicleRequest $r): array
+    {
+        $tripDate = $r->trip_date->toDateString();
 
-            if ($approvePending && $vehicleRequest->status === 'pending') {
-                $vehicleRequest->update([
-                    'status' => 'approved',
-                    'disapproval_reason' => null,
-                    'approved_by' => $allocatedBy,
-                    'approved_date' => now(),
-                ]);
-            }
-
-            $trip = Trip::create([
-                'vehicle_request_id' => $vehicleRequest->id,
-                'vehicle_id' => $vehicle->id,
-                'driver_id' => $driver->id,
-                'trip_date' => $vehicleRequest->trip_date,
-                'departure_time' => $vehicleRequest->departure_time,
-                'estimated_return_time' => $vehicleRequest->estimated_return_time,
-                'destination' => $vehicleRequest->destination,
-                'purpose' => $vehicleRequest->purpose,
-                'trip_status' => 'scheduled',
-            ]);
-
-            $allocation = Allocation::create([
-                'trip_id' => $trip->id,
-                'vehicle_id' => $vehicle->id,
-                'driver_id' => $driver->id,
-                'allocated_by' => $allocatedBy,
-                'allocation_date' => now(),
-                'notes' => $notes,
-            ]);
-
-            Vehicle::whereKey($vehicle->id)->update(['status' => 'in_use']);
-            Driver::whereKey($driver->id)->update([
-                'is_available' => false,
-                'assigned_vehicle_id' => $vehicle->id,
-            ]);
-
-            return $allocation;
-        });
+        return [
+            'id' => $r->id,
+            'status' => $r->status,
+            'label' => "#{$r->id} · {$r->destination} · {$tripDate} " . substr((string) $r->departure_time, 0, 5),
+            'destination' => $r->destination,
+            'purpose' => $r->purpose,
+            'requester' => $r->requester?->full_name,
+            'trip_date' => $tripDate,
+            'trip_end_date' => $r->trip_end_date?->toDateString(),
+            'trip_type' => $r->trip_type,
+            'departure_time' => $r->departure_time,
+            'estimated_return_time' => $r->estimated_return_time,
+            'passengers' => $r->passengers,
+            'number_of_passengers' => $r->number_of_passengers,
+        ];
     }
 
     /**

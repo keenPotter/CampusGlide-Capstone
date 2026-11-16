@@ -9,7 +9,7 @@ class VehicleController extends Controller
 {
     /**
      * GET /api/vehicles
-     * Administrators and staff can view vehicles (route middleware).
+     * Administrators only (route middleware). The trip schedule and maintenance pages read this.
      */
     public function index()
     {

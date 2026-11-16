@@ -7,11 +7,10 @@ use App\Http\Requests\UpdateMaintenanceLogRequest;
 use App\Http\Resources\MaintenanceLogResource;
 use App\Models\VehicleMaintenance;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class MaintenanceLogController extends Controller
 {
-    private const VEHICLE_COLUMNS = 'vehicle:id,plate_number,vehicle_model,mileage,status';
+    private const VEHICLE_COLUMNS = 'vehicle:id,plate_number,vehicle_model,mileage';
 
     /**
      * The API uses the names `type` and `date_performed`.
@@ -104,26 +103,13 @@ class MaintenanceLogController extends Controller
     public function store(StoreMaintenanceLogRequest $request)
     {
         $columns = array_merge(['status' => 'scheduled', 'maintenance_category' => 'preventive'], $this->toColumns($request->validated()));
-        $isCompleted = $columns['status'] === 'completed';
 
-        if ($isCompleted) {
-            $columns['completion_date'] = now()->toDateString();
-        }
+        $log = VehicleMaintenance::create($columns);
+        $log->load(self::VEHICLE_COLUMNS);
 
-        $log = DB::transaction(function () use ($columns, $isCompleted) {
-            $log = VehicleMaintenance::create($columns);
-            $log->load(self::VEHICLE_COLUMNS);
+        $this->syncVehicleDates($log);
 
-            $this->syncVehicleDates($log);
-
-            if ($isCompleted) {
-                $this->restoreVehicleAvailability($log);
-            }
-
-            return $log->fresh(self::VEHICLE_COLUMNS);
-        });
-
-        return (new MaintenanceLogResource($log))
+        return (new MaintenanceLogResource($log->fresh(self::VEHICLE_COLUMNS)))
             ->response()
             ->setStatusCode(201);
     }
@@ -133,26 +119,12 @@ class MaintenanceLogController extends Controller
      */
     public function update(UpdateMaintenanceLogRequest $request, VehicleMaintenance $maintenanceLog)
     {
-        $columns = $this->toColumns($request->validated());
-        $isCompleting = ($columns['status'] ?? $maintenanceLog->status) === 'completed'
-            && $maintenanceLog->status !== 'completed';
+        $maintenanceLog->update($this->toColumns($request->validated()));
+        $maintenanceLog->load(self::VEHICLE_COLUMNS);
 
-        if ($isCompleting) {
-            $columns['completion_date'] = now()->toDateString();
-        }
+        $this->syncVehicleDates($maintenanceLog);
 
-        DB::transaction(function () use ($maintenanceLog, $columns, $isCompleting) {
-            $maintenanceLog->update($columns);
-            $maintenanceLog->load(self::VEHICLE_COLUMNS);
-
-            $this->syncVehicleDates($maintenanceLog);
-
-            if ($isCompleting) {
-                $this->restoreVehicleAvailability($maintenanceLog);
-            }
-        });
-
-        return new MaintenanceLogResource($maintenanceLog->fresh(self::VEHICLE_COLUMNS));
+        return new MaintenanceLogResource($maintenanceLog);
     }
 
     /**
@@ -179,21 +151,9 @@ class MaintenanceLogController extends Controller
 
         if ($vehicle->latestMaintenanceLog?->is($log)) {
             $vehicle->update([
-                'last_maintenance_date' => ($log->completion_date ?? $log->maintenance_date)->toDateString(),
+                'last_maintenance_date' => $log->maintenance_date->toDateString(),
                 'next_maintenance_date' => $log->next_due_date?->toDateString(),
             ]);
-        }
-    }
-
-    private function restoreVehicleAvailability(VehicleMaintenance $log): void
-    {
-        $vehicle = $log->vehicle;
-
-        if (
-            $vehicle->status === 'maintenance'
-            && ! $vehicle->maintenanceLogs()->where('status', 'in_progress')->exists()
-        ) {
-            $vehicle->update(['status' => 'available']);
         }
     }
 }

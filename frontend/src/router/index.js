@@ -71,18 +71,6 @@ const routes = [
     meta: { requiresAuth: true, roles: ['administrator'] },
   },
   {
-    path: '/audit-logs',
-    name: 'auditLogs',
-    component: () => import('@/views/AuditLogsView.vue'),
-    meta: { requiresAuth: true, roles: ['administrator'], showForbidden: true },
-  },
-  {
-    path: '/forbidden',
-    name: 'forbidden',
-    component: () => import('@/views/ForbiddenView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
     path: '/users',
     name: 'users.index',
     component: () => import('@/views/users/UsersView.vue'),
@@ -123,10 +111,6 @@ router.beforeEach(async (to) => {
 
   // Wrong role (for example, faculty typing /users/new): send back to the dashboard.
   if (to.meta.roles && !to.meta.roles.includes(auth.role)) {
-    if (to.meta.showForbidden) {
-      return { name: 'forbidden' }
-    }
-
     return { name: 'dashboard' }
   }
 
