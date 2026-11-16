@@ -65,7 +65,7 @@ async function load(searchQuery = search.value) {
   loadError.value = ''
 
   try {
-    summary.value = await requests.fetchSummary(searchQuery)
+    summary.value = await requests.fetchSummary(searchQuery, auth.isStaff)
   } catch (error) {
     loadError.value = errorMessage(error, 'Unable to load the dashboard.')
   } finally {

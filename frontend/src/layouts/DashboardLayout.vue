@@ -64,6 +64,7 @@ const navigation = computed(() => {
         badge: notifications.openMaintenance,
       },
       { name: 'Users', to: { name: 'users.index' }, icon: 'users' },
+      { name: 'Audit Log', to: { name: 'auditLogs' }, icon: 'shield' },
     )
   }
 
@@ -80,6 +81,7 @@ const icons = {
   wrench: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z',
   'user-plus': 'M15 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M16 11h6',
   users: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  shield: 'M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-3zM9 12l2 2 4-4',
 }
 
 function isActive(item) {

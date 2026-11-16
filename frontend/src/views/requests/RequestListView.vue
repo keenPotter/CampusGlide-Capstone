@@ -28,6 +28,7 @@ import PaginationBar from '@/components/ui/PaginationBar.vue'
 import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 import VehicleRequestModal from '@/components/requests/VehicleRequestModal.vue'
+import OnSiteBookingModal from '@/components/requests/OnSiteBookingModal.vue'
 
 const auth = useAuthStore()
 const store = useVehicleRequestStore()
@@ -39,6 +40,7 @@ const selectedRequest = ref(null)
 const detailRequest = ref(null)
 const detailLoading = ref(false)
 const showNewRequest = ref(false)
+const showOnSiteBooking = ref(false)
 
 watch(
   () => route.query.create,
@@ -70,7 +72,17 @@ const requestDetailRows = computed(() => {
   if (!request) return []
 
   return [
-    { label: 'Requesting official', value: fullName(request.requested_by) },
+    { label: 'Booking source', value: request.booking_source === 'on_site' ? 'On-Site' : 'Online' },
+    {
+      label: request.booking_source === 'on_site' ? 'Requesting personnel' : 'Requesting official',
+      value: request.requester_name || fullName(request.requested_by),
+    },
+    ...(request.booking_source === 'on_site'
+      ? [
+          { label: 'Office/Department', value: request.requester_department },
+          { label: 'Contact Number', value: request.requester_contact },
+        ]
+      : []),
     { label: 'Destination', value: request.destination },
     { label: 'Purpose', value: request.purpose },
     { label: 'Date of travel', value: formatDate(request.trip_date) },
@@ -145,6 +157,24 @@ async function onRequestSubmitted() {
   }
 }
 
+async function onOnSiteBookingSubmitted(request) {
+  showOnSiteBooking.value = false
+  toast.success(
+    request.status === 'approved'
+      ? 'On-site trip recorded and scheduled.'
+      : 'On-site request recorded and added to the allocation queue.',
+  )
+  try {
+    await store.fetch({ page: 1 })
+  } catch (error) {
+    toast.error(errorMessage(error, 'Request recorded, but the list could not be refreshed.'))
+  }
+}
+
+function personName(request) {
+  return request.requester_name || fullName(request.requested_by) || '—'
+}
+
 function editSelectedRequest() {
   const request = detailRequest.value
   closeRequest()
@@ -195,6 +225,9 @@ function onDisapproved() {
 
       <div class="page-actions">
         <RefreshButton :loading="store.loading" label="Refresh vehicle requests" @click="store.fetch()" />
+        <BaseButton v-if="auth.isAdministrator" size="sm" @click="showOnSiteBooking = true">
+          + Direct Trip Booking
+        </BaseButton>
         <BaseButton v-if="auth.isFaculty" size="sm" @click="showNewRequest = true">
           New request
         </BaseButton>
@@ -264,65 +297,70 @@ function onDisapproved() {
           <div class="min-w-0 w-full flex-1 md:w-auto">
             <button
               type="button"
-              class="card-row-value block w-full truncate text-left md:text-section-title"
+              class="card-row-value block w-full truncate text-left"
               :title="request.destination"
               @click="openRequest(request)"
             >
               {{ request.destination }}
             </button>
-            <p class="mt-0.5 truncate text-small text-ink-muted md:text-body">{{ request.purpose }}</p>
+            <p class="mt-0.5 truncate text-small text-ink-muted">{{ request.purpose }}</p>
           </div>
-          <StatusBadge :status="request.status" class="shrink-0 self-start" />
+          <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
+            <span
+              class="rounded-full px-2 py-1 text-xs font-medium"
+              :class="request.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-ink-muted'"
+            >
+              {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
+            </span>
+            <StatusBadge :status="request.status" />
+          </div>
         </div>
 
         <div class="mb-3 space-y-1.5 md:space-y-2">
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0 md:text-body">Requested by</span>
-            <span class="min-w-0 flex-1 break-words text-right text-small text-ink md:text-body">{{ fullName(request.requested_by) }}</span>
+            <span class="card-row-label shrink-0">Requested by</span>
+            <span class="min-w-0 flex-1 break-words text-right text-small text-ink">{{ personName(request) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0 md:text-body">Travel date</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ formatDate(request.trip_date) }}</span>
+            <span class="card-row-label shrink-0">Travel date</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ formatDate(request.trip_date) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0 md:text-body">Departure</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ formatTime(request.departure_time) }}</span>
+            <span class="card-row-label shrink-0">Departure</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ formatTime(request.departure_time) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0 md:text-body">Passengers</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ request.number_of_passengers ?? '—' }}</span>
+            <span class="card-row-label shrink-0">Passengers</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ request.number_of_passengers ?? '—' }}</span>
           </div>
           <div
             v-if="request.status === 'disapproved' && request.disapproval_reason"
             class="flex items-start justify-between gap-3"
           >
-            <span class="card-row-label shrink-0 md:text-body">Reason</span>
-            <span class="min-w-0 flex-1 break-words text-right text-small text-red-700 md:text-body">
+            <span class="card-row-label shrink-0">Reason</span>
+            <span class="min-w-0 flex-1 break-words text-right text-small text-red-700">
               {{ request.disapproval_reason }}
             </span>
           </div>
         </div>
 
-        <div class="mt-auto border-t border-line pt-3">
-          <template v-if="auth.isAdministrator && request.status === 'pending'">
-            <div class="flex items-center gap-2">
-              <BaseButton size="sm" class="flex-1" @click="openApprove(request)">
-                <Check :size="16" aria-hidden="true" /> Approve
-              </BaseButton>
-              <BaseButton size="sm" variant="outline" class="flex-1" @click="openDisapprove(request)">
-                <X :size="16" aria-hidden="true" /> Disapprove
-              </BaseButton>
-            </div>
-          </template>
-
+        <div class="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
           <BaseButton
             size="sm"
             variant="ghost"
-            class="mt-2 w-full"
             @click="openRequest(request)"
           >
             <Eye :size="16" aria-hidden="true" /> View
           </BaseButton>
+
+          <template v-if="auth.isAdministrator && request.status === 'pending'">
+            <BaseButton size="sm" @click="openApprove(request)">
+              <Check :size="16" aria-hidden="true" /> Approve
+            </BaseButton>
+            <BaseButton size="sm" variant="outline" @click="openDisapprove(request)">
+              <X :size="16" aria-hidden="true" /> Disapprove
+            </BaseButton>
+          </template>
         </div>
       </div>
     </div>
@@ -365,7 +403,7 @@ function onDisapproved() {
               <p class="truncate text-small text-ink-muted">{{ request.purpose }}</p>
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
-              <span class="break-words">{{ fullName(request.requested_by) }}</span>
+              <span class="break-words">{{ personName(request) }}</span>
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
               <p>
@@ -378,7 +416,15 @@ function onDisapproved() {
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">{{ request.number_of_passengers ?? '—' }}</td>
             <td class="px-2 py-3 align-top xl:px-card">
-              <StatusBadge :status="request.status" />
+              <div class="flex flex-col items-start gap-1">
+                <span
+                  class="rounded-full px-2 py-1 text-xs font-medium"
+                  :class="request.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-ink-muted'"
+                >
+                  {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
+                </span>
+                <StatusBadge :status="request.status" />
+              </div>
             </td>
             <!-- Reason for disapproval. Blank when there is none. -->
             <td class="px-2 py-3 align-top text-small text-ink-muted xl:px-card">
@@ -488,6 +534,11 @@ function onDisapproved() {
       :open="showNewRequest"
       @close="closeNewRequest"
       @submitted="onRequestSubmitted"
+    />
+    <OnSiteBookingModal
+      :open="showOnSiteBooking"
+      @close="showOnSiteBooking = false"
+      @submitted="onOnSiteBookingSubmitted"
     />
   </div>
 </template>

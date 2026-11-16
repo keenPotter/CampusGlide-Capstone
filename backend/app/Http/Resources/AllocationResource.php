@@ -27,6 +27,9 @@ class AllocationResource extends JsonResource
                 'estimated_return_time' => $trip?->estimated_return_time,
                 'destination' => $trip?->destination,
                 'purpose' => $trip?->purpose,
+                'cancellation_reason' => $trip?->cancellation_reason,
+                'cancelled_by' => $trip?->cancelledBy?->full_name,
+                'cancelled_at' => $trip?->cancelled_at?->toIso8601String(),
             ],
             'vehicle_request' => [
                 'id' => $vehicleRequest?->id,
@@ -34,7 +37,11 @@ class AllocationResource extends JsonResource
                 'status' => $vehicleRequest?->status,
                 // The frontend filters allocations by trip type.
                 'trip_type' => $vehicleRequest?->trip_type,
-                'requester' => $vehicleRequest?->requester?->full_name,
+                'booking_source' => $vehicleRequest?->booking_source ?? 'online',
+                'requester' => $vehicleRequest?->requester?->full_name
+                    ?? $vehicleRequest?->requester_name,
+                'requester_department' => $vehicleRequest?->requester_department,
+                'requester_contact' => $vehicleRequest?->requester_contact,
                 // Shown in the allocation summary table.
                 'number_of_passengers' => $vehicleRequest?->number_of_passengers,
             ],
@@ -42,6 +49,7 @@ class AllocationResource extends JsonResource
                 'id' => $this->vehicle?->id,
                 'plate_number' => $this->vehicle?->plate_number,
                 'vehicle_model' => $this->vehicle?->vehicle_model,
+                'capacity' => $this->vehicle?->capacity,
             ],
             // A driver is a record only (no login): name, contact number and license.
             'driver' => [
