@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\VehicleRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -12,7 +13,7 @@ class VehicleRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'status' => $this->status,
-            'booking_source' => $this->booking_source ?? 'online',
+            'booking_source' => $this->booking_source ?? VehicleRequest::SOURCE_ONLINE,
             'requester_name' => $this->requester_name ?: $this->requester?->full_name,
             'requester_department' => $this->requester_department,
             'requester_contact' => $this->requester_contact,
