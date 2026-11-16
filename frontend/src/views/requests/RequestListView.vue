@@ -420,22 +420,25 @@ function onDisapproved() {
             </div>
           </template>
 
-          <BaseButton
-            size="sm"
-            variant="ghost"
-            class="mt-2 w-full"
-            @click="openRequest(request)"
-          >
-            <Eye :size="16" aria-hidden="true" /> View
-          </BaseButton>
-          <BaseButton
-            v-if="canEditRequest(request)"
-            size="sm"
-            variant="outline"
-            @click="openEditRequest(request)"
-          >
-            <Pencil :size="16" aria-hidden="true" /> Edit
-          </BaseButton>
+          <div class="mt-2 flex gap-2">
+            <BaseButton
+              size="sm"
+              variant="ghost"
+              class="flex-1"
+              @click="openRequest(request)"
+            >
+              <Eye :size="16" aria-hidden="true" /> View
+            </BaseButton>
+            <BaseButton
+              v-if="canEditRequest(request)"
+              size="sm"
+              variant="outline"
+              class="flex-1"
+              @click="openEditRequest(request)"
+            >
+              <Pencil :size="16" aria-hidden="true" /> Edit
+            </BaseButton>
+          </div>
         </div>
       </div>
     </div>

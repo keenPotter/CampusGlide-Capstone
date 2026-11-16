@@ -6,8 +6,8 @@ use App\Http\Requests\EditVehicleRequestRequest;
 use App\Http\Requests\StoreOnSiteVehicleRequestRequest;
 use App\Http\Requests\StoreVehicleRequestRequest;
 use App\Http\Requests\UpdateVehicleRequestStatusRequest;
-use App\Models\Allocation;
 use App\Http\Resources\VehicleRequestResource;
+use App\Models\Allocation;
 use App\Models\Driver;
 use App\Models\Trip;
 use App\Models\Vehicle;
@@ -76,6 +76,7 @@ class VehicleRequestController extends Controller
                             ->where('destination', 'like', $pattern)
                             ->orWhere('purpose', 'like', $pattern)
                             ->orWhere('disapproval_reason', 'like', $pattern)
+                            ->orWhere('requester_name', 'like', $pattern)
                             ->orWhereHas('requester', function ($requesterQuery) use ($pattern) {
                                 $requesterQuery
                                     ->where('first_name', 'like', $pattern)
