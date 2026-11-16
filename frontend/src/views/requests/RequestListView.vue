@@ -87,7 +87,6 @@ const requestDetailRows = computed(() => {
   if (!request) return []
 
   return [
-    { label: 'Booking source', value: request.booking_source === 'on_site' ? 'On-Site' : 'Online' },
     {
       label: request.booking_source === 'on_site' ? 'Requesting personnel' : 'Requesting official',
       value: requesterName(request),
@@ -378,15 +377,7 @@ function onDisapproved() {
             </button>
             <p class="mt-0.5 truncate text-small text-ink-muted md:text-body">{{ request.purpose }}</p>
           </div>
-          <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
-            <span
-              class="rounded-full px-2.5 py-1 text-xs font-semibold"
-              :class="request.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-neutral-600'"
-            >
-              {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
-            </span>
-            <StatusBadge :status="request.status" />
-          </div>
+          <StatusBadge :status="request.status" class="shrink-0 self-start" />
         </div>
 
         <div class="mb-3 space-y-1.5 md:space-y-2">
@@ -418,27 +409,8 @@ function onDisapproved() {
         </div>
 
         <div class="mt-auto border-t border-line pt-3">
-          <div class="flex items-center gap-2">
-            <BaseButton
-              size="sm"
-              variant="ghost"
-              class="flex-1"
-              @click="openRequest(request)"
-            >
-              <Eye :size="16" aria-hidden="true" /> View
-            </BaseButton>
-            <BaseButton
-              v-if="canEditRequest(request)"
-              size="sm"
-              variant="outline"
-              class="flex-1"
-              @click="openEditRequest(request)"
-            >
-              <Pencil :size="16" aria-hidden="true" /> Edit
-            </BaseButton>
-          </div>
           <template v-if="auth.isAdministrator && request.status === 'pending'">
-            <div class="mt-2 flex items-center gap-2">
+            <div class="flex items-center gap-2">
               <BaseButton size="sm" class="flex-1" @click="openApprove(request)">
                 <Check :size="16" aria-hidden="true" /> Approve
               </BaseButton>
@@ -447,6 +419,23 @@ function onDisapproved() {
               </BaseButton>
             </div>
           </template>
+
+          <BaseButton
+            size="sm"
+            variant="ghost"
+            class="mt-2 w-full"
+            @click="openRequest(request)"
+          >
+            <Eye :size="16" aria-hidden="true" /> View
+          </BaseButton>
+          <BaseButton
+            v-if="canEditRequest(request)"
+            size="sm"
+            variant="outline"
+            @click="openEditRequest(request)"
+          >
+            <Pencil :size="16" aria-hidden="true" /> Edit
+          </BaseButton>
         </div>
       </div>
     </div>
@@ -502,15 +491,7 @@ function onDisapproved() {
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">{{ request.number_of_passengers ?? '—' }}</td>
             <td class="px-2 py-3 align-top xl:px-card">
-              <div class="flex flex-col items-start gap-1">
-                <span
-                  class="rounded-full px-2.5 py-1 text-xs font-semibold"
-                  :class="request.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-neutral-600'"
-                >
-                  {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
-                </span>
-                <StatusBadge :status="request.status" />
-              </div>
+              <StatusBadge :status="request.status" />
             </td>
             <!-- Reason for disapproval. Blank when there is none. -->
             <td class="px-2 py-3 align-top text-small text-ink-muted xl:px-card">
