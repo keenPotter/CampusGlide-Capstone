@@ -55,23 +55,8 @@ async function save() {
     : {
         plate_number: form.plate_number.trim(),
         vehicle_model: form.vehicle_model.trim(),
-        capacity: Number(form.capacity),
+        capacity: form.capacity ? Number(form.capacity) : undefined,
       }
-
-  if (isDriver && !/^09\d{9}$/.test(form.contact_number.trim())) {
-    errors.value = {
-      contact_number: 'Enter a valid 11-digit Philippine mobile number starting with 09.',
-    }
-    return
-  }
-
-  if (!isDriver) {
-    const capacity = Number(form.capacity)
-    if (!String(form.capacity).trim() || !Number.isInteger(capacity) || capacity < 1 || capacity > 100) {
-      errors.value = { capacity: 'Enter a whole number between 1 and 100.' }
-      return
-    }
-  }
 
   saving.value = true
   try {
@@ -100,8 +85,7 @@ async function save() {
         v-model="form.contact_number"
         label="Contact number"
         type="tel"
-        placeholder="09XXXXXXXXX"
-        max-length="11"
+        placeholder="0917-123-4567"
         :error="errors.contact_number"
         required
       />
@@ -136,12 +120,10 @@ async function save() {
       />
       <BaseInput
         v-model="form.capacity"
-        label="Seating capacity"
+        label="Seating capacity (optional)"
         type="number"
         min="1"
-        max="100"
         :error="errors.capacity"
-        required
       />
     </div>
 

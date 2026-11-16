@@ -94,7 +94,6 @@ function matchesSearch(trip) {
     trip.vehicle?.plate_number,
     trip.vehicle?.vehicle_model,
     trip.driver?.name,
-    trip.vehicle_request?.requester_name,
     trip.vehicle_request?.requester?.first_name,
     trip.vehicle_request?.requester?.last_name,
   ]

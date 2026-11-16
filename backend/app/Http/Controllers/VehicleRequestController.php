@@ -158,13 +158,44 @@ class VehicleRequestController extends Controller
             ]);
 
             if (! empty($data['vehicle_id']) && ! empty($data['driver_id'])) {
-                $this->allocations->allocateRequest(
+                $vehicle = Vehicle::findOrFail($data['vehicle_id']);
+                $driver = Driver::findOrFail($data['driver_id']);
+                $this->allocations->assertAssignable(
                     $vehicleRequest,
-                    Vehicle::findOrFail($data['vehicle_id']),
-                    Driver::findOrFail($data['driver_id']),
-                    (int) $request->user()->id,
-                    approvePending: true
+                    $vehicle,
+                    $driver,
+                    allowPending: true,
                 );
+
+                $vehicleRequest->update([
+                    'status' => 'approved',
+                    'approved_by' => $request->user()->id,
+                    'approved_date' => now(),
+                ]);
+                $trip = Trip::create([
+                    'vehicle_request_id' => $vehicleRequest->id,
+                    'vehicle_id' => $vehicle->id,
+                    'driver_id' => $driver->id,
+                    'trip_date' => $vehicleRequest->trip_date,
+                    'departure_time' => $vehicleRequest->departure_time,
+                    'estimated_return_time' => $vehicleRequest->estimated_return_time,
+                    'destination' => $vehicleRequest->destination,
+                    'purpose' => $vehicleRequest->purpose,
+                    'trip_status' => 'scheduled',
+                ]);
+                Allocation::create([
+                    'trip_id' => $trip->id,
+                    'vehicle_id' => $vehicle->id,
+                    'driver_id' => $driver->id,
+                    'allocated_by' => $request->user()->id,
+                    'allocation_date' => now(),
+                ]);
+
+                $vehicle->update(['status' => 'in_use']);
+                $driver->update([
+                    'is_available' => false,
+                    'assigned_vehicle_id' => $vehicle->id,
+                ]);
             }
 
             return $vehicleRequest;
