@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
 import api, { errorMessage, unwrap } from '@/lib/api'
@@ -18,9 +18,9 @@ import PaginationBar from '@/components/ui/PaginationBar.vue'
 import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 import VehicleRequestModal from '@/components/requests/VehicleRequestModal.vue'
+import VehicleRequestEditModal from '@/components/requests/VehicleRequestEditModal.vue'
 
 const auth = useAuthStore()
-const router = useRouter()
 const requests = useVehicleRequestStore()
 const toast = useToast()
 
@@ -37,6 +37,7 @@ const detailLoading = ref(false)
 const approving = ref(null)
 const disapproving = ref(null)
 const showNewRequest = ref(false)
+const editingRequest = ref(null)
 
 const requestDetailRows = computed(() => {
   const request = detailRequest.value
@@ -170,7 +171,12 @@ async function onDisapproved() {
 function editSelectedRequest() {
   const request = detailRequest.value
   closeRequest()
-  if (request) router.push({ name: 'requests.edit', params: { id: request.id } })
+  if (request) editingRequest.value = request
+}
+
+async function onRequestUpdated() {
+  editingRequest.value = null
+  await load()
 }
 
 async function onRequestSubmitted() {
@@ -196,13 +202,10 @@ watch(pageCount, (count) => {
       </div>
       <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh dashboard" @click="load" />
+        <BaseButton v-if="auth.isFaculty" size="sm" @click="showNewRequest = true">
+          New request
+        </BaseButton>
       </div>
-    </div>
-
-    <div v-if="auth.isFaculty" class="flex justify-end">
-      <BaseButton @click="showNewRequest = true">
-        New request
-      </BaseButton>
     </div>
 
     <LoadError :message="loadError" @retry="load" />
@@ -338,6 +341,11 @@ watch(pageCount, (count) => {
       :open="showNewRequest"
       @close="showNewRequest = false"
       @submitted="onRequestSubmitted"
+    />
+    <VehicleRequestEditModal
+      :request="editingRequest"
+      @close="editingRequest = null"
+      @saved="onRequestUpdated"
     />
   </div>
 </template>

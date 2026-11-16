@@ -26,7 +26,7 @@ function emptyForm() {
     trip_date: today,
     trip_end_date: today,
     min_trip_date: today,
-    trip_type: 'inclusive',
+    trip_type: '',
     departure_time: '07:30',
     estimated_return_time: '17:00',
     passengers: '',

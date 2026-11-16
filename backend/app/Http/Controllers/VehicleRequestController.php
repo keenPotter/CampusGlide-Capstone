@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\EditVehicleRequestRequest;
+use App\Http\Requests\StoreOnSiteVehicleRequestRequest;
 use App\Http\Requests\StoreVehicleRequestRequest;
 use App\Http\Requests\UpdateVehicleRequestStatusRequest;
+use App\Models\Allocation;
 use App\Http\Resources\VehicleRequestResource;
 use App\Models\Driver;
 use App\Models\Trip;
@@ -126,6 +128,79 @@ class VehicleRequestController extends Controller
         ]);
 
         return new VehicleRequestResource($vehicleRequest->load('requester'));
+    }
+
+    public function storeOnSite(StoreOnSiteVehicleRequestRequest $request)
+    {
+        $data = $request->validated();
+
+        $vehicleRequest = DB::transaction(function () use ($data, $request) {
+            $vehicleRequest = VehicleRequest::create([
+                'requester_id' => null,
+                'booking_source' => VehicleRequest::SOURCE_ON_SITE,
+                'requester_name' => $data['requester_name'],
+                'requester_department' => $data['requester_department'],
+                'requester_contact' => $data['requester_contact'],
+                'request_date' => now(),
+                'destination' => $data['destination'],
+                'purpose' => $data['purpose'],
+                'trip_date' => $data['trip_date'],
+                'trip_end_date' => $data['trip_end_date'],
+                'trip_type' => $data['trip_type'],
+                'departure_time' => $data['departure_time'],
+                'estimated_return_time' => $data['estimated_return_time'],
+                'passengers' => $data['passengers'],
+                'number_of_passengers' => $data['number_of_passengers'],
+                'status' => 'pending',
+            ]);
+
+            if (! empty($data['vehicle_id']) && ! empty($data['driver_id'])) {
+                $vehicle = Vehicle::findOrFail($data['vehicle_id']);
+                $driver = Driver::findOrFail($data['driver_id']);
+                $this->allocations->assertAssignable(
+                    $vehicleRequest,
+                    $vehicle,
+                    $driver,
+                    allowPending: true,
+                );
+
+                $vehicleRequest->update([
+                    'status' => 'approved',
+                    'approved_by' => $request->user()->id,
+                    'approved_date' => now(),
+                ]);
+                $trip = Trip::create([
+                    'vehicle_request_id' => $vehicleRequest->id,
+                    'vehicle_id' => $vehicle->id,
+                    'driver_id' => $driver->id,
+                    'trip_date' => $vehicleRequest->trip_date,
+                    'departure_time' => $vehicleRequest->departure_time,
+                    'estimated_return_time' => $vehicleRequest->estimated_return_time,
+                    'destination' => $vehicleRequest->destination,
+                    'purpose' => $vehicleRequest->purpose,
+                    'trip_status' => 'scheduled',
+                ]);
+                Allocation::create([
+                    'trip_id' => $trip->id,
+                    'vehicle_id' => $vehicle->id,
+                    'driver_id' => $driver->id,
+                    'allocated_by' => $request->user()->id,
+                    'allocation_date' => now(),
+                ]);
+
+                $vehicle->update(['status' => 'in_use']);
+                $driver->update([
+                    'is_available' => false,
+                    'assigned_vehicle_id' => $vehicle->id,
+                ]);
+            }
+
+            return $vehicleRequest;
+        });
+
+        return (new VehicleRequestResource($vehicleRequest->fresh('requester')))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Request $request, VehicleRequest $vehicleRequest)

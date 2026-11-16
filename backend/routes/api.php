@@ -104,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/users/{user}/cancel-deletion', [UserController::class, 'cancelDeletion'])->whereNumber('user');
 
         // Vehicle request approval
+        Route::post('/vehicle-requests/on-site', [VehicleRequestController::class, 'storeOnSite']);
         Route::patch('/vehicle-requests/{vehicleRequest}/status', [VehicleRequestController::class, 'updateStatus']);
 
         // Approved requests waiting to be scheduled ('whereNumber' on the show route keeps "approved" from being read as an ID).

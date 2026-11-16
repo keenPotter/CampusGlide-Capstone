@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import api, { errorMessage, validationErrors } from '@/lib/api'
 import { useToast } from '@/composables/useToast'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -23,6 +23,8 @@ const roleFilter = ref('')
 const deletionFilter = ref('')
 const editing = ref(null)
 const editForm = ref(null)
+const editErrors = ref({})
+const editingUser = computed(() => users.value.find((user) => user.id === editing.value) ?? null)
 const confirmDeleteUser = ref(null)
 const saving = ref(false)
 const showCreate = ref(false)
@@ -96,10 +98,15 @@ async function createUser() {
 function startEdit(user) {
   editing.value = user.id
   editForm.value = { first_name: user.first_name, last_name: user.last_name, email: user.email, position: user.position ?? '', phone_number: user.phone_number ?? '', role: user.role, password: '' }
+  editErrors.value = {}
 }
-function cancelEdit() { editing.value = null; editForm.value = null }
-async function saveEdit(user) {
+function cancelEdit() { editing.value = null; editForm.value = null; editErrors.value = {} }
+async function saveEdit() {
+  const user = editingUser.value
+  if (!user || !editForm.value) return
+
   saving.value = true
+  editErrors.value = {}
   try {
     const payload = { ...editForm.value }
     if (!payload.password) delete payload.password
@@ -108,7 +115,10 @@ async function saveEdit(user) {
     users.value = users.value.map((item) => item.id === user.id ? updated : item)
     cancelEdit()
     toast.success('User account updated.')
-  } catch (error) { toast.error(errorMessage(error, 'Unable to update user account.')) }
+  } catch (error) {
+    editErrors.value = validationErrors(error)
+    if (!Object.keys(editErrors.value).length) toast.error(errorMessage(error, 'Unable to update user account.'))
+  }
   finally { saving.value = false }
 }
 async function requestDelete() {
@@ -177,48 +187,69 @@ onMounted(loadUsers)
       <div v-else-if="!users.length" class="py-8 text-center text-ink-muted">No user accounts found.</div>
       <div v-else class="space-y-3">
         <article v-for="user in users" :key="user.id" class="rounded-card border border-line p-4 transition hover:border-primary-200 hover:shadow-sm">
-          <template v-if="editing === user.id">
-            <form class="grid gap-3 sm:grid-cols-2" @submit.prevent="saveEdit(user)">
-              <BaseInput v-model="editForm.first_name" label="First name" required />
-              <BaseInput v-model="editForm.last_name" label="Last name" required />
-              <BaseInput v-model="editForm.email" label="Email" type="email" required />
-              <BaseSelect v-model="editForm.role" label="Role" :options="roleOptions" :disabled="user.role === 'administrator'" required />
-              <BaseInput v-model="editForm.position" label="Position / designation" />
-              <BaseInput v-model="editForm.phone_number" label="Phone number" />
-              <div class="sm:col-span-2"><BaseInput v-model="editForm.password" label="New password (optional)" type="password" hint="Leave blank to keep the current password." /></div>
-              <div class="flex flex-wrap justify-end gap-2 sm:col-span-2">
-                <BaseButton type="button" size="sm" variant="outline" @click="cancelEdit">Cancel</BaseButton>
-                <BaseButton type="submit" size="sm" :loading="saving">Confirm changes</BaseButton>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-base font-semibold">{{ fullName(user) }}</h2>
+                <span class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700">{{ ROLE_LABELS[user.role] ?? user.role }}</span>
+                <span v-if="user.deletion_requested_at" class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">Pending deletion</span>
+                <span v-else-if="!user.is_active" class="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600">Inactive</span>
               </div>
-            </form>
-          </template>
-          <template v-else>
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <h2 class="text-base font-semibold">{{ fullName(user) }}</h2>
-                  <span class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700">{{ ROLE_LABELS[user.role] ?? user.role }}</span>
-                  <span v-if="user.deletion_requested_at" class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">Pending deletion</span>
-                  <span v-else-if="!user.is_active" class="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600">Inactive</span>
-                </div>
-                <p class="mt-1 break-all text-small text-ink-muted">{{ user.email }}</p>
-                <p v-if="user.position || user.phone_number" class="mt-1 text-small text-ink-muted">{{ [user.position, user.phone_number].filter(Boolean).join(' · ') }}</p>
-                <p v-if="user.deletion_requested_at" class="mt-2 text-small text-red-700">Requested {{ formatDateTime(user.deletion_requested_at) }}. Deletion processing after {{ formatDateTime(user.deletion_due_at) }}. Historical requests, allocations, and trips will be retained.</p>
-              </div>
-              <div class="flex shrink-0 flex-wrap items-center gap-2">
-                <BaseButton v-if="user.deletion_requested_at" variant="outline" size="sm" :loading="saving" @click="cancelDeletion(user)">Cancel deletion</BaseButton>
-                <template v-else-if="user.role !== 'administrator'">
-                  <BaseButton variant="outline" size="sm" @click="startEdit(user)">Edit</BaseButton>
-                  <BaseButton variant="danger" size="sm" @click="confirmDeleteUser = user">Delete account</BaseButton>
-                </template>
-                <BaseButton v-else variant="outline" size="sm" @click="startEdit(user)">Edit</BaseButton>
-              </div>
+              <p class="mt-1 break-all text-small text-ink-muted">{{ user.email }}</p>
+              <p v-if="user.position || user.phone_number" class="mt-1 text-small text-ink-muted">{{ [user.position, user.phone_number].filter(Boolean).join(' · ') }}</p>
+              <p v-if="user.deletion_requested_at" class="mt-2 text-small text-red-700">Requested {{ formatDateTime(user.deletion_requested_at) }}. Deletion processing after {{ formatDateTime(user.deletion_due_at) }}. Historical requests, allocations, and trips will be retained.</p>
             </div>
-          </template>
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+              <BaseButton v-if="user.deletion_requested_at" variant="outline" size="sm" :loading="saving" @click="cancelDeletion(user)">Cancel deletion</BaseButton>
+              <template v-else-if="user.role !== 'administrator'">
+                <BaseButton variant="outline" size="sm" @click="startEdit(user)">Edit</BaseButton>
+                <BaseButton variant="danger" size="sm" @click="confirmDeleteUser = user">Delete account</BaseButton>
+              </template>
+              <BaseButton v-else variant="outline" size="sm" @click="startEdit(user)">Edit</BaseButton>
+            </div>
+          </div>
         </article>
       </div>
       <PaginationBar v-if="!loading" :meta="paginationMeta" @change="changePage" />
     </BaseCard>
+
+    <BaseModal
+      :open="Boolean(editingUser)"
+      title="Edit user account"
+      :subtitle="editingUser ? fullName(editingUser) : ''"
+      @close="!saving && cancelEdit()"
+    >
+      <form v-if="editingUser && editForm" class="grid gap-4 sm:grid-cols-2" @submit.prevent="saveEdit">
+        <BaseInput v-model="editForm.first_name" label="First name" :error="editErrors.first_name" required />
+        <BaseInput v-model="editForm.last_name" label="Last name" :error="editErrors.last_name" required />
+        <div class="sm:col-span-2">
+          <BaseInput v-model="editForm.email" label="Email" type="email" :error="editErrors.email" required />
+        </div>
+        <BaseSelect
+          v-model="editForm.role"
+          label="Role"
+          :options="roleOptions"
+          :error="editErrors.role"
+          :disabled="editingUser.role === 'administrator'"
+          required
+        />
+        <BaseInput v-model="editForm.position" label="Position / designation" :error="editErrors.position" />
+        <BaseInput v-model="editForm.phone_number" label="Phone number" :error="editErrors.phone_number" />
+        <div class="sm:col-span-2">
+          <BaseInput
+            v-model="editForm.password"
+            label="New password (optional)"
+            type="password"
+            hint="Leave blank to keep the current password."
+            :error="editErrors.password"
+          />
+        </div>
+        <div class="flex justify-end gap-2 sm:col-span-2">
+          <BaseButton type="button" variant="outline" :disabled="saving" @click="cancelEdit">Cancel</BaseButton>
+          <BaseButton type="submit" :loading="saving">Confirm changes</BaseButton>
+        </div>
+      </form>
+    </BaseModal>
 
     <BaseModal :open="showCreate" title="Create user account" subtitle="Add an administrator, employee, or staff account" @close="showCreate = false">
       <form class="grid gap-4 sm:grid-cols-2" @submit.prevent="createUser">

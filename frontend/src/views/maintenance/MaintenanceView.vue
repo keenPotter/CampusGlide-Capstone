@@ -198,7 +198,7 @@ const filtered = computed(() => {
     if (fStatus.value && log.display !== fStatus.value) return false
     if (fVehicle.value && String(log.vehicle?.id) !== String(fVehicle.value)) return false
     if (fType.value && log.type !== fType.value) return false
-    if (fMonth.value && (log.date_performed || '').slice(5, 7) !== fMonth.value) return false
+    if (fMonth.value && Number((log.date_performed || '').slice(5, 7)) !== Number(fMonth.value)) return false
     if (fYear.value && (log.date_performed || '').slice(0, 4) !== fYear.value) return false
 
     if (query) {

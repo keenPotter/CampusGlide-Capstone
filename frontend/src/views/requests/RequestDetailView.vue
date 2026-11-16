@@ -11,6 +11,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
+import VehicleRequestEditModal from '@/components/requests/VehicleRequestEditModal.vue'
 
 const auth = useAuthStore()
 const store = useVehicleRequestStore()
@@ -22,6 +23,7 @@ const request = ref(null)
 const loading = ref(true)
 const approveOpen = ref(false)
 const disapproveOpen = ref(false)
+const editingRequest = ref(null)
 
 const canEdit = computed(
   () => auth.isFaculty && ['pending', 'approved'].includes(request.value?.status),
@@ -71,6 +73,11 @@ function onApproved() {
 
 function onDisapproved() {
   disapproveOpen.value = false
+  load()
+}
+
+function onRequestUpdated() {
+  editingRequest.value = null
   load()
 }
 </script>
@@ -138,7 +145,7 @@ function onDisapproved() {
       <BaseButton
         v-if="canEdit"
         variant="outline"
-        @click="router.push({ name: 'requests.edit', params: { id: request.id } })"
+        @click="editingRequest = request"
       >
         Edit
       </BaseButton>
@@ -154,6 +161,11 @@ function onDisapproved() {
       :request="disapproveOpen ? request : null"
       @close="disapproveOpen = false"
       @done="onDisapproved"
+    />
+    <VehicleRequestEditModal
+      :request="editingRequest"
+      @close="editingRequest = null"
+      @saved="onRequestUpdated"
     />
   </div>
 </template>

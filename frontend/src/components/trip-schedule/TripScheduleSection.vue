@@ -18,7 +18,7 @@ const emit = defineEmits(['open-trip'])
 
 const PAGE_SIZE = 10
 const viewMode = ref('month')
-const selectedMonth = ref(String(new Date().getMonth() + 1).padStart(2, '0'))
+const selectedMonth = ref(String(new Date().getMonth() + 1))
 const selectedYear = ref(String(new Date().getFullYear()))
 const listMonth = ref('')
 const listYear = ref('')
