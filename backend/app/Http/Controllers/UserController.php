@@ -68,35 +68,11 @@ class UserController extends Controller
         ]);
 
         // Admin accounts may be edited, but never converted to another role.
-        if ($user->role === User::ROLE_ADMINISTRATOR && $data['role'] !== User::ROLE_ADMINISTRATOR) {
+        if ($user->role === 'administrator' && $data['role'] !== 'administrator') {
             return response()->json(['message' => 'Administrator accounts must keep the Administrator role.'], 422);
         }
         if (array_key_exists('password', $data) && blank($data['password'])) unset($data['password']);
         if (!empty($data['password'])) $data['password'] = Hash::make($data['password']);
-
-        $isAdministratorPromotion = $user->is_active
-            && $user->role !== User::ROLE_ADMINISTRATOR
-            && $data['role'] === User::ROLE_ADMINISTRATOR;
-
-        if ($isAdministratorPromotion) {
-            return DB::transaction(function () use ($user, $data) {
-                $activeAdministrators = User::query()
-                    ->activeAdministrators()
-                    ->lockForUpdate()
-                    ->get();
-
-                if ($activeAdministrators->count() >= User::MAX_ACTIVE_ADMINISTRATORS) {
-                    return response()->json([
-                        'message' => 'Maximum limit of 2 administrators reached.',
-                    ], 400);
-                }
-
-                $user->update($data);
-
-                return new UserResource($user->fresh());
-            });
-        }
-
         $user->update($data);
 
         return new UserResource($user->fresh());
@@ -114,15 +90,13 @@ class UserController extends Controller
             return response()->json(['message' => 'You cannot schedule your own account for deletion.'], 422);
         }
 
-        DB::transaction(function () use ($user) {
-            $user->deletion_requested_at = now();
-            $user->is_active = false;
-            $user->save();
-            $user->tokens()->delete();
-        });
+        $user->deletion_requested_at = now();
+        $user->is_active = false;
+        $user->save();
+        $user->tokens()->delete();
 
         return response()->json([
-            'message' => 'Account deactivated. Personal details are scheduled to be anonymized after 30 days; the account record and historical references will remain. The account can be restored during this period.',
+            'message' => 'Account scheduled for deletion in 30 days. It is disabled immediately and can be restored during the waiting period.',
             'user' => new UserResource($user),
         ]);
     }

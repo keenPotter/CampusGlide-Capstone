@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Hash;
 /**
  * IDs: 1-2 administrators | 3 staff | 4-8 faculty (4 is the University President)
  *      9-10 test accounts for the UAT account tests (edit, delete, restore, deactivated sign-in)
- *      11-13 inactive administrator test accounts (only 2 active administrators)
+ *      11-13 extra administrators for testers (5 administrators in total)
  *      14-17 extra staff for testers (5 staff in total)
  *      18-22 extra faculty for testers. Each one has its own requests (see UatTesterSeeder)
  *      23-27 practice accounts for TC-AD-19 (Delete account), one for each administrator tester
@@ -43,10 +43,10 @@ class UserSeeder extends Seeder
             // Already scheduled for deletion 5 days ago (disabled). Use it for Cancel deletion and the deactivated sign-in test.
             [10, 'testuser2@nvsu.edu.ph', 'Test',    'User Two', 'Instructor I',        '09201234522', 'faculty',       false, -5],
 
-            // ---------- Inactive administrator test accounts (the system allows only two active admins) ----------
-            [11, 'admin.tester1@nvsu.edu.ph',   'Test', 'Admin One',   'Administrator (Tester)', '09171234511', 'administrator', false, null],
-            [12, 'admin.tester2@nvsu.edu.ph',   'Test', 'Admin Two',   'Administrator (Tester)', '09171234512', 'administrator', false, null],
-            [13, 'admin.tester3@nvsu.edu.ph',   'Test', 'Admin Three', 'Administrator (Tester)', '09171234513', 'administrator', false, null],
+            // ---------- Extra administrators (one for each administrator tester) ----------
+            [11, 'admin.tester1@nvsu.edu.ph',   'Test', 'Admin One',   'Administrator (Tester)', '09171234511', 'administrator', true, null],
+            [12, 'admin.tester2@nvsu.edu.ph',   'Test', 'Admin Two',   'Administrator (Tester)', '09171234512', 'administrator', true, null],
+            [13, 'admin.tester3@nvsu.edu.ph',   'Test', 'Admin Three', 'Administrator (Tester)', '09171234513', 'administrator', true, null],
 
             // ---------- Extra staff (one for each staff tester) ----------
             [14, 'staff.tester1@nvsu.edu.ph',   'Test', 'Staff One',   'Motorpool Staff (Tester)', '09171234514', 'staff', true, null],

@@ -86,12 +86,6 @@ watch(paginationMeta, (meta) => {
             <div class="flex flex-wrap items-center gap-2">
               <p class="font-semibold text-ink">{{ item.trip?.destination || 'Destination not provided' }}</p>
               <StatusBadge :status="item.status || 'scheduled'" />
-              <span
-                class="rounded-full px-2 py-1 text-xs font-medium"
-                :class="item.vehicle_request?.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-ink-muted'"
-              >
-                {{ item.vehicle_request?.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
-              </span>
               <TripTypeBadge :type="item.vehicle_request?.trip_type" />
             </div>
             <p class="mt-1 text-small text-ink-muted">
@@ -99,10 +93,6 @@ watch(paginationMeta, (meta) => {
               <span v-if="item.trip?.trip_end_date && item.trip.trip_end_date !== item.trip?.trip_date"> – {{ formatDate(item.trip.trip_end_date) }}</span>
             </p>
             <p class="mt-2 text-small text-ink">Requester: {{ item.vehicle_request?.requester || '—' }}</p>
-            <template v-if="item.vehicle_request?.booking_source === 'on_site'">
-              <p class="text-small text-ink-muted">Office/Department: {{ item.vehicle_request?.requester_department || '—' }}</p>
-              <p class="text-small text-ink-muted">Contact: {{ item.vehicle_request?.requester_contact || '—' }}</p>
-            </template>
             <p class="text-small text-ink-muted">Purpose: {{ item.trip?.purpose || '—' }}</p>
           </div>
           <div class="min-w-0 text-small sm:w-64">

@@ -11,7 +11,7 @@ const toast = useToast()
 
 const roleOptions = [
   { value: 'administrator', label: 'Administrator' },
-  { value: 'faculty', label: 'User' },
+  { value: 'faculty', label: 'Employee' },
   { value: 'staff', label: 'Staff' },
 ]
 
@@ -67,7 +67,7 @@ async function submit() {
     <div>
       <h1 class="text-page-title">Create user</h1>
       <p class="mt-0.5 text-small text-ink-muted">
-        Add an administrator, user, or staff account.
+        Add an administrator, employee, or staff account.
       </p>
     </div>
 

@@ -19,7 +19,6 @@ const styles = {
   // Trips and maintenance
   scheduled: primary,
   completed: primary,
-  cancelled: danger,
   upcoming: secondary,
   overdue: danger,
   in_progress: 'bg-blue-50 text-blue-700 ring-blue-200',

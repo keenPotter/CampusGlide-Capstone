@@ -18,7 +18,6 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'audit' => \App\Http\Middleware\AuditLogMiddleware::class,
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         ]);
     })

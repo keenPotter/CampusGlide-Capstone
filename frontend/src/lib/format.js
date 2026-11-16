@@ -106,7 +106,7 @@ export function formatMoney(value) {
 
 export const ROLE_LABELS = {
   administrator: 'Administrator',
-  faculty: 'User',
+  faculty: 'Employee',
   staff: 'Staff',
 }
 

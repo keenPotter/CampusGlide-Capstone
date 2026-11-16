@@ -10,17 +10,10 @@ class VehicleRequest extends Model
 {
     use HasFactory;
 
-    public const SOURCE_ONLINE = 'online';
-    public const SOURCE_ON_SITE = 'on_site';
-
     protected $table = 'vehicle_requests';
 
     protected $fillable = [
         'requester_id',
-        'booking_source',
-        'requester_name',
-        'requester_department',
-        'requester_contact',
         'request_date',
         'trip_date',
         'trip_end_date',

@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
  */
 class TripController extends Controller
 {
-    private const WITH = ['driver', 'vehicle', 'vehicleRequest.requester', 'cancelledBy'];
+    private const WITH = ['driver', 'vehicle', 'vehicleRequest.requester'];
 
     public function __construct(protected AllocationService $allocations)
     {
@@ -22,33 +22,24 @@ class TripController extends Controller
 
     /**
      * GET /api/trips
-     * All trips. Administrators and staff only (route middleware).
+     * All trips. Administrators only (route middleware).
      * Trips that already passed their return time are marked completed first.
      */
     public function index(Request $request)
     {
         $this->allocations->completeFinishedTrips();
 
-        $request->validate([
-            'trip_type' => ['nullable', 'in:inclusive,exclusive'],
-            'status' => ['nullable', 'in:scheduled,in_progress,completed,cancelled'],
-            'month' => ['nullable', 'integer', 'between:1,12'],
-            'year' => ['nullable', 'integer', 'between:1900,2200'],
-            'search' => ['nullable', 'string', 'max:255'],
-            'per_page' => ['sometimes', 'integer', 'between:1,100'],
-        ]);
-
-        $query = Trip::with(self::WITH);
-        if ($request->filled('status')) {
-            $query->where('trip_status', $request->query('status'));
-        } else {
-            $query->whereIn('trip_status', AllocationService::ACTIVE);
-        }
+        $query = Trip::with(self::WITH)
+            ->whereIn('trip_status', AllocationService::ACTIVE);
 
         if ($request->filled('trip_type')) {
             $query->whereHas('vehicleRequest', fn ($requestQuery) =>
                 $requestQuery->where('trip_type', $request->query('trip_type'))
             );
+        }
+
+        if ($request->filled('status')) {
+            $query->where('trip_status', $request->query('status'));
         }
 
         if ($request->filled('month')) {
@@ -65,11 +56,6 @@ class TripController extends Controller
                 $searchQuery
                     ->where('destination', 'like', $pattern)
                     ->orWhere('purpose', 'like', $pattern)
-                    ->orWhere('cancellation_reason', 'like', $pattern)
-                    ->orWhereHas('cancelledBy', fn ($userQuery) =>
-                        $userQuery->where('first_name', 'like', $pattern)
-                            ->orWhere('last_name', 'like', $pattern)
-                    )
                     ->orWhereHas('vehicle', fn ($vehicleQuery) =>
                         $vehicleQuery->where('vehicle_model', 'like', $pattern)
                             ->orWhere('plate_number', 'like', $pattern)
@@ -81,16 +67,20 @@ class TripController extends Controller
                     ->orWhereHas('vehicleRequest.requester', fn ($requesterQuery) =>
                         $requesterQuery->where('first_name', 'like', $pattern)
                             ->orWhere('last_name', 'like', $pattern)
-                    )
-                    ->orWhereHas('vehicleRequest', fn ($requestQuery) =>
-                        $requestQuery->where('requester_name', 'like', $pattern)
-                            ->orWhere('requester_department', 'like', $pattern)
-                            ->orWhere('requester_contact', 'like', $pattern)
                     );
             });
         }
 
         if ($request->filled('per_page')) {
+            $request->validate([
+                'trip_type' => ['nullable', 'in:inclusive,exclusive'],
+                'status' => ['nullable', 'in:scheduled,in_progress'],
+                'month' => ['nullable', 'integer', 'between:1,12'],
+                'year' => ['nullable', 'integer', 'between:1900,2200'],
+                'search' => ['nullable', 'string', 'max:255'],
+                'per_page' => ['integer', 'between:1,100'],
+            ]);
+
             return TripResource::collection(
                 $query->orderBy('trip_date')
                     ->orderBy('departure_time')
