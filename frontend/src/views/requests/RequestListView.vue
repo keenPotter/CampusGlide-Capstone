@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Check, Eye, X } from 'lucide-vue-next'
+import { Check, Eye, Pencil, X } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
@@ -12,7 +12,7 @@ import {
   fullName,
   MONTH_OPTIONS,
   STATUS_LABELS,
-  TRIP_TYPE_LABELS,
+  TRIP_TYPE_DESCRIPTIONS,
   YEAR_OPTIONS,
 } from '@/lib/format'
 import { useToast } from '@/composables/useToast'
@@ -22,12 +22,14 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
+import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
 import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 import VehicleRequestModal from '@/components/requests/VehicleRequestModal.vue'
+import VehicleRequestEditModal from '@/components/requests/VehicleRequestEditModal.vue'
 import OnSiteBookingModal from '@/components/requests/OnSiteBookingModal.vue'
 
 const auth = useAuthStore()
@@ -41,6 +43,9 @@ const detailRequest = ref(null)
 const detailLoading = ref(false)
 const showNewRequest = ref(false)
 const showOnSiteBooking = ref(false)
+const editingRequest = ref(null)
+const tripTypeCounts = ref({ all: 0, inclusive: 0, exclusive: 0 })
+const tripTypeCountsSequence = ref(0)
 
 watch(
   () => route.query.create,
@@ -56,31 +61,40 @@ const statusOptions = ['pending', 'approved', 'disapproved'].map((value) => ({
   label: STATUS_LABELS[value],
 }))
 
-const typeOptions = ['inclusive', 'exclusive'].map((value) => ({
-  value,
-  label: TRIP_TYPE_LABELS[value],
-}))
+const tripTypeFilterOptions = computed(() => [
+  { value: '', label: `All (${tripTypeCounts.value.all})` },
+  {
+    value: 'inclusive',
+    label: `${TRIP_TYPE_DESCRIPTIONS.inclusive} (${tripTypeCounts.value.inclusive})`,
+    dot: 'bg-primary',
+  },
+  {
+    value: 'exclusive',
+    label: `${TRIP_TYPE_DESCRIPTIONS.exclusive} (${tripTypeCounts.value.exclusive})`,
+    dot: 'bg-secondary',
+  },
+])
 
 const disapproving = ref(null)
 // The pending request that is being approved. The assign window is open while this is set.
 const approving = ref(null)
-const canEditSelectedRequest = computed(
-  () => auth.isFaculty && ['pending', 'approved'].includes(detailRequest.value?.status),
-)
+function canEditRequest(request) {
+  return auth.isFaculty && ['pending', 'approved'].includes(request?.status)
+}
+const canEditSelectedRequest = computed(() => canEditRequest(detailRequest.value))
 const requestDetailRows = computed(() => {
   const request = detailRequest.value
   if (!request) return []
 
   return [
-    { label: 'Booking source', value: request.booking_source === 'on_site' ? 'On-Site' : 'Online' },
     {
       label: request.booking_source === 'on_site' ? 'Requesting personnel' : 'Requesting official',
-      value: request.requester_name || fullName(request.requested_by),
+      value: requesterName(request),
     },
     ...(request.booking_source === 'on_site'
       ? [
-          { label: 'Office/Department', value: request.requester_department },
-          { label: 'Contact Number', value: request.requester_contact },
+          { label: 'Department', value: request.requester_department },
+          { label: 'Contact number', value: request.requester_contact },
         ]
       : []),
     { label: 'Destination', value: request.destination },
@@ -98,16 +112,61 @@ const requestDetailRows = computed(() => {
   ]
 })
 
+function requesterName(request) {
+  return request.requester_name || fullName(request.requested_by) || '—'
+}
+
 // Reset the filters too, because the store is shared with other pages.
-onMounted(() => store.fetch({ status: '', trip_type: '', month: '', year: '', search: '', page: 1 }))
+onMounted(() => {
+  store.fetch({ status: '', trip_type: '', month: '', year: '', search: '', page: 1 })
+  loadTripTypeCounts()
+})
 
 watch(search, (_, __, onCleanup) => {
-  const timeout = setTimeout(() => store.fetch({ search: search.value, page: 1 }), 250)
+  const timeout = setTimeout(() => {
+    store.fetch({ search: search.value, page: 1 })
+    loadTripTypeCounts()
+  }, 250)
   onCleanup(() => clearTimeout(timeout))
 })
 
+async function loadTripTypeCounts() {
+  const sequence = ++tripTypeCountsSequence.value
+  const params = {
+    status: store.filters.status || undefined,
+    month: store.filters.month || undefined,
+    year: store.filters.year || undefined,
+    search: (store.filters.search || search.value).trim() || undefined,
+    page: 1,
+    per_page: 1,
+  }
+
+  try {
+    const responses = await Promise.all(
+      ['', 'inclusive', 'exclusive'].map((tripType) =>
+        api.get('/vehicle-requests', {
+          params: { ...params, trip_type: tripType || undefined },
+        }),
+      ),
+    )
+    if (sequence !== tripTypeCountsSequence.value) return
+
+    const total = (response) => Number(response.data?.meta?.total ?? response.data?.data?.length ?? 0)
+    tripTypeCounts.value = {
+      all: total(responses[0]),
+      inclusive: total(responses[1]),
+      exclusive: total(responses[2]),
+    }
+  } catch (error) {
+    if (sequence === tripTypeCountsSequence.value) {
+      toast.error(errorMessage(error, 'Unable to load trip type counts.'))
+    }
+  }
+}
+
 function changeStatus(value) {
   store.fetch({ status: value, search: search.value, page: 1 })
+  loadTripTypeCounts()
 }
 
 function changeType(value) {
@@ -116,10 +175,12 @@ function changeType(value) {
 
 function changeMonth(value) {
   store.fetch({ month: value, search: search.value, page: 1 })
+  loadTripTypeCounts()
 }
 
 function changeYear(value) {
   store.fetch({ year: value, search: search.value, page: 1 })
+  loadTripTypeCounts()
 }
 
 function openRequest(request) {
@@ -171,14 +232,23 @@ async function onOnSiteBookingSubmitted(request) {
   }
 }
 
-function personName(request) {
-  return request.requester_name || fullName(request.requested_by) || '—'
+function editSelectedRequest() {
+  openEditRequest(detailRequest.value)
 }
 
-function editSelectedRequest() {
-  const request = detailRequest.value
+function openEditRequest(request) {
+  if (!canEditRequest(request)) return
   closeRequest()
-  if (request) router.push({ name: 'requests.edit', params: { id: request.id } })
+  editingRequest.value = request
+}
+
+async function onRequestUpdated() {
+  editingRequest.value = null
+  try {
+    await store.fetch()
+  } catch (error) {
+    toast.error(errorMessage(error, 'Request updated, but the list could not be refreshed.'))
+  }
 }
 
 // Clicking anywhere on a row or card opens the request.
@@ -243,34 +313,36 @@ function onDisapproved() {
           type="search"
           placeholder="Search requests..."
         />
-        <BaseSelect
-          :model-value="store.filters.status"
-          :options="statusOptions"
-          placeholder="All status"
-          allow-empty
-          @update:model-value="changeStatus"
-        />
-        <BaseSelect
+        <SegmentedControl
+          class="sm:col-span-2 lg:col-span-4"
           :model-value="store.filters.trip_type"
-          :options="typeOptions"
-          placeholder="All types"
-          allow-empty
+          :options="tripTypeFilterOptions"
+          label="Trip type"
           @update:model-value="changeType"
         />
-        <BaseSelect
-          :model-value="store.filters.month"
-          :options="MONTH_OPTIONS"
-          placeholder="All months"
-          allow-empty
-          @update:model-value="changeMonth"
-        />
-        <BaseSelect
-          :model-value="store.filters.year"
-          :options="YEAR_OPTIONS"
-          placeholder="All years"
-          allow-empty
-          @update:model-value="changeYear"
-        />
+        <div class="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-3 lg:col-span-4">
+          <BaseSelect
+            :model-value="store.filters.status"
+            :options="statusOptions"
+            placeholder="All status"
+            allow-empty
+            @update:model-value="changeStatus"
+          />
+          <BaseSelect
+            :model-value="store.filters.month"
+            :options="MONTH_OPTIONS"
+            placeholder="All months"
+            allow-empty
+            @update:model-value="changeMonth"
+          />
+          <BaseSelect
+            :model-value="store.filters.year"
+            :options="YEAR_OPTIONS"
+            placeholder="All years"
+            allow-empty
+            @update:model-value="changeYear"
+          />
+        </div>
       </div>
     </BaseCard>
 
@@ -297,70 +369,73 @@ function onDisapproved() {
           <div class="min-w-0 w-full flex-1 md:w-auto">
             <button
               type="button"
-              class="card-row-value block w-full truncate text-left"
+              class="card-row-value block w-full truncate text-left md:text-section-title"
               :title="request.destination"
               @click="openRequest(request)"
             >
               {{ request.destination }}
             </button>
-            <p class="mt-0.5 truncate text-small text-ink-muted">{{ request.purpose }}</p>
+            <p class="mt-0.5 truncate text-small text-ink-muted md:text-body">{{ request.purpose }}</p>
           </div>
-          <div class="flex shrink-0 flex-wrap items-center gap-2 self-start">
-            <span
-              class="rounded-full px-2 py-1 text-xs font-medium"
-              :class="request.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-ink-muted'"
-            >
-              {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
-            </span>
-            <StatusBadge :status="request.status" />
-          </div>
+          <StatusBadge :status="request.status" class="shrink-0 self-start" />
         </div>
 
         <div class="mb-3 space-y-1.5 md:space-y-2">
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0">Requested by</span>
-            <span class="min-w-0 flex-1 break-words text-right text-small text-ink">{{ personName(request) }}</span>
+            <span class="card-row-label shrink-0 md:text-body">Requested by</span>
+            <span class="min-w-0 flex-1 break-words text-right text-small text-ink md:text-body">{{ requesterName(request) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0">Travel date</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ formatDate(request.trip_date) }}</span>
+            <span class="card-row-label shrink-0 md:text-body">Travel date</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ formatDate(request.trip_date) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0">Departure</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ formatTime(request.departure_time) }}</span>
+            <span class="card-row-label shrink-0 md:text-body">Departure</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ formatTime(request.departure_time) }}</span>
           </div>
           <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-            <span class="card-row-label shrink-0">Passengers</span>
-            <span class="min-w-0 flex-1 text-right text-small text-ink">{{ request.number_of_passengers ?? '—' }}</span>
+            <span class="card-row-label shrink-0 md:text-body">Passengers</span>
+            <span class="min-w-0 flex-1 text-right text-small text-ink md:text-body">{{ request.number_of_passengers ?? '—' }}</span>
           </div>
           <div
             v-if="request.status === 'disapproved' && request.disapproval_reason"
             class="flex items-start justify-between gap-3"
           >
-            <span class="card-row-label shrink-0">Reason</span>
-            <span class="min-w-0 flex-1 break-words text-right text-small text-red-700">
+            <span class="card-row-label shrink-0 md:text-body">Reason</span>
+            <span class="min-w-0 flex-1 break-words text-right text-small text-red-700 md:text-body">
               {{ request.disapproval_reason }}
             </span>
           </div>
         </div>
 
-        <div class="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
+        <div class="mt-auto border-t border-line pt-3">
+          <template v-if="auth.isAdministrator && request.status === 'pending'">
+            <div class="flex items-center gap-2">
+              <BaseButton size="sm" class="flex-1" @click="openApprove(request)">
+                <Check :size="16" aria-hidden="true" /> Approve
+              </BaseButton>
+              <BaseButton size="sm" variant="outline" class="flex-1" @click="openDisapprove(request)">
+                <X :size="16" aria-hidden="true" /> Disapprove
+              </BaseButton>
+            </div>
+          </template>
+
           <BaseButton
             size="sm"
             variant="ghost"
+            class="mt-2 w-full"
             @click="openRequest(request)"
           >
             <Eye :size="16" aria-hidden="true" /> View
           </BaseButton>
-
-          <template v-if="auth.isAdministrator && request.status === 'pending'">
-            <BaseButton size="sm" @click="openApprove(request)">
-              <Check :size="16" aria-hidden="true" /> Approve
-            </BaseButton>
-            <BaseButton size="sm" variant="outline" @click="openDisapprove(request)">
-              <X :size="16" aria-hidden="true" /> Disapprove
-            </BaseButton>
-          </template>
+          <BaseButton
+            v-if="canEditRequest(request)"
+            size="sm"
+            variant="outline"
+            @click="openEditRequest(request)"
+          >
+            <Pencil :size="16" aria-hidden="true" /> Edit
+          </BaseButton>
         </div>
       </div>
     </div>
@@ -403,7 +478,7 @@ function onDisapproved() {
               <p class="truncate text-small text-ink-muted">{{ request.purpose }}</p>
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
-              <span class="break-words">{{ personName(request) }}</span>
+              <span class="break-words">{{ requesterName(request) }}</span>
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">
               <p>
@@ -416,15 +491,7 @@ function onDisapproved() {
             </td>
             <td class="px-2 py-3 align-top text-small xl:px-card">{{ request.number_of_passengers ?? '—' }}</td>
             <td class="px-2 py-3 align-top xl:px-card">
-              <div class="flex flex-col items-start gap-1">
-                <span
-                  class="rounded-full px-2 py-1 text-xs font-medium"
-                  :class="request.booking_source === 'on_site' ? 'bg-secondary-50 text-secondary-700' : 'bg-neutral-100 text-ink-muted'"
-                >
-                  {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
-                </span>
-                <StatusBadge :status="request.status" />
-              </div>
+              <StatusBadge :status="request.status" />
             </td>
             <!-- Reason for disapproval. Blank when there is none. -->
             <td class="px-2 py-3 align-top text-small text-ink-muted xl:px-card">
@@ -449,6 +516,14 @@ function onDisapproved() {
 
                 <BaseButton size="sm" variant="ghost" @click="openRequest(request)">
                   <Eye :size="16" aria-hidden="true" /> View
+                </BaseButton>
+                <BaseButton
+                  v-if="canEditRequest(request)"
+                  size="sm"
+                  variant="outline"
+                  @click="openEditRequest(request)"
+                >
+                  <Pencil :size="16" aria-hidden="true" /> Edit
                 </BaseButton>
               </div>
             </td>
@@ -534,6 +609,11 @@ function onDisapproved() {
       :open="showNewRequest"
       @close="closeNewRequest"
       @submitted="onRequestSubmitted"
+    />
+    <VehicleRequestEditModal
+      :request="editingRequest"
+      @close="editingRequest = null"
+      @saved="onRequestUpdated"
     />
     <OnSiteBookingModal
       :open="showOnSiteBooking"

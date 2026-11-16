@@ -119,6 +119,7 @@ class TripController extends Controller
 
         $request->validate([
             'status' => ['nullable', 'in:scheduled,in_progress,completed'],
+            'trip_type' => ['nullable', 'in:inclusive,exclusive'],
             'month' => ['nullable', 'integer', 'between:1,12'],
             'year' => ['nullable', 'integer', 'between:1900,2200'],
             'search' => ['nullable', 'string', 'max:255'],
@@ -130,6 +131,12 @@ class TripController extends Controller
 
         if ($request->filled('status')) {
             $query->where('trip_status', $request->query('status'));
+        }
+
+        if ($request->filled('trip_type')) {
+            $query->whereHas('vehicleRequest', fn ($requestQuery) =>
+                $requestQuery->where('trip_type', $request->query('trip_type'))
+            );
         }
 
         if ($request->filled('month')) {

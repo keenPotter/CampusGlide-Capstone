@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import api, { errorMessage, unwrap, validationErrors } from '@/lib/api'
 import { availabilityOptions, conflictOf } from '@/lib/allocations'
-import { todayIso } from '@/lib/format'
+import { todayIso, TRIP_TYPE_DESCRIPTIONS } from '@/lib/format'
 import { useNotificationStore } from '@/stores/notifications'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -18,6 +18,10 @@ const props = defineProps({
 const emit = defineEmits(['close', 'submitted'])
 
 const notifications = useNotificationStore()
+const tripTypeOptions = [
+  { value: 'inclusive', label: TRIP_TYPE_DESCRIPTIONS.inclusive },
+  { value: 'exclusive', label: TRIP_TYPE_DESCRIPTIONS.exclusive },
+]
 const form = reactive(createForm())
 const errors = ref({})
 const formError = ref('')
@@ -295,11 +299,8 @@ function closeConflict() {
           />
           <BaseSelect
             v-model="form.trip_type"
-            label="Trip Type"
-            :options="[
-              { value: 'inclusive', label: 'Inclusive' },
-              { value: 'exclusive', label: 'Exclusive' },
-            ]"
+            label="Trip type"
+            :options="tripTypeOptions"
             placeholder="Select trip type"
             :error="errors.trip_type"
             required

@@ -3,8 +3,6 @@
 use App\Http\Controllers\AllocationController;
 use App\Http\Controllers\AllocationPrintController;
 use App\Http\Controllers\AllocationQuickAddController;
-use App\Http\Controllers\AdministratorTransferController;
-use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\FuelUsageRecordController;
@@ -24,13 +22,13 @@ use Illuminate\Support\Facades\Route;
 
 // ---------- Public ----------
 // Login is the only route that can be used without a token.
-// Login attempts are limited per email/IP pair and per IP.
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+// The throttle allows 10 attempts per minute to slow down password guessing.
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
 // ---------- Authenticated (every route below needs a valid token) ----------
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
-    Route::post('/logout', [AuthController::class, 'logout'])->middleware('audit:LOGOUT,users');
+    Route::post('/logout', [AuthController::class, 'logout']);
 
     // Everyone who is logged in can list/view; scoping happens inside the controller
     Route::get('/vehicle-requests', [VehicleRequestController::class, 'index']);
@@ -49,40 +47,48 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/trips', [TripController::class, 'index']);
         Route::get('/trips/{trip}', [TripController::class, 'show'])->whereNumber('trip');
         Route::get('/trip-views', [TripViewController::class, 'index']);
-        Route::post('/trips/{trip}/view', [TripViewController::class, 'store'])
-            ->whereNumber('trip')
-            ->middleware('audit:VIEW_TRIP_DETAILS,trips');
+        Route::post('/trips/{trip}/view', [TripViewController::class, 'store'])->whereNumber('trip');
         Route::get('/drivers', [DriverController::class, 'index']);
         Route::get('/vehicles', [VehicleController::class, 'index']);
         Route::get('/vehicles/{vehicle}/status', [VehicleController::class, 'status']);
     });
 
-    // ---------- Allocation views and ticket sharing for administrators and staff ----------
-    // Mutations are administrator-only below; staff retain read-only views and ticket sharing.
+    // ---------- Allocation management for administrators and staff ----------
+    // Staff use the same allocation page as administrators.
+    // Creating an allocation (which can approve a request) stays administrator only (see below).
     Route::middleware('role:administrator,staff')->group(function () {
+        // Vehicle-driver allocation
         Route::get('/allocation-options', [AllocationController::class, 'options']);
+        Route::put('/allocations/{allocation}', [AllocationController::class, 'update'])
+            ->whereNumber('allocation');
         Route::get('/allocations/{allocation}/print', [AllocationPrintController::class, 'show'])
             ->whereNumber('allocation');
+        Route::post('/allocation-drivers', [AllocationQuickAddController::class, 'storeDriver']);
+        Route::post('/allocation-vehicles', [AllocationQuickAddController::class, 'storeVehicle']);
+
+        // Date changes: reassign the date directly, or approve / disapprove a faculty request.
+        Route::post('/allocations/{allocation}/reschedule', [RescheduleRequestController::class, 'reschedule'])
+            ->whereNumber('allocation');
+        Route::post('/reschedule-requests/{rescheduleRequest}/approve', [RescheduleRequestController::class, 'approve'])
+            ->whereNumber('rescheduleRequest');
+        Route::post('/reschedule-requests/{rescheduleRequest}/disapprove', [RescheduleRequestController::class, 'disapprove'])
+            ->whereNumber('rescheduleRequest');
 
         // Sending a trip request to an administrator
         Route::get('/admins', [TripRequestShareController::class, 'admins']);
         Route::get('/trip-request-shares', [TripRequestShareController::class, 'index']);
-        Route::post('/trip-request-shares', [TripRequestShareController::class, 'store'])
-            ->middleware('audit:SEND_TRIP_REQUEST,trip_request_shares');
+        Route::post('/trip-request-shares', [TripRequestShareController::class, 'store']);
     });
 
     // ---------- Faculty only ----------
     Route::middleware('role:faculty')->group(function () {
-        Route::post('/vehicle-requests', [VehicleRequestController::class, 'store'])
-            ->middleware('audit:CREATE_VEHICLE_REQUEST,vehicle_requests');
-        Route::put('/vehicle-requests/{vehicleRequest}/edit', [VehicleRequestController::class, 'edit'])
-            ->middleware('audit:EDIT_VEHICLE_REQUEST,vehicle_requests');
+        Route::post('/vehicle-requests', [VehicleRequestController::class, 'store']);
+        Route::put('/vehicle-requests/{vehicleRequest}/edit', [VehicleRequestController::class, 'edit']);
         Route::get('/my-trips', [TripController::class, 'myTrips']);
 
         // Faculty ask for a date change; the administrator decides.
         Route::post('/allocations/{allocation}/reschedule-requests', [RescheduleRequestController::class, 'store'])
-            ->whereNumber('allocation')
-            ->middleware('audit:CREATE_RESCHEDULE_REQUEST,reschedule_requests');
+            ->whereNumber('allocation');
     });
 
     // ---------- Administrator only ----------
@@ -91,20 +97,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/notifications/summary', [NotificationSummaryController::class, 'summary']);
 
         // Accounts
-        Route::post('/register', [AuthController::class, 'register'])
-            ->middleware('audit:CREATE_USER,users');
-        Route::post('/admin-transfer', [AdministratorTransferController::class, 'store'])
-            ->middleware('audit:TRANSFER_ADMINISTRATOR,users');
+        Route::post('/register', [AuthController::class, 'register']);
         Route::get('/users', [UserController::class, 'index']);
-        Route::put('/users/{user}', [UserController::class, 'update'])
-            ->whereNumber('user')
-            ->middleware('audit:UPDATE_USER,users');
-        Route::delete('/users/{user}', [UserController::class, 'requestDeletion'])
-            ->whereNumber('user')
-            ->middleware('audit:DEACTIVATE_USER,users');
-        Route::post('/users/{user}/cancel-deletion', [UserController::class, 'cancelDeletion'])
-            ->whereNumber('user')
-            ->middleware('audit:RESTORE_USER,users');
+        Route::put('/users/{user}', [UserController::class, 'update'])->whereNumber('user');
+        Route::delete('/users/{user}', [UserController::class, 'requestDeletion'])->whereNumber('user');
+        Route::post('/users/{user}/cancel-deletion', [UserController::class, 'cancelDeletion'])->whereNumber('user');
 
         // Vehicle request approval
         Route::post('/vehicle-requests/on-site', [VehicleRequestController::class, 'storeOnSite'])
@@ -116,60 +113,27 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/vehicle-requests/approved', [VehicleRequestController::class, 'approved']);
 
         // A pending request is approved and assigned in one step: POST /allocations with approve_request = true.
-        Route::post('/allocations', [AllocationController::class, 'store'])
-            ->middleware('audit:APPROVE_AND_ALLOCATE_REQUEST,allocations');
-        Route::post('/allocations/{allocation}/cancel', [AllocationController::class, 'cancel'])
-            ->whereNumber('allocation')
-            ->middleware('audit:CANCEL_TRIP,allocations');
-        Route::put('/allocations/{allocation}', [AllocationController::class, 'update'])
-            ->whereNumber('allocation')
-            ->middleware('audit:UPDATE_ALLOCATION,allocations');
-        Route::post('/allocation-drivers', [AllocationQuickAddController::class, 'storeDriver'])
-            ->middleware('audit:CREATE_DRIVER,drivers');
-        Route::post('/allocation-vehicles', [AllocationQuickAddController::class, 'storeVehicle'])
-            ->middleware('audit:CREATE_VEHICLE,vehicles');
-
-        // Date changes: reassign the date directly, or approve / disapprove a faculty request.
-        Route::post('/allocations/{allocation}/reschedule', [RescheduleRequestController::class, 'reschedule'])
-            ->whereNumber('allocation')
-            ->middleware('audit:RESCHEDULE_ALLOCATION,allocations');
-        Route::post('/reschedule-requests/{rescheduleRequest}/approve', [RescheduleRequestController::class, 'approve'])
-            ->whereNumber('rescheduleRequest')
-            ->middleware('audit:APPROVE_RESCHEDULE_REQUEST,reschedule_requests');
-        Route::post('/reschedule-requests/{rescheduleRequest}/disapprove', [RescheduleRequestController::class, 'disapprove'])
-            ->whereNumber('rescheduleRequest')
-            ->middleware('audit:DISAPPROVE_RESCHEDULE_REQUEST,reschedule_requests');
+        Route::post('/allocations', [AllocationController::class, 'store']);
 
         // Maintenance Monitoring
         Route::get('/maintenance-logs', [MaintenanceLogController::class, 'index']);
-        Route::post('/maintenance-logs', [MaintenanceLogController::class, 'store'])
-            ->middleware('audit:CREATE_MAINTENANCE,vehicle_maintenance');
-        Route::patch('/maintenance-logs/{maintenanceLog}', [MaintenanceLogController::class, 'update'])
-            ->middleware('audit:UPDATE_MAINTENANCE,vehicle_maintenance');
+        Route::post('/maintenance-logs', [MaintenanceLogController::class, 'store']);
+        Route::patch('/maintenance-logs/{maintenanceLog}', [MaintenanceLogController::class, 'update']);
 
         // Fleet forms captured from the NVSU Motor Pool documents.
         Route::get('/post-travel-reports', [PostTravelReportController::class, 'index']);
-        Route::post('/post-travel-reports', [PostTravelReportController::class, 'store'])
-            ->middleware('audit:CREATE_POST_TRAVEL_REPORT,post_travel_reports');
-        Route::patch('/post-travel-reports/{postTravelReport}', [PostTravelReportController::class, 'update'])
-            ->middleware('audit:UPDATE_POST_TRAVEL_REPORT,post_travel_reports');
+        Route::post('/post-travel-reports', [PostTravelReportController::class, 'store']);
+        Route::patch('/post-travel-reports/{postTravelReport}', [PostTravelReportController::class, 'update']);
 
         Route::get('/fuel-usage-records', [FuelUsageRecordController::class, 'index']);
-        Route::post('/fuel-usage-records', [FuelUsageRecordController::class, 'store'])
-            ->middleware('audit:CREATE_FUEL_USAGE_RECORD,fuel_usage_records');
-        Route::patch('/fuel-usage-records/{fuelUsageRecord}', [FuelUsageRecordController::class, 'update'])
-            ->middleware('audit:UPDATE_FUEL_USAGE_RECORD,fuel_usage_records');
+        Route::post('/fuel-usage-records', [FuelUsageRecordController::class, 'store']);
+        Route::patch('/fuel-usage-records/{fuelUsageRecord}', [FuelUsageRecordController::class, 'update']);
 
         Route::get('/preventive-maintenance-checklists', [PreventiveMaintenanceChecklistController::class, 'index']);
-        Route::post('/preventive-maintenance-checklists', [PreventiveMaintenanceChecklistController::class, 'store'])
-            ->middleware('audit:CREATE_PREVENTIVE_MAINTENANCE_CHECKLIST,preventive_maintenance_checklists');
-        Route::patch('/preventive-maintenance-checklists/{preventiveMaintenanceChecklist}', [PreventiveMaintenanceChecklistController::class, 'update'])
-            ->middleware('audit:UPDATE_PREVENTIVE_MAINTENANCE_CHECKLIST,preventive_maintenance_checklists');
+        Route::post('/preventive-maintenance-checklists', [PreventiveMaintenanceChecklistController::class, 'store']);
+        Route::patch('/preventive-maintenance-checklists/{preventiveMaintenanceChecklist}', [PreventiveMaintenanceChecklistController::class, 'update']);
         // The printable checklist (legal size), built by the backend.
         Route::get('/preventive-maintenance-checklists/{preventiveMaintenanceChecklist}/print', [PreventiveMaintenanceChecklistPrintController::class, 'show'])
             ->whereNumber('preventiveMaintenanceChecklist');
-
-        // Audit history is read-only and administrator-only.
-        Route::get('/audit-logs', [AuditLogController::class, 'index']);
     });
 });

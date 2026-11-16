@@ -1,6 +1,7 @@
 <script setup>
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import { TRIP_TYPE_DESCRIPTIONS } from '@/lib/format'
 
 defineProps({
   form: { type: Object, required: true },
@@ -8,8 +9,8 @@ defineProps({
 })
 
 const tripTypes = [
-  { value: 'inclusive', label: 'Inclusive (Inside Nueva Vizcaya)' },
-  { value: 'exclusive', label: 'Exclusive (Outside Nueva Vizcaya)' },
+  { value: 'inclusive', label: TRIP_TYPE_DESCRIPTIONS.inclusive },
+  { value: 'exclusive', label: TRIP_TYPE_DESCRIPTIONS.exclusive },
 ]
 </script>
 
@@ -55,8 +56,9 @@ const tripTypes = [
 
     <BaseSelect
       v-model="form.trip_type"
-      label="Days of travel"
+      label="Trip type"
       :options="tripTypes"
+      placeholder="Select trip type"
       :error="errors.trip_type"
       required
     />

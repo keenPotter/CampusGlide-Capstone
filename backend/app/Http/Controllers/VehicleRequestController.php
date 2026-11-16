@@ -6,6 +6,7 @@ use App\Http\Requests\EditVehicleRequestRequest;
 use App\Http\Requests\StoreOnSiteVehicleRequestRequest;
 use App\Http\Requests\StoreVehicleRequestRequest;
 use App\Http\Requests\UpdateVehicleRequestStatusRequest;
+use App\Models\Allocation;
 use App\Http\Resources\VehicleRequestResource;
 use App\Models\Driver;
 use App\Models\Trip;
@@ -20,13 +21,14 @@ class VehicleRequestController extends Controller
     public function __construct(protected AllocationService $allocations)
     {
     }
-
     /**
      * GET /api/vehicle-requests
      * Administrators see all. Faculty see only their own.
         * Query params: ?status=pending, ?trip_type=inclusive, ?month=1, ?year=2026
      *
-     * Requests are shown newest first for administrators, staff, and faculty.
+     * Order: pending requests first, with the soonest travel date on top.
+     * All other requests follow, newest first.
+     * The sorting is done here (not in the frontend) so it covers every page.
      */
     public function index(Request $request)
     {
@@ -39,9 +41,10 @@ class VehicleRequestController extends Controller
 
         $user = $request->user();
 
-        $query = VehicleRequest::query()
-            ->select('vehicle_requests.*')
-            ->with('requester')
+        $query = VehicleRequest::with('requester')
+            ->orderByRaw("CASE WHEN status = 'pending' THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN status = 'pending' THEN trip_date END ASC")
+            ->orderByRaw("CASE WHEN status = 'pending' THEN departure_time END ASC")
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
@@ -76,9 +79,6 @@ class VehicleRequestController extends Controller
                             ->where('destination', 'like', $pattern)
                             ->orWhere('purpose', 'like', $pattern)
                             ->orWhere('disapproval_reason', 'like', $pattern)
-                            ->orWhere('requester_name', 'like', $pattern)
-                            ->orWhere('requester_department', 'like', $pattern)
-                            ->orWhere('requester_contact', 'like', $pattern)
                             ->orWhereHas('requester', function ($requesterQuery) use ($pattern) {
                                 $requesterQuery
                                     ->where('first_name', 'like', $pattern)
@@ -117,7 +117,6 @@ class VehicleRequestController extends Controller
     {
         $vehicleRequest = VehicleRequest::create([
             'requester_id' => $request->user()->id,
-            'booking_source' => VehicleRequest::SOURCE_ONLINE,
             'request_date' => now(),
             'destination' => $request->destination,
             'purpose' => $request->purpose,
@@ -138,7 +137,7 @@ class VehicleRequestController extends Controller
     {
         $data = $request->validated();
 
-        return DB::transaction(function () use ($data, $request) {
+        $vehicleRequest = DB::transaction(function () use ($data, $request) {
             $vehicleRequest = VehicleRequest::create([
                 'requester_id' => null,
                 'booking_source' => VehicleRequest::SOURCE_ON_SITE,
@@ -168,10 +167,12 @@ class VehicleRequestController extends Controller
                 );
             }
 
-            return (new VehicleRequestResource($vehicleRequest->fresh('requester')))
-                ->response()
-                ->setStatusCode(201);
+            return $vehicleRequest;
         });
+
+        return (new VehicleRequestResource($vehicleRequest->fresh('requester')))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function show(Request $request, VehicleRequest $vehicleRequest)
