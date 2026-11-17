@@ -3,7 +3,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ClipboardCheck } from 'lucide-vue-next'
 import api, { errorMessage, unwrap, validationErrors } from '@/lib/api'
 import { formatDate, todayIso } from '@/lib/format'
-import { printHtml } from '@/lib/printHtml'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseCard from '@/components/ui/BaseCard.vue'
@@ -39,6 +38,8 @@ const page = ref(1)
 const showForm = ref(false)
 const assessing = ref(null)
 const saving = ref(false)
+const printableHtml = ref('')
+const printFrame = ref(null)
 const errors = ref({})
 const formError = ref('')
 
@@ -190,7 +191,18 @@ function closeForm() {
   emit('close')
 }
 
-// Saves the checklist, prints it, and resets the form so it can be used again.
+function closePrintPreview() {
+  printableHtml.value = ''
+  if (props.modalOnly) emit('close')
+}
+
+function printNow() {
+  const win = printFrame.value?.contentWindow
+  win?.focus()
+  win?.print()
+}
+
+// Saves the checklist, opens its print preview, and resets the form for the next assessment.
 async function printAssessment() {
   errors.value = {}
   formError.value = ''
@@ -216,10 +228,11 @@ async function printAssessment() {
       headers: { Accept: 'text/html' },
     })
 
-    closeForm()
+    showForm.value = false
+    assessing.value = null
     form.value = emptyForm()
-    toast.success('Checklist saved. Opening the print window.')
-    printHtml(html)
+    printableHtml.value = html
+    toast.success('Checklist saved. Review the print preview before printing.')
     await loadRecords()
   } catch (error) {
     errors.value = validationErrors(error)
@@ -418,4 +431,28 @@ async function printAssessment() {
         <BaseButton :loading="saving" @click="printAssessment">Print</BaseButton>
       </template>
   </BaseModal>
+
+  <Teleport to="body">
+    <div
+      v-if="printableHtml"
+      class="fixed inset-0 z-[55] flex items-start justify-center overflow-y-auto bg-ink/40 p-0 sm:p-page"
+    >
+      <div class="w-full max-w-4xl bg-surface p-card shadow-pop sm:rounded-card">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-section-title">Preventive maintenance checklist</h2>
+          <div class="flex flex-wrap gap-2">
+            <BaseButton size="sm" @click="printNow">Print / Save as PDF</BaseButton>
+            <BaseButton variant="outline" size="sm" @click="closePrintPreview">Close</BaseButton>
+          </div>
+        </div>
+
+        <iframe
+          ref="printFrame"
+          :srcdoc="printableHtml"
+          title="Preventive maintenance checklist"
+          class="mt-3 h-[70vh] w-full rounded-card border border-line bg-white"
+        />
+      </div>
+    </div>
+  </Teleport>
 </template>
