@@ -37,6 +37,7 @@ const navigation = computed(() => {
   if (auth.isStaff) {
     items.push(
       { name: 'Allocations', to: { name: 'allocations' }, icon: 'car' },
+      { name: 'Date Change Requests', to: { name: 'dateChangeRequests' }, icon: 'calendar' },
       { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
     )
   }
@@ -54,7 +55,13 @@ const navigation = computed(() => {
         name: 'Allocations',
         to: { name: 'allocations' },
         icon: 'car',
-        badge: notifications.allocationAttention,
+        badge: notifications.needsAllocation,
+      },
+      {
+        name: 'Date Change Requests',
+        to: { name: 'dateChangeRequests' },
+        icon: 'calendar',
+        badge: notifications.pendingDateChanges,
       },
       { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
       {

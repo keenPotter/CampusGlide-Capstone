@@ -17,7 +17,6 @@ export const useNotificationStore = defineStore('notifications', {
   }),
 
   getters: {
-    allocationAttention: (state) => state.needsAllocation + state.pendingDateChanges,
     total: (state) =>
       state.pendingRequests +
       state.openMaintenance +

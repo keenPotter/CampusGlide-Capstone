@@ -227,6 +227,7 @@ function closeConflict() {
           id="on-site-requester-name"
           v-model="form.requester_name"
           label="Full Name"
+          placeholder="e.g. Juan Dela Cruz"
           :error="errors.requester_name"
           required
         />
@@ -234,6 +235,7 @@ function closeConflict() {
           id="on-site-requester-department"
           v-model="form.requester_department"
           label="Office/Department"
+          placeholder="e.g. College of Engineering"
           :error="errors.requester_department"
           required
         />
@@ -241,6 +243,7 @@ function closeConflict() {
           id="on-site-requester-contact"
           v-model="form.requester_contact"
           label="Contact Number"
+          placeholder="e.g. 09XXXXXXXXX"
           :error="errors.requester_contact"
           required
         />
@@ -252,6 +255,7 @@ function closeConflict() {
           id="on-site-destination"
           v-model="form.destination"
           label="Destination"
+          placeholder="e.g. Tuguegarao City"
           :error="errors.destination"
           required
         />
@@ -312,6 +316,7 @@ function closeConflict() {
             min="1"
             step="1"
             label="Number of Passengers"
+            placeholder="e.g. 10"
             :error="errors.number_of_passengers"
             required
           />
@@ -320,6 +325,7 @@ function closeConflict() {
           id="on-site-passengers"
           v-model="form.passengers"
           label="Authorized Passengers"
+          placeholder="e.g. All fund administrators"
           hint="Enter the passenger names or group description."
           :error="errors.passengers"
           required

@@ -5,7 +5,7 @@ import { useToast } from '@/composables/useToast'
 import { useNotificationStore } from '@/stores/notifications'
 import { useAuthStore } from '@/stores/auth'
 import api, { errorMessage, validationErrors } from '@/lib/api'
-import { formatDate, formatDateTime } from '@/lib/format'
+import { formatDate, formatDateTime, TRIP_TYPE_DESCRIPTIONS } from '@/lib/format'
 import {
   allocationStatusLabel,
   canPrint,
@@ -29,11 +29,8 @@ import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import TripTypeBadge from '@/components/ui/TripTypeBadge.vue'
 import AllocationModal from '@/components/allocations/AllocationModal.vue'
-import ConflictModal from '@/components/allocations/ConflictModal.vue'
-import DateChangeDecisionModal from '@/components/allocations/DateChangeDecisionModal.vue'
 import PrintableTripRequest from '@/components/allocations/PrintableTripRequest.vue'
 import QuickAddModal from '@/components/allocations/QuickAddModal.vue'
-import RescheduleRequestCard from '@/components/allocations/RescheduleRequestCard.vue'
 
 // The allocation page for administrators.
 // New allocations are made when a vehicle request is approved (Vehicle Requests page).
@@ -46,7 +43,6 @@ const {
   loading,
   loadError,
   counts,
-  pendingDateChanges,
   pendingByAllocation,
   conflicts,
   conflictedAllocations,
@@ -60,7 +56,6 @@ const {
 } = useAllocations()
 
 const PAGE_SIZE = 10
-const DATE_CHANGE_PAGE_SIZE = 10
 
 const search = ref('')
 const typeFilter = ref('')
@@ -68,22 +63,16 @@ const statusFilter = ref('')
 const monthFilter = ref('') // '' = all months, '01' to '12'
 const yearFilter = ref('') // '' = all years, for example '2026'
 const page = ref(1)
-const dateChangePage = ref(1)
 
 const modalOpen = ref(false)
 const editing = ref(null)
 const viewTarget = ref(null)
-// Conflicts found when a date change request was approved (vehicle and driver together).
-const pageConflicts = ref([])
 const printTarget = ref(null)
 const printNotice = ref('')
 
 // 'vehicle' or 'driver' while the "Add" window is open.
 const quickAdd = ref('')
 
-// The faculty date change request the administrator is deciding on.
-const decisionItem = ref(null)
-const decisionAction = ref('')
 const cancelTarget = ref(null)
 const cancelReason = ref('')
 const cancelError = ref('')
@@ -155,8 +144,16 @@ function countOf(type) {
 
 const typeOptions = computed(() => [
   { value: '', label: `All (${dateRows.value.length})` },
-  { value: 'inclusive', label: `Inclusive (${countOf('inclusive')})`, dot: 'bg-primary' },
-  { value: 'exclusive', label: `Exclusive (${countOf('exclusive')})`, dot: 'bg-secondary' },
+  {
+    value: 'inclusive',
+    label: `${TRIP_TYPE_DESCRIPTIONS.inclusive} (${countOf('inclusive')})`,
+    dot: 'bg-primary',
+  },
+  {
+    value: 'exclusive',
+    label: `${TRIP_TYPE_DESCRIPTIONS.exclusive} (${countOf('exclusive')})`,
+    dot: 'bg-secondary',
+  },
 ])
 
 const statusOptions = computed(() => {
@@ -208,19 +205,6 @@ const pageRows = computed(() =>
   visibleRows.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE),
 )
 
-const dateChangePages = computed(() => Math.max(1, Math.ceil(pendingDateChanges.value.length / DATE_CHANGE_PAGE_SIZE)))
-const pagedDateChanges = computed(() =>
-  pendingDateChanges.value.slice(
-    (dateChangePage.value - 1) * DATE_CHANGE_PAGE_SIZE,
-    dateChangePage.value * DATE_CHANGE_PAGE_SIZE,
-  ),
-)
-const dateChangePaginationMeta = computed(() => ({
-  current_page: dateChangePage.value,
-  last_page: dateChangePages.value,
-  total: pendingDateChanges.value.length,
-}))
-
 const paginationMeta = computed(() => ({
   current_page: page.value,
   last_page: pageCount.value,
@@ -235,10 +219,6 @@ watch([search, typeFilter, statusFilter, monthFilter, yearFilter], () => {
 // If the list gets shorter (for example after a reload), stay on a page that exists.
 watch(pageCount, (count) => {
   if (page.value > count) page.value = count
-})
-
-watch(dateChangePages, (count) => {
-  if (dateChangePage.value > count) dateChangePage.value = count
 })
 
 /* ================= ACTIONS ================= */
@@ -290,28 +270,6 @@ function onQuickAdded({ kind, item }) {
     toast.success('Vehicle added.')
   }
   quickAdd.value = ''
-}
-
-function decide(item, action) {
-  decisionItem.value = item
-  decisionAction.value = action
-}
-
-function closeDecision() {
-  decisionItem.value = null
-  decisionAction.value = ''
-}
-
-async function onDecided(message) {
-  closeDecision()
-  await reload()
-  toast.success(message)
-}
-
-// The requested date is already booked: close the decision window and show the conflicts.
-function onDecisionConflict(found) {
-  closeDecision()
-  pageConflicts.value = found
 }
 
 function openCancel(allocation) {
@@ -459,36 +417,6 @@ async function confirmCancel() {
         <i class="h-2.5 w-2.5 rounded-full" :class="dotClass[key]" /> {{ label }}
       </span>
     </p>
-
-    <!-- Date change requests from faculty -->
-    <BaseCard
-      v-if="loading || pendingDateChanges.length"
-      title="Date change requests"
-      :subtitle="
-        auth.isAdministrator
-          ? `${pendingDateChanges.length} waiting for your decision`
-          : `${pendingDateChanges.length} requests · read-only`
-      "
-    >
-      <div v-if="loading" class="flex justify-center p-8" aria-label="Loading date change requests">
-        <div class="h-7 w-7 animate-spin rounded-full border-2 border-line border-t-primary" />
-      </div>
-      <div v-else class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <RescheduleRequestCard
-          v-for="item in pagedDateChanges"
-          :key="item.id"
-          :item="item"
-          :is-admin="auth.isAdministrator"
-          @approve="decide($event, 'approve')"
-          @disapprove="decide($event, 'disapprove')"
-        />
-      </div>
-      <PaginationBar
-        v-if="!loading"
-        :meta="dateChangePaginationMeta"
-        @change="(value) => (dateChangePage = value)"
-      />
-    </BaseCard>
 
     <!-- Trip status summary -->
     <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -776,15 +704,6 @@ async function confirmCancel() {
       @created="onQuickAdded"
     />
 
-    <DateChangeDecisionModal
-      v-if="auth.isAdministrator"
-      :item="decisionItem"
-      :action="decisionAction"
-      @close="closeDecision"
-      @saved="onDecided"
-      @conflict="onDecisionConflict"
-    />
-
     <PrintableTripRequest
       :allocation="printTarget"
       :notice="printNotice"
@@ -820,10 +739,5 @@ async function confirmCancel() {
       </template>
     </BaseModal>
 
-    <ConflictModal
-      :conflicts="pageConflicts"
-      hint="Please choose another date."
-      @close="pageConflicts = []"
-    />
   </div>
 </template>
