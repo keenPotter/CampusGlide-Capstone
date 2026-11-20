@@ -321,7 +321,7 @@ function closeConflict() {
             required
           />
         </div>
-        <BaseInput
+        <BaseTextarea
           id="on-site-passengers"
           v-model="form.passengers"
           label="Authorized Passengers"
