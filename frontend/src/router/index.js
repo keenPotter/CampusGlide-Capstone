@@ -25,7 +25,7 @@ const routes = [
     path: '/requests',
     name: 'requests.index',
     component: () => import('@/views/requests/RequestListView.vue'),
-    meta: { requiresAuth: true, roles: ['administrator', 'faculty'] },
+    meta: { requiresAuth: true, roles: ['administrator', 'staff', 'faculty'] },
   },
   {
     path: '/requests/new',
@@ -37,7 +37,7 @@ const routes = [
     path: '/requests/:id',
     name: 'requests.show',
     component: () => import('@/views/requests/RequestDetailView.vue'),
-    meta: { requiresAuth: true, roles: ['administrator', 'faculty'] },
+    meta: { requiresAuth: true, roles: ['administrator', 'staff', 'faculty'] },
   },
   {
     path: '/requests/:id/edit',
@@ -74,7 +74,7 @@ const routes = [
     path: '/maintenance',
     name: 'maintenance',
     component: () => import('@/views/maintenance/MaintenanceView.vue'),
-    meta: { requiresAuth: true, roles: ['administrator'] },
+    meta: { requiresAuth: true, roles: ['administrator', 'staff'] },
   },
   {
     path: '/audit-logs',

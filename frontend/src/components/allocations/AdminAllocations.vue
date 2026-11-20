@@ -270,7 +270,7 @@ function onQuickAdded({ kind, item }) {
         <h1 class="text-page-title">Vehicle-Driver Allocation</h1>
         <p class="mt-1 text-small text-ink-muted">
           {{
-            auth.isAdministrator
+            auth.isAdministratorOrStaff
               ? 'Manage scheduled, ongoing, and completed trips.'
               : 'View scheduled, ongoing, and completed trips.'
           }}
@@ -293,13 +293,13 @@ function onQuickAdded({ kind, item }) {
         {{ conflictTexts.length }} conflict{{ conflictTexts.length > 1 ? 's' : '' }} detected:
         {{ conflictTexts.join(' · ') }}.
         {{
-          auth.isAdministrator
+          auth.isAdministratorOrStaff
             ? 'Please resolve before confirming the schedule.'
             : 'Please contact an administrator to resolve this conflict.'
         }}
       </p>
       <BaseButton
-        v-if="auth.isAdministrator && resolvableConflict"
+        v-if="auth.isAdministratorOrStaff && resolvableConflict"
         size="sm"
         variant="outline"
         @click="openEdit(resolvableConflict)"
@@ -312,7 +312,7 @@ function onQuickAdded({ kind, item }) {
     <div class="grid grid-cols-1 gap-page lg:grid-cols-2">
       <BaseCard title="Vehicles" subtitle="Availability today" :padded="false">
         <template #actions>
-          <BaseButton v-if="auth.isAdministrator" size="sm" @click="quickAdd = 'vehicle'">
+          <BaseButton v-if="auth.isAdministratorOrStaff" size="sm" @click="quickAdd = 'vehicle'">
             + Add vehicle
           </BaseButton>
         </template>
@@ -338,7 +338,7 @@ function onQuickAdded({ kind, item }) {
 
       <BaseCard title="Drivers" subtitle="Availability today" :padded="false">
         <template #actions>
-          <BaseButton v-if="auth.isAdministrator" size="sm" @click="quickAdd = 'driver'">
+          <BaseButton v-if="auth.isAdministratorOrStaff" size="sm" @click="quickAdd = 'driver'">
             + Add driver
           </BaseButton>
         </template>
@@ -514,7 +514,7 @@ function onQuickAdded({ kind, item }) {
             <template v-if="row.kind === 'allocation'">
               <!-- Reassign is for scheduled trips only. It turns red when there is a conflict. -->
               <BaseButton
-                v-if="auth.isAdministrator && canReassign(row.allocation)"
+                v-if="auth.isAdministratorOrStaff && canReassign(row.allocation)"
                 size="sm"
                 :variant="conflicts[row.allocation.id] ? 'danger' : 'outline'"
                 @click="openEdit(row.allocation)"
@@ -619,7 +619,7 @@ function onQuickAdded({ kind, item }) {
     </BaseModal>
 
     <AllocationModal
-      v-if="auth.isAdministrator"
+      v-if="auth.isAdministratorOrStaff"
       :open="modalOpen"
       :allocation="editing"
       @close="modalOpen = false"
@@ -627,7 +627,7 @@ function onQuickAdded({ kind, item }) {
     />
 
     <QuickAddModal
-      v-if="auth.isAdministrator"
+      v-if="auth.isAdministratorOrStaff"
       :kind="quickAdd"
       @close="quickAdd = ''"
       @created="onQuickAdded"

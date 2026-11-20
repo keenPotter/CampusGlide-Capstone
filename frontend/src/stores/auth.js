@@ -12,6 +12,7 @@ export const useAuthStore = defineStore('auth', {
     isAuthenticated: (state) => Boolean(state.token && state.user),
     role: (state) => state.user?.role ?? null,
     isAdministrator: (state) => state.user?.role === 'administrator',
+    isAdministratorOrStaff: (state) => ['administrator', 'staff'].includes(state.user?.role),
     isFaculty: (state) => state.user?.role === 'faculty',
     isStaff: (state) => state.user?.role === 'staff',
   },

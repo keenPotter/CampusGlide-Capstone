@@ -85,26 +85,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('audit:CREATE_RESCHEDULE_REQUEST,reschedule_requests');
     });
 
-    // ---------- Administrator only ----------
-    Route::middleware('role:administrator')->group(function () {
+    // ---------- Administrators and staff ----------
+    Route::middleware('role:administrator,staff')->group(function () {
         // Sidebar numbers. One small call instead of four list calls on every page change.
         Route::get('/notifications/summary', [NotificationSummaryController::class, 'summary']);
-
-        // Accounts
-        Route::post('/register', [AuthController::class, 'register'])
-            ->middleware('audit:CREATE_USER,users');
-        Route::post('/admin-transfer', [AdministratorTransferController::class, 'store'])
-            ->middleware('audit:TRANSFER_ADMINISTRATOR,users');
-        Route::get('/users', [UserController::class, 'index']);
-        Route::put('/users/{user}', [UserController::class, 'update'])
-            ->whereNumber('user')
-            ->middleware('audit:UPDATE_USER,users');
-        Route::delete('/users/{user}', [UserController::class, 'requestDeletion'])
-            ->whereNumber('user')
-            ->middleware('audit:DEACTIVATE_USER,users');
-        Route::post('/users/{user}/cancel-deletion', [UserController::class, 'cancelDeletion'])
-            ->whereNumber('user')
-            ->middleware('audit:RESTORE_USER,users');
 
         // Vehicle request approval
         Route::post('/vehicle-requests/on-site', [VehicleRequestController::class, 'storeOnSite'])
@@ -165,7 +149,24 @@ Route::middleware('auth:sanctum')->group(function () {
         // The printable checklist (legal size), built by the backend.
         Route::get('/preventive-maintenance-checklists/{preventiveMaintenanceChecklist}/print', [PreventiveMaintenanceChecklistPrintController::class, 'show'])
             ->whereNumber('preventiveMaintenanceChecklist');
+    });
 
+    // ---------- Administrator only: accounts and audit history ----------
+    Route::middleware('role:administrator')->group(function () {
+        Route::post('/register', [AuthController::class, 'register'])
+            ->middleware('audit:CREATE_USER,users');
+        Route::post('/admin-transfer', [AdministratorTransferController::class, 'store'])
+            ->middleware('audit:TRANSFER_ADMINISTRATOR,users');
+        Route::get('/users', [UserController::class, 'index']);
+        Route::put('/users/{user}', [UserController::class, 'update'])
+            ->whereNumber('user')
+            ->middleware('audit:UPDATE_USER,users');
+        Route::delete('/users/{user}', [UserController::class, 'requestDeletion'])
+            ->whereNumber('user')
+            ->middleware('audit:DEACTIVATE_USER,users');
+        Route::post('/users/{user}/cancel-deletion', [UserController::class, 'cancelDeletion'])
+            ->whereNumber('user')
+            ->middleware('audit:RESTORE_USER,users');
         // Audit history is read-only and administrator-only.
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
     });
