@@ -1,6 +1,7 @@
 <script setup>
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 import { TRIP_TYPE_DESCRIPTIONS } from '@/lib/format'
 
 defineProps({
@@ -89,7 +90,7 @@ const tripTypes = [
     />
 
     <div class="sm:col-span-2">
-      <BaseInput
+      <BaseTextarea
         v-model="form.passengers"
         label="Authorized passenger(s)"
         placeholder="e.g. All fund administrators"
