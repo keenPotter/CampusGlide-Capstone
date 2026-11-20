@@ -83,7 +83,7 @@ export function useAllocations() {
   )
 
   const counts = computed(() => {
-    const result = { scheduled: 0, in_progress: 0, completed: 0, cancelled: 0 }
+    const result = { scheduled: 0, in_progress: 0, completed: 0 }
     allocations.value.forEach((allocation) => {
       if (result[allocation.status] !== undefined) result[allocation.status]++
     })

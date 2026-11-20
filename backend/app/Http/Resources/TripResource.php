@@ -31,9 +31,6 @@ class TripResource extends JsonResource
             'actual_return_time' => $this->actual_return_time,
             'actual_mileage' => $this->actual_mileage,
             'notes' => $this->notes,
-            'cancellation_reason' => $this->cancellation_reason,
-            'cancelled_by' => $this->cancelledBy?->full_name,
-            'cancelled_at' => $this->cancelled_at?->toIso8601String(),
             'vehicle_request' => $vehicleRequest ? [
                 'id' => $vehicleRequest->id,
                 'status' => $vehicleRequest->status,

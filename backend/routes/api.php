@@ -118,9 +118,6 @@ Route::middleware('auth:sanctum')->group(function () {
         // A pending request is approved and assigned in one step: POST /allocations with approve_request = true.
         Route::post('/allocations', [AllocationController::class, 'store'])
             ->middleware('audit:APPROVE_AND_ALLOCATE_REQUEST,allocations');
-        Route::post('/allocations/{allocation}/cancel', [AllocationController::class, 'cancel'])
-            ->whereNumber('allocation')
-            ->middleware('audit:CANCEL_TRIP,allocations');
         Route::put('/allocations/{allocation}', [AllocationController::class, 'update'])
             ->whereNumber('allocation')
             ->middleware('audit:UPDATE_ALLOCATION,allocations');

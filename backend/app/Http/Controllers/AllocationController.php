@@ -22,7 +22,6 @@ class AllocationController extends Controller
 {
     private const WITH = [
         'trip.vehicleRequest.requester',
-        'trip.cancelledBy',
         'vehicle',
         'driver',
         'allocatedBy',
@@ -43,7 +42,7 @@ class AllocationController extends Controller
     public function index(Request $request)
     {
         $request->validate([
-            'status' => ['nullable', 'in:scheduled,in_progress,completed,cancelled'],
+            'status' => ['nullable', 'in:scheduled,in_progress,completed'],
             'search' => ['nullable', 'string', 'max:255'],
             'per_page' => ['sometimes', 'integer', 'between:1,100'],
         ]);
@@ -68,12 +67,7 @@ class AllocationController extends Controller
                 $searchQuery
                     ->whereHas('trip', function ($tripQuery) use ($pattern) {
                         $tripQuery->where('destination', 'like', $pattern)
-                            ->orWhere('purpose', 'like', $pattern)
-                            ->orWhere('cancellation_reason', 'like', $pattern)
-                            ->orWhereHas('cancelledBy', fn ($userQuery) =>
-                                $userQuery->where('first_name', 'like', $pattern)
-                                    ->orWhere('last_name', 'like', $pattern)
-                            );
+                            ->orWhere('purpose', 'like', $pattern);
                     })
                     ->orWhereHas('vehicle', function ($vehicleQuery) use ($pattern) {
                         $vehicleQuery->where('vehicle_model', 'like', $pattern)
@@ -326,47 +320,4 @@ class AllocationController extends Controller
         return new AllocationResource($allocation->fresh(self::WITH));
     }
 
-    /**
-     * POST /api/allocations/{allocation}/cancel
-     * Cancels a scheduled trip and releases its assigned vehicle and driver.
-     */
-    public function cancel(Request $request, Allocation $allocation)
-    {
-        $validated = $request->validate([
-            'reason' => ['required', 'string', 'max:500'],
-        ]);
-
-        $this->allocations->completeFinishedTrips();
-
-        DB::transaction(function () use ($request, $allocation, $validated) {
-            $trip = Trip::query()->lockForUpdate()->findOrFail($allocation->trip_id);
-            if ($trip->trip_status !== 'scheduled') {
-                throw ValidationException::withMessages([
-                    'status' => ['Only scheduled trips can be cancelled.'],
-                ]);
-            }
-
-            $trip->update([
-                'trip_status' => 'cancelled',
-                'cancellation_reason' => trim($validated['reason']),
-                'cancelled_by' => $request->user()->id,
-                'cancelled_at' => now(),
-            ]);
-
-            if (! Trip::where('vehicle_id', $trip->vehicle_id)->whereIn('trip_status', AllocationService::ACTIVE)->exists()) {
-                Vehicle::whereKey($trip->vehicle_id)
-                    ->where('status', 'in_use')
-                    ->update(['status' => 'available']);
-            }
-
-            if (! Trip::where('driver_id', $trip->driver_id)->whereIn('trip_status', AllocationService::ACTIVE)->exists()) {
-                Driver::whereKey($trip->driver_id)->update([
-                    'is_available' => true,
-                    'assigned_vehicle_id' => null,
-                ]);
-            }
-        });
-
-        return new AllocationResource($allocation->fresh(self::WITH));
-    }
 }

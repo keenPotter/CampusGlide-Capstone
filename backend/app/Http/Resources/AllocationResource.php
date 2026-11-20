@@ -27,9 +27,6 @@ class AllocationResource extends JsonResource
                 'estimated_return_time' => $trip?->estimated_return_time,
                 'destination' => $trip?->destination,
                 'purpose' => $trip?->purpose,
-                'cancellation_reason' => $trip?->cancellation_reason,
-                'cancelled_by' => $trip?->cancelledBy?->full_name,
-                'cancelled_at' => $trip?->cancelled_at?->toIso8601String(),
             ],
             'vehicle_request' => [
                 'id' => $vehicleRequest?->id,
