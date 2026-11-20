@@ -4,12 +4,10 @@ import { useAllocations } from '@/composables/useAllocations'
 import { useToast } from '@/composables/useToast'
 import { useNotificationStore } from '@/stores/notifications'
 import { useAuthStore } from '@/stores/auth'
-import api, { errorMessage, validationErrors } from '@/lib/api'
-import { formatDate, formatDateTime, TRIP_TYPE_DESCRIPTIONS } from '@/lib/format'
+import { formatDate, TRIP_TYPE_DESCRIPTIONS } from '@/lib/format'
 import {
   allocationStatusLabel,
   canPrint,
-  canCancel,
   canReassign,
   passengerText,
   requestNumber,
@@ -21,7 +19,6 @@ import BaseCard from '@/components/ui/BaseCard.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
-import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadError from '@/components/ui/LoadError.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
@@ -73,11 +70,6 @@ const printNotice = ref('')
 // 'vehicle' or 'driver' while the "Add" window is open.
 const quickAdd = ref('')
 
-const cancelTarget = ref(null)
-const cancelReason = ref('')
-const cancelError = ref('')
-const cancelling = ref(false)
-
 const tones = {
   primary: 'bg-primary-50 text-primary-700',
   secondary: 'bg-secondary-50 text-secondary-700',
@@ -88,7 +80,6 @@ const stats = computed(() => [
   { label: 'Scheduled trips', value: counts.value.scheduled, tone: 'primary' },
   { label: 'Ongoing trips', value: counts.value.in_progress, tone: 'secondary' },
   { label: 'Completed trips', value: counts.value.completed, tone: 'primary' },
-  { label: 'Cancelled trips', value: counts.value.cancelled, tone: 'danger' },
 ])
 
 // Availability is for today.
@@ -164,7 +155,6 @@ const statusOptions = computed(() => {
     { value: 'scheduled', label: `Scheduled (${countOfStatus('scheduled')})` },
     { value: 'in_progress', label: `Ongoing (${countOfStatus('in_progress')})` },
     { value: 'completed', label: `Completed (${countOfStatus('completed')})` },
-    { value: 'cancelled', label: `Cancelled (${countOfStatus('cancelled')})` },
   ]
 })
 
@@ -188,8 +178,6 @@ const visibleRows = computed(() => {
       item?.driver?.name,
       item?.vehicle?.plate_number,
       item?.vehicle?.vehicle_model,
-      item?.trip?.cancellation_reason,
-      item?.trip?.cancelled_by,
     ]
       .join(' ')
       .toLowerCase()
@@ -272,42 +260,6 @@ function onQuickAdded({ kind, item }) {
   quickAdd.value = ''
 }
 
-function openCancel(allocation) {
-  cancelTarget.value = allocation
-  cancelReason.value = ''
-  cancelError.value = ''
-}
-
-function closeCancel() {
-  cancelTarget.value = null
-  cancelReason.value = ''
-  cancelError.value = ''
-}
-
-async function confirmCancel() {
-  if (!cancelTarget.value || cancelling.value) return
-
-  cancelError.value = ''
-  const reason = cancelReason.value.trim()
-  if (!reason) {
-    cancelError.value = 'Please provide a cancellation reason.'
-    return
-  }
-
-  cancelling.value = true
-  try {
-    await api.post(`/allocations/${cancelTarget.value.id}/cancel`, { reason })
-    closeCancel()
-    await reload()
-    toast.success('Trip cancelled.')
-  } catch (error) {
-    const errors = validationErrors(error)
-    cancelError.value =
-      errors.reason ?? errors.status ?? errorMessage(error, 'Unable to cancel this trip.')
-  } finally {
-    cancelling.value = false
-  }
-}
 </script>
 
 <template>
@@ -319,8 +271,8 @@ async function confirmCancel() {
         <p class="mt-1 text-small text-ink-muted">
           {{
             auth.isAdministrator
-              ? 'Manage scheduled, ongoing, completed, and cancelled trips.'
-              : 'View scheduled, ongoing, completed, and cancelled trips.'
+              ? 'Manage scheduled, ongoing, and completed trips.'
+              : 'View scheduled, ongoing, and completed trips.'
           }}
         </p>
       </div>
@@ -475,7 +427,7 @@ async function confirmCancel() {
         :message="
           typeFilter || statusFilter || search || monthFilter || yearFilter
             ? 'No trips match your filters.'
-            : 'Scheduled, ongoing, completed, and cancelled trips will appear here.'
+            : 'Scheduled, ongoing, and completed trips will appear here.'
         "
       />
 
@@ -569,14 +521,6 @@ async function confirmCancel() {
               >
                 Reassign
               </BaseButton>
-              <BaseButton
-                v-if="auth.isAdministrator && canCancel(row.allocation)"
-                size="sm"
-                variant="danger"
-                @click="openCancel(row.allocation)"
-              >
-                Cancel
-              </BaseButton>
               <BaseButton size="sm" variant="ghost" @click="openView(row)">
                 View
               </BaseButton>
@@ -660,21 +604,6 @@ async function confirmCancel() {
           <p class="text-ink-muted">Purpose</p>
           <p class="font-medium">{{ viewTarget.allocation.trip?.purpose ?? '—' }}</p>
         </div>
-        <div
-          v-if="viewTarget.allocation.status === 'cancelled'"
-          class="sm:col-span-2 rounded-card border border-red-200 bg-red-50 p-3"
-        >
-          <p class="font-semibold text-red-800">Cancellation details</p>
-          <p class="mt-1 text-red-800">
-            Reason: {{ viewTarget.allocation.trip?.cancellation_reason || '—' }}
-          </p>
-          <p class="text-red-800">
-            Cancelled by: {{ viewTarget.allocation.trip?.cancelled_by || '—' }}
-          </p>
-          <p class="text-red-800">
-            Cancelled at: {{ formatDateTime(viewTarget.allocation.trip?.cancelled_at) }}
-          </p>
-        </div>
       </div>
       <template #footer>
         <BaseButton
@@ -712,32 +641,6 @@ async function confirmCancel() {
       @sent="reload"
     />
 
-    <BaseModal
-      v-if="auth.isAdministrator"
-      :open="Boolean(cancelTarget)"
-      title="Cancel scheduled trip"
-      :subtitle="cancelTarget ? `Request #${cancelTarget.vehicle_request?.id}` : ''"
-      @close="closeCancel"
-    >
-      <p class="mb-3 text-small text-ink-muted">
-        Cancelling releases the assigned vehicle and driver. This action cannot be undone.
-      </p>
-      <BaseTextarea
-        v-model="cancelReason"
-        label="Reason for cancellation"
-        placeholder="Enter the reason for cancelling this trip."
-        :error="cancelError"
-        required
-      />
-      <template #footer>
-        <BaseButton variant="outline" :disabled="cancelling" @click="closeCancel">
-          Keep trip
-        </BaseButton>
-        <BaseButton variant="danger" :loading="cancelling" @click="confirmCancel">
-          Cancel trip
-        </BaseButton>
-      </template>
-    </BaseModal>
 
   </div>
 </template>

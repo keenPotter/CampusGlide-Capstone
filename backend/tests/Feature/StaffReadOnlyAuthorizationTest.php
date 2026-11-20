@@ -30,7 +30,6 @@ class StaffReadOnlyAuthorizationTest extends TestCase
             ['POST', "/api/reschedule-requests/{$rescheduleRequest->id}/approve", []],
             ['POST', "/api/reschedule-requests/{$rescheduleRequest->id}/disapprove", []],
             ['POST', '/api/allocations', []],
-            ['POST', "/api/allocations/{$allocation->id}/cancel", []],
             ['POST', '/api/allocation-drivers', []],
             ['POST', '/api/allocation-vehicles', []],
             ['PATCH', "/api/vehicle-requests/{$vehicleRequest->id}/status", []],

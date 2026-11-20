@@ -19,7 +19,7 @@ class AllocationPrintController extends Controller
 
     public function show(Allocation $allocation)
     {
-        $allocation->load(['trip.vehicleRequest.requester', 'trip.cancelledBy', 'vehicle', 'driver']);
+        $allocation->load(['trip.vehicleRequest.requester', 'vehicle', 'driver']);
         $trip = $allocation->trip;
         $vehicleRequest = $allocation->trip?->vehicleRequest;
 
@@ -67,10 +67,6 @@ class AllocationPrintController extends Controller
             // Filled in by the allocation.
             'plateNumber' => $allocation->vehicle->plate_number,
             'driverName' => $allocation->driver->full_name,
-            'isCancelled' => $trip?->trip_status === 'cancelled',
-            'cancellationReason' => $trip?->cancellation_reason,
-            'cancelledBy' => $trip?->cancelledBy?->full_name,
-            'cancelledAt' => $trip?->cancelled_at?->format('F j, Y g:i A'),
             'chiefMotorpool' => self::CHIEF_MOTORPOOL,
             'unitHeadGsu' => self::UNIT_HEAD_GSU,
         ]);

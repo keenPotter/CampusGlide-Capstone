@@ -45,7 +45,6 @@
 
   .action-top { display: flex; gap: 4mm; }
   .action-top > div { flex: 1 1 50%; }
-  .cancellation { margin-top: 1mm; border: 1px solid #000; padding: 1mm 2mm; font-size: 8pt; }
   .request { display: flex; gap: 2mm; }
   .request .checks { display: flex; flex-direction: column; gap: 1.5mm; }
   .check { display: block; }
@@ -135,12 +134,6 @@
       </div>
     </div>
 
-    @if ($isCancelled)
-      <div class="cancellation">
-        <b>TRIP CANCELLED</b> · Reason: {{ $cancellationReason }} ·
-        Cancelled by: {{ $cancelledBy ?: '—' }} · At: {{ $cancelledAt ?: '—' }}
-      </div>
-    @endif
 
     <div class="action-sign">
       <div class="sig">

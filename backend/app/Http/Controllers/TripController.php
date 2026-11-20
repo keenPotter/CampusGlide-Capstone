@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
  */
 class TripController extends Controller
 {
-    private const WITH = ['driver', 'vehicle', 'vehicleRequest.requester', 'cancelledBy'];
+    private const WITH = ['driver', 'vehicle', 'vehicleRequest.requester'];
 
     public function __construct(protected AllocationService $allocations)
     {
@@ -31,7 +31,7 @@ class TripController extends Controller
 
         $request->validate([
             'trip_type' => ['nullable', 'in:inclusive,exclusive'],
-            'status' => ['nullable', 'in:scheduled,in_progress,completed,cancelled'],
+            'status' => ['nullable', 'in:scheduled,in_progress,completed'],
             'month' => ['nullable', 'integer', 'between:1,12'],
             'year' => ['nullable', 'integer', 'between:1900,2200'],
             'search' => ['nullable', 'string', 'max:255'],
@@ -65,11 +65,6 @@ class TripController extends Controller
                 $searchQuery
                     ->where('destination', 'like', $pattern)
                     ->orWhere('purpose', 'like', $pattern)
-                    ->orWhere('cancellation_reason', 'like', $pattern)
-                    ->orWhereHas('cancelledBy', fn ($userQuery) =>
-                        $userQuery->where('first_name', 'like', $pattern)
-                            ->orWhere('last_name', 'like', $pattern)
-                    )
                     ->orWhereHas('vehicle', fn ($vehicleQuery) =>
                         $vehicleQuery->where('vehicle_model', 'like', $pattern)
                             ->orWhere('plate_number', 'like', $pattern)
