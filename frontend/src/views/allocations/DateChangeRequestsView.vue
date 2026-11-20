@@ -111,9 +111,9 @@ onMounted(load)
     <template v-else>
       <p class="text-small text-ink-muted">
         {{
-          auth.isAdministrator
+          auth.isAdministratorOrStaff
             ? `${requests.length} waiting for your decision`
-            : `${requests.length} requests · read-only`
+            : `${requests.length} requests`
         }}
       </p>
       <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -121,7 +121,7 @@ onMounted(load)
           v-for="item in pagedRequests"
           :key="item.id"
           :item="item"
-          :is-admin="auth.isAdministrator"
+          :is-admin="auth.isAdministratorOrStaff"
           @approve="decide($event, 'approve')"
           @disapprove="decide($event, 'disapprove')"
         />
@@ -130,7 +130,7 @@ onMounted(load)
     </template>
 
     <DateChangeDecisionModal
-      v-if="auth.isAdministrator"
+      v-if="auth.isAdministratorOrStaff"
       :item="decisionItem"
       :action="decisionAction"
       @close="closeDecision"

@@ -16,7 +16,7 @@ class StaffReadOnlyAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_staff_cannot_mutate_allocations_or_approve_requests(): void
+    public function test_staff_cannot_manage_accounts_or_audit_logs(): void
     {
         $staff = User::factory()->create(['role' => 'staff']);
         $administrator = User::factory()->create(['role' => 'administrator']);
@@ -24,20 +24,13 @@ class StaffReadOnlyAuthorizationTest extends TestCase
         $driverCount = Driver::count();
         $vehicleCount = Vehicle::count();
 
-        $mutations = [
-            ['PUT', "/api/allocations/{$allocation->id}", ['trip_status' => 'completed']],
-            ['POST', "/api/allocations/{$allocation->id}/reschedule", []],
-            ['POST', "/api/reschedule-requests/{$rescheduleRequest->id}/approve", []],
-            ['POST', "/api/reschedule-requests/{$rescheduleRequest->id}/disapprove", []],
-            ['POST', '/api/allocations', []],
-            ['POST', '/api/allocation-drivers', []],
-            ['POST', '/api/allocation-vehicles', []],
-            ['PATCH', "/api/vehicle-requests/{$vehicleRequest->id}/status", []],
-            ['POST', '/api/vehicle-requests/on-site', []],
+        $forbiddenRoutes = [
+            ['GET', '/api/users', []],
             ['DELETE', "/api/users/{$administrator->id}", []],
+            ['GET', '/api/audit-logs', []],
         ];
 
-        foreach ($mutations as [$method, $uri, $payload]) {
+        foreach ($forbiddenRoutes as [$method, $uri, $payload]) {
             $this->actingAs($staff, 'sanctum')
                 ->json($method, $uri, $payload)
                 ->assertForbidden();

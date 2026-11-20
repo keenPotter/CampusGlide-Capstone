@@ -36,9 +36,22 @@ const navigation = computed(() => {
   }
   if (auth.isStaff) {
     items.push(
+      {
+        name: 'Vehicle Requests',
+        to: { name: 'requests.index' },
+        icon: 'list',
+        also: ['requests.show'],
+        badge: notifications.pendingRequests,
+      },
       { name: 'Allocations', to: { name: 'allocations' }, icon: 'car' },
       { name: 'Date Change Requests', to: { name: 'dateChangeRequests' }, icon: 'calendar' },
       { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
+      {
+        name: 'Maintenance',
+        to: { name: 'maintenance' },
+        icon: 'wrench',
+        badge: notifications.openMaintenance,
+      },
     )
   }
 
@@ -99,9 +112,9 @@ function badgeLabel(count) {
   return count > 99 ? '99+' : String(count)
 }
 
-// Only administrators see the numbers. Refresh when the page loads and on every page change.
+// Administrators and staff see the operational numbers.
 function refreshBadges() {
-  if (auth.isAdministrator) {
+  if (auth.isAdministratorOrStaff) {
     notifications.refresh()
   }
 }

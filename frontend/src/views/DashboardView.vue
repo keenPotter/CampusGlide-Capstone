@@ -14,7 +14,6 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import LoadError from '@/components/ui/LoadError.vue'
-import PaginationBar from '@/components/ui/PaginationBar.vue'
 import ApproveAssignModal from '@/components/requests/ApproveAssignModal.vue'
 import DisapproveRequestModal from '@/components/requests/DisapproveRequestModal.vue'
 import VehicleRequestModal from '@/components/requests/VehicleRequestModal.vue'
@@ -29,7 +28,6 @@ const PAGE_SIZE = 5
 const loading = ref(true)
 const loadError = ref('')
 const summary = ref({ counts: {}, upcoming: [] })
-const page = ref(1)
 const search = ref('')
 const selectedRequest = ref(null)
 const detailRequest = ref(null)
@@ -66,7 +64,7 @@ async function load(searchQuery = search.value) {
   loadError.value = ''
 
   try {
-    summary.value = await requests.fetchSummary(searchQuery, auth.isStaff)
+    summary.value = await requests.fetchSummary(searchQuery, auth.isAdministratorOrStaff)
   } catch (error) {
     loadError.value = errorMessage(error, 'Unable to load the dashboard.')
   } finally {
@@ -104,22 +102,9 @@ const filteredUpcoming = computed(() => {
   )
 })
 
-/* ================= PAGINATION ================= */
-
-const pageCount = computed(() => Math.max(1, Math.ceil(filteredUpcoming.value.length / PAGE_SIZE)))
-
-const pagedUpcoming = computed(() =>
-  filteredUpcoming.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE),
-)
-
-const paginationMeta = computed(() => ({
-  current_page: page.value,
-  last_page: pageCount.value,
-  total: filteredUpcoming.value.length,
-}))
+const previewUpcoming = computed(() => filteredUpcoming.value.slice(0, PAGE_SIZE))
 
 watch(search, (_, __, onCleanup) => {
-  page.value = 1
   const timeout = setTimeout(() => load(), 250)
   onCleanup(() => clearTimeout(timeout))
 })
@@ -184,10 +169,6 @@ async function onRequestSubmitted() {
   await load()
 }
 
-// If the list gets shorter (for example after a reload), stay on a page that exists.
-watch(pageCount, (count) => {
-  if (page.value > count) page.value = count
-})
 </script>
 
 <template>
@@ -227,7 +208,6 @@ watch(pageCount, (count) => {
     <BaseCard title="Upcoming vehicle requests" subtitle="Vehicle requests ordered by requested trip date. Approval does not mean a trip has been scheduled." :padded="false">
       <template #actions>
         <RouterLink
-          v-if="!auth.isStaff"
           :to="{ name: 'requests.index' }"
           class="text-small font-medium text-primary hover:underline"
         >
@@ -250,7 +230,7 @@ watch(pageCount, (count) => {
       />
 
       <ul v-else class="flex flex-col divide-y divide-line">
-        <li v-for="request in pagedUpcoming" :key="request.id">
+        <li v-for="request in previewUpcoming" :key="request.id">
           <button
             type="button"
             class="flex w-full flex-col gap-2 px-card py-3 text-left transition-colors hover:bg-neutral-50 hover:filter-none"
@@ -268,11 +248,6 @@ watch(pageCount, (count) => {
         </li>
       </ul>
 
-      <PaginationBar
-        v-if="!loading && filteredUpcoming.length > PAGE_SIZE"
-        :meta="paginationMeta"
-        @change="(value) => (page = value)"
-      />
     </BaseCard>
 
     <BaseModal
@@ -324,7 +299,7 @@ watch(pageCount, (count) => {
         >
           Edit
         </BaseButton>
-        <template v-if="auth.isAdministrator && detailRequest?.status === 'pending'">
+        <template v-if="auth.isAdministratorOrStaff && detailRequest?.status === 'pending'">
           <BaseButton @click="openApprove(detailRequest)">Approve</BaseButton>
           <BaseButton variant="outline" @click="openDisapprove(detailRequest)">Disapprove</BaseButton>
         </template>

@@ -296,7 +296,7 @@ function onDisapproved() {
 
       <div class="page-actions">
         <RefreshButton :loading="store.loading" label="Refresh vehicle requests" @click="store.fetch()" />
-        <BaseButton v-if="auth.isAdministrator" size="sm" @click="showOnSiteBooking = true">
+        <BaseButton v-if="auth.isAdministratorOrStaff" size="sm" @click="showOnSiteBooking = true">
           + Direct Trip Booking
         </BaseButton>
         <BaseButton v-if="auth.isFaculty" size="sm" @click="showNewRequest = true">
@@ -434,7 +434,7 @@ function onDisapproved() {
             <Pencil :size="16" aria-hidden="true" /> Edit
           </BaseButton>
 
-          <template v-if="auth.isAdministrator && request.status === 'pending'">
+          <template v-if="auth.isAdministratorOrStaff && request.status === 'pending'">
             <BaseButton size="sm" @click="openApprove(request)">
               <Check :size="16" aria-hidden="true" /> Approve
             </BaseButton>
@@ -519,7 +519,7 @@ function onDisapproved() {
             </td>
             <td class="px-2 py-3 align-top xl:px-card">
               <div class="flex flex-nowrap items-center justify-end gap-1.5">
-                <template v-if="auth.isAdministrator && request.status === 'pending'">
+                <template v-if="auth.isAdministratorOrStaff && request.status === 'pending'">
                   <BaseButton size="sm" @click="openApprove(request)">
                     <Check :size="16" aria-hidden="true" /> Approve
                   </BaseButton>
@@ -604,7 +604,7 @@ function onDisapproved() {
         <BaseButton v-if="canEditSelectedRequest" variant="outline" @click="editSelectedRequest">
           Edit
         </BaseButton>
-        <template v-if="auth.isAdministrator && detailRequest?.status === 'pending'">
+        <template v-if="auth.isAdministratorOrStaff && detailRequest?.status === 'pending'">
           <BaseButton @click="openApprove(detailRequest)">Approve</BaseButton>
           <BaseButton variant="outline" @click="openDisapprove(detailRequest)">
             Disapprove

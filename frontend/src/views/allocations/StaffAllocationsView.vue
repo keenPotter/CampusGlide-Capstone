@@ -61,7 +61,7 @@ watch(paginationMeta, (meta) => {
     <div class="page-header">
       <div class="page-header-copy">
         <h1 class="text-page-title">Allocations</h1>
-        <p class="mt-1 text-small text-ink-muted">View assigned vehicles, drivers, and scheduled trips. Staff accounts cannot change allocations.</p>
+        <p class="mt-1 text-small text-ink-muted">Manage assigned vehicles, drivers, and scheduled trips.</p>
       </div>
       <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh allocations" @click="load" />
@@ -70,7 +70,7 @@ watch(paginationMeta, (meta) => {
 
     <LoadError :message="loadError" @retry="load" />
 
-    <BaseCard title="Allocation records" subtitle="Read-only view">
+    <BaseCard title="Allocation records" subtitle="Allocation management">
       <BaseInput v-model="search" type="search" placeholder="Search allocations..." />
       <div v-if="loading" class="flex justify-center p-12">
         <div class="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />

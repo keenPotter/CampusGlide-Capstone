@@ -25,9 +25,9 @@ export const useNotificationStore = defineStore('notifications', {
   },
 
   actions: {
-    // One small request gets all four numbers. The sidebar numbers are shown to administrators only.
+    // One small request gets all four operational numbers.
     refresh() {
-      if (!useAuthStore().isAdministrator) return Promise.resolve()
+      if (!useAuthStore().isAdministratorOrStaff) return Promise.resolve()
       if (running) return running
 
       running = api

@@ -135,7 +135,7 @@ function onRequestUpdated() {
     </BaseCard>
 
     <div class="page-actions sm:justify-end">
-      <template v-if="auth.isAdministrator && request.status === 'pending'">
+      <template v-if="auth.isAdministratorOrStaff && request.status === 'pending'">
         <BaseButton @click="approveOpen = true">Approve</BaseButton>
         <BaseButton variant="outline" @click="disapproveOpen = true">
           Disapprove
