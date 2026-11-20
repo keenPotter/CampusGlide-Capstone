@@ -55,6 +55,10 @@ const emit = defineEmits(['close'])
 </template>
 
 <style scoped>
+.modal-body :deep(.field-label) {
+  text-transform: capitalize;
+}
+
 .modal-body :deep(button),
 .modal-footer :deep(button) {
   height: 2rem;

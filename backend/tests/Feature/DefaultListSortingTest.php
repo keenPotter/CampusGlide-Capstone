@@ -16,51 +16,56 @@ class DefaultListSortingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_vehicle_requests_are_newest_first_for_admin_staff_and_faculty(): void
+    public function test_vehicle_requests_are_grouped_by_status_and_ordered_by_trip_date(): void
     {
         $administrator = User::factory()->create(['role' => 'administrator']);
         $staff = User::factory()->create(['role' => 'staff']);
         $faculty = User::factory()->create(['role' => 'faculty']);
 
-        $olderFacultyRequest = VehicleRequest::factory()->create([
-            'requester_id' => $faculty->id,
-            'status' => 'pending',
-            'trip_date' => now()->addDay()->toDateString(),
-        ]);
-        $newerFacultyRequest = VehicleRequest::factory()->create([
+        $pendingLater = VehicleRequest::factory()->create([
             'requester_id' => $faculty->id,
             'status' => 'pending',
             'trip_date' => now()->addDays(20)->toDateString(),
         ]);
-        $onSiteRequest = VehicleRequest::factory()->create([
+        $pendingSooner = VehicleRequest::factory()->create([
+            'requester_id' => $faculty->id,
+            'status' => 'pending',
+            'trip_date' => now()->addDays(10)->toDateString(),
+        ]);
+        $approvedRequest = VehicleRequest::factory()->create([
+            'requester_id' => $faculty->id,
+            'status' => 'approved',
+            'trip_date' => now()->addDays(2)->toDateString(),
+        ]);
+        $disapprovedRequest = VehicleRequest::factory()->create([
             'requester_id' => null,
             'booking_source' => VehicleRequest::SOURCE_ON_SITE,
             'requester_name' => 'On-Site Requester',
-            'status' => 'pending',
+            'requester_department' => 'Testing',
+            'requester_contact' => '09123456789',
+            'status' => 'disapproved',
+            'trip_date' => now()->addDay()->toDateString(),
         ]);
-
-        DB::table('vehicle_requests')->where('id', $olderFacultyRequest->id)
-            ->update(['created_at' => now()->subDays(2)]);
-        DB::table('vehicle_requests')->where('id', $newerFacultyRequest->id)
-            ->update(['created_at' => now()->subDay()]);
-        DB::table('vehicle_requests')->where('id', $onSiteRequest->id)
-            ->update(['created_at' => now()]);
 
         foreach ([$administrator, $staff] as $user) {
             $this->actingAs($user, 'sanctum')
                 ->getJson('/api/vehicle-requests')
                 ->assertOk()
-                ->assertJsonPath('data.0.id', $onSiteRequest->id)
-                ->assertJsonPath('data.1.id', $newerFacultyRequest->id);
+                ->assertJsonPath('data.0.id', $pendingSooner->id)
+                ->assertJsonPath('data.1.id', $pendingLater->id)
+                ->assertJsonPath('data.2.id', $approvedRequest->id)
+                ->assertJsonPath('data.3.id', $disapprovedRequest->id);
         }
 
         $this->actingAs($faculty, 'sanctum')
             ->getJson('/api/vehicle-requests')
             ->assertOk()
-            ->assertJsonCount(2, 'data')
-            ->assertJsonPath('data.0.id', $newerFacultyRequest->id)
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.id', $pendingSooner->id)
+            ->assertJsonPath('data.1.id', $pendingLater->id)
+            ->assertJsonPath('data.2.id', $approvedRequest->id)
             ->assertJsonPath('data.0.booking_source', VehicleRequest::SOURCE_ONLINE)
-            ->assertJsonPath('data.1.id', $olderFacultyRequest->id);
+            ->assertJsonPath('data.1.booking_source', VehicleRequest::SOURCE_ONLINE);
     }
 
     public function test_allocations_default_to_most_recently_updated_and_trips_remain_chronological(): void

@@ -7,7 +7,13 @@ import RefreshButton from '@/components/ui/RefreshButton.vue'
 import SegmentedControl from '@/components/ui/SegmentedControl.vue'
 import LoadError from '@/components/ui/LoadError.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
-import { MONTH_OPTIONS, parseDate, STATUS_LABELS, YEAR_OPTIONS } from '@/lib/format'
+import {
+  MONTH_OPTIONS,
+  parseDate,
+  STATUS_LABELS,
+  TRIP_TYPE_DESCRIPTIONS,
+  YEAR_OPTIONS,
+} from '@/lib/format'
 import { getTripStartDate } from '@/lib/trips'
 import ScheduleSummary from '@/components/trip-schedule/ScheduleSummary.vue'
 import MonthCalendar from '@/components/trip-schedule/MonthCalendar.vue'
@@ -17,8 +23,16 @@ import TripDetailsModal from '@/components/trip-schedule/TripDetailsModal.vue'
 import { useTripSchedule } from '@/composables/useTripSchedule'
 
 const typeOptions = computed(() => [
-  { value: 'inclusive', label: `Inclusive (${inclusiveTripCount.value})`, dot: 'bg-primary' },
-  { value: 'exclusive', label: `Exclusive (${exclusiveTripCount.value})`, dot: 'bg-secondary' },
+  {
+    value: 'inclusive',
+    label: `${TRIP_TYPE_DESCRIPTIONS.inclusive} (${inclusiveTripCount.value})`,
+    dot: 'bg-primary',
+  },
+  {
+    value: 'exclusive',
+    label: `${TRIP_TYPE_DESCRIPTIONS.exclusive} (${exclusiveTripCount.value})`,
+    dot: 'bg-secondary',
+  },
 ])
 
 const viewOptions = [

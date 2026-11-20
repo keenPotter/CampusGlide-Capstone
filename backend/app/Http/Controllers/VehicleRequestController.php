@@ -27,7 +27,7 @@ class VehicleRequestController extends Controller
      * Administrators see all. Faculty see only their own.
         * Query params: ?status=pending, ?trip_type=inclusive, ?month=1, ?year=2026
      *
-     * Requests are shown newest first for administrators, staff, and faculty.
+     * Requests are grouped by status, then ordered by travel date and departure time.
      */
     public function index(Request $request)
     {
@@ -43,8 +43,10 @@ class VehicleRequestController extends Controller
         $query = VehicleRequest::query()
             ->select('vehicle_requests.*')
             ->with('requester')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
+            ->orderByRaw("CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 WHEN 'disapproved' THEN 2 ELSE 3 END")
+            ->orderBy('trip_date')
+            ->orderBy('departure_time')
+            ->orderBy('id');
 
         if ($user->hasRole('faculty')) {
             $query->where('requester_id', $user->id);
