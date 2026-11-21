@@ -398,7 +398,7 @@ function onDisapproved() {
               v-if="request.modification_pending"
               class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
             >
-              Modification Pending
+              Date Change Pending
             </span>
           </div>
         </div>
@@ -445,7 +445,8 @@ function onDisapproved() {
             variant="outline"
             @click="openEditRequest(request)"
           >
-            <Pencil :size="16" aria-hidden="true" /> Edit
+            <Pencil :size="16" aria-hidden="true" />
+            {{ request.status === 'approved' ? 'Request Date Change' : 'Edit' }}
           </BaseButton>
           <BaseButton
             v-else-if="auth.isFaculty && request.modification_pending"
@@ -453,7 +454,7 @@ function onDisapproved() {
             variant="outline"
             disabled
           >
-            Modification Pending
+            Date Change Pending
           </BaseButton>
           <BaseButton
             v-else-if="auth.isFaculty && request.modification_pending"
@@ -461,7 +462,7 @@ function onDisapproved() {
             variant="outline"
             disabled
           >
-            Modification Pending
+            Date Change Pending
           </BaseButton>
 
           <template v-if="auth.isAdministratorOrStaff && request.status === 'pending'">
@@ -539,7 +540,7 @@ function onDisapproved() {
                   v-if="request.modification_pending"
                   class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
                 >
-                  Modification Pending
+                  Date Change Pending
                 </span>
               </div>
             </td>
@@ -573,7 +574,8 @@ function onDisapproved() {
                   variant="outline"
                   @click="openEditRequest(request)"
                 >
-                  <Pencil :size="16" aria-hidden="true" /> Edit
+                  <Pencil :size="16" aria-hidden="true" />
+                  {{ request.status === 'approved' ? 'Request Date Change' : 'Edit' }}
                 </BaseButton>
               </div>
             </td>
@@ -618,7 +620,7 @@ function onDisapproved() {
               v-if="detailRequest.modification_pending"
               class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
             >
-              Modification Pending
+              Date Change Pending
             </span>
           </div>
         </div>
@@ -654,14 +656,14 @@ function onDisapproved() {
       <template #footer>
         <BaseButton variant="outline" @click="closeRequest">Close</BaseButton>
         <BaseButton v-if="canEditSelectedRequest" variant="outline" @click="editSelectedRequest">
-          Edit
+          {{ detailRequest?.status === 'approved' ? 'Request Date Change' : 'Edit' }}
         </BaseButton>
         <BaseButton
           v-else-if="auth.isFaculty && detailRequest?.modification_pending"
           variant="outline"
           disabled
         >
-          Modification Pending
+          Date Change Pending
         </BaseButton>
         <template v-if="auth.isAdministrator && detailRequest?.status === 'pending'">
           <BaseButton @click="openApprove(detailRequest)">Approve</BaseButton>

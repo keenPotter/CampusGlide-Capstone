@@ -46,7 +46,7 @@ async function submit() {
     await api.post(path, { new_date: form.new_date, reason: form.reason.trim() })
     emit(
       'saved',
-      props.isAdmin ? 'Trip modification applied.' : 'Trip Modification Request sent to the administrator.',
+      props.isAdmin ? 'Date change applied.' : 'Date Change Request sent to the administrator.',
     )
   } catch (error) {
     // The vehicle or driver is already booked on the new date.
@@ -58,7 +58,7 @@ async function submit() {
 
     errors.value = validationErrors(error)
     if (!Object.keys(errors.value).length) {
-      formError.value = errorMessage(error, 'Unable to save the Trip Modification Request.')
+      formError.value = errorMessage(error, 'Unable to save the Date Change Request.')
     }
   } finally {
     saving.value = false
@@ -67,7 +67,7 @@ async function submit() {
 </script>
 
 <template>
-  <BaseModal :open="Boolean(allocation)" :title="isAdmin ? 'Modify trip' : 'Request Modification'"
+  <BaseModal :open="Boolean(allocation)" :title="isAdmin ? 'Change trip date' : 'Request Date Change'"
     :subtitle="allocation ? `${allocation.trip?.destination ?? '—'} · now ${formatDate(allocation.trip?.trip_date)}` : ''"
     @close="emit('close')">
     <div class="flex flex-col gap-4">

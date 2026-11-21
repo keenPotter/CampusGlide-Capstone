@@ -48,7 +48,7 @@ async function submit() {
   errors.value = {}
   formError.value = ''
   if (isApproved() && !form.reason.trim()) {
-    errors.value.reason = 'Please give a reason for this modification.'
+    errors.value.reason = 'Please give a reason for this date change.'
     return
   }
 
@@ -66,16 +66,12 @@ async function submit() {
       await api.post(`/allocations/${props.trip.allocation_id}/trip-modification-requests`, {
         new_date: payload.trip_date,
         new_departure_time: payload.departure_time,
-        new_estimated_return_time: payload.estimated_return_time,
-        new_destination: payload.destination,
-        new_purpose: payload.purpose,
-        new_number_of_passengers: payload.number_of_passengers,
         reason: form.reason.trim(),
       })
     } else {
       await api.put(`/trips/${props.trip.id}/edit`, payload)
     }
-    emit('saved', isApproved() ? 'Trip modification request submitted.' : 'Trip updated.')
+    emit('saved', isApproved() ? 'Date Change Request submitted.' : 'Trip updated.')
   } catch (error) {
     errors.value = validationErrors(error)
     if (!Object.keys(errors.value).length) {
@@ -90,20 +86,42 @@ async function submit() {
 <template>
   <BaseModal
     :open="Boolean(trip)"
-    :title="isApproved() ? 'Request Modification' : 'Edit Trip'"
+    :title="isApproved() ? 'Request Date Change' : 'Edit Trip'"
     :subtitle="trip?.destination || ''"
     @close="emit('close')"
   >
     <div class="flex flex-col gap-4">
-      <BaseInput v-model="form.trip_date" label="Date" type="date" :error="errors.trip_date" required />
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <BaseInput v-model="form.departure_time" label="Departure time" type="time" :error="errors.departure_time" required />
-        <BaseInput v-model="form.estimated_return_time" label="Estimated return time" type="time" :error="errors.estimated_return_time" />
-      </div>
-      <BaseInput v-model="form.destination" label="Destination" :error="errors.destination" required />
-      <BaseInput v-model="form.purpose" label="Purpose" :error="errors.purpose" required />
-      <BaseInput v-model="form.number_of_passengers" label="Passenger count" type="number" min="1" :error="errors.number_of_passengers" required />
-      <BaseTextarea v-if="isApproved()" v-model="form.reason" label="Reason for change" :error="errors.reason" required />
+      <template v-if="isApproved()">
+        <div class="rounded-card border-l-4 border-secondary bg-secondary-50 p-card text-small text-secondary-700">
+          <p class="font-medium">Only these fields can be changed</p>
+          <p class="mt-1">Travel date and departure time. All other trip details are not editable.</p>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <BaseInput v-model="form.trip_date" label="New travel date" type="date" :error="errors.trip_date" required />
+          <BaseInput v-model="form.departure_time" label="New departure time" type="time" :error="errors.departure_time" required />
+        </div>
+        <div class="rounded-card border border-line bg-surface p-3 text-small">
+          <p class="font-medium text-ink">Not editable</p>
+          <p class="mt-1 text-ink-muted">
+            Destination: {{ trip?.destination || '—' }} · Purpose: {{ trip?.purpose || '—' }}
+          </p>
+          <p class="mt-1 text-ink-muted">
+            Estimated return: {{ trip?.estimated_return_time ? toTimeInput(trip.estimated_return_time) : '—' }} ·
+            Passengers: {{ trip?.vehicle_request?.number_of_passengers || '—' }}
+          </p>
+        </div>
+        <BaseTextarea v-model="form.reason" label="Reason for date change" :error="errors.reason" required />
+      </template>
+      <template v-else>
+        <BaseInput v-model="form.trip_date" label="Date" type="date" :error="errors.trip_date" required />
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <BaseInput v-model="form.departure_time" label="Departure time" type="time" :error="errors.departure_time" required />
+          <BaseInput v-model="form.estimated_return_time" label="Estimated return time" type="time" :error="errors.estimated_return_time" />
+        </div>
+        <BaseInput v-model="form.destination" label="Destination" :error="errors.destination" required />
+        <BaseInput v-model="form.purpose" label="Purpose" :error="errors.purpose" required />
+        <BaseInput v-model="form.number_of_passengers" label="Passenger count" type="number" min="1" :error="errors.number_of_passengers" required />
+      </template>
       <p v-if="formError" class="rounded-card bg-red-50 p-3 text-small font-medium text-red-700">{{ formError }}</p>
     </div>
     <template #footer>

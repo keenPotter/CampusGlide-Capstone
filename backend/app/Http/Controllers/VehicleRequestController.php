@@ -214,8 +214,8 @@ class VehicleRequestController extends Controller
     /**
      * PUT /api/vehicle-requests/{id}/edit
      * Faculty edit their own request.
-     * Editing an approved request (a reason is required) creates a pending Trip Modification Request.
-     * The existing trip and its assignment stay in place until the modification is approved.
+     * Editing an approved request (a reason is required) creates a pending Date Change Request.
+     * The existing trip and its assignment stay in place until the date change is approved.
      */
     public function edit(EditVehicleRequestRequest $request, VehicleRequest $vehicleRequest)
     {
@@ -238,7 +238,7 @@ class VehicleRequestController extends Controller
         );
 
         if ($wasApproved) {
-            abort_unless($trip, 422, 'An approved request with no trip cannot create a trip modification.');
+            abort_unless($trip, 422, 'An approved request with no trip cannot create a date change.');
             abort_if(
                 in_array($trip->trip_status, ['in_progress', 'completed'], true),
                 422,
@@ -247,38 +247,33 @@ class VehicleRequestController extends Controller
             abort_if(
                 RescheduleRequest::where('trip_id', $trip->id)->where('status', 'pending')->exists(),
                 422,
-                'This trip already has a pending Trip Modification Request.'
+                'This trip already has a pending Date Change Request.'
             );
 
             $oldDate = $trip->trip_date->toDateString();
             $newDate = $validated['trip_date'] ?? $oldDate;
             $oldEndDate = $vehicleRequest->trip_end_date?->toDateString() ?? $oldDate;
-            $newEndDate = $validated['trip_end_date'] ?? $oldEndDate;
+            [, $newEndDate] = $this->allocations->tripRange($vehicleRequest, $newDate);
             $oldTripType = $vehicleRequest->trip_type;
-            $newTripType = $validated['trip_type'] ?? $oldTripType;
+            $newTripType = $oldTripType;
             $oldDeparture = substr((string) $trip->departure_time, 0, 5);
             $newDeparture = substr((string) ($validated['departure_time'] ?? $oldDeparture), 0, 5);
             $oldReturn = $trip->estimated_return_time ? substr((string) $trip->estimated_return_time, 0, 5) : null;
-            $newReturn = array_key_exists('estimated_return_time', $validated)
-                ? substr((string) $validated['estimated_return_time'], 0, 5)
-                : $oldReturn;
+            $newReturn = $oldReturn;
             $oldPassengers = $vehicleRequest->number_of_passengers;
             $newPassengers = (int) ($validated['number_of_passengers'] ?? $oldPassengers);
             $oldAuthorizedPassengers = $vehicleRequest->passengers;
-            $newAuthorizedPassengers = $validated['passengers'] ?? $oldAuthorizedPassengers;
+            $newAuthorizedPassengers = $oldAuthorizedPassengers;
+            $oldDestination = $trip->destination;
+            $newDestination = $oldDestination;
+            $oldPurpose = $trip->purpose;
+            $newPurpose = $oldPurpose;
 
             abort_if(
                 $newDate === $oldDate
-                    && $newEndDate === $oldEndDate
-                    && $newTripType === $oldTripType
-                    && $newDeparture === $oldDeparture
-                    && $newReturn === $oldReturn
-                    && ($validated['destination'] ?? $trip->destination) === $trip->destination
-                    && ($validated['purpose'] ?? $trip->purpose) === $trip->purpose
-                    && $newAuthorizedPassengers === $oldAuthorizedPassengers
-                    && $newPassengers === (int) $oldPassengers,
+                    && $newDeparture === $oldDeparture,
                 422,
-                'No trip details were changed.'
+                'No date or departure time was changed.'
             );
 
             RescheduleRequest::create([
@@ -294,10 +289,10 @@ class VehicleRequestController extends Controller
                 'new_departure_time' => $newDeparture,
                 'old_estimated_return_time' => $oldReturn,
                 'new_estimated_return_time' => $newReturn,
-                'old_destination' => $trip->destination,
-                'new_destination' => $validated['destination'] ?? $trip->destination,
-                'old_purpose' => $trip->purpose,
-                'new_purpose' => $validated['purpose'] ?? $trip->purpose,
+                'old_destination' => $oldDestination,
+                'new_destination' => $newDestination,
+                'old_purpose' => $oldPurpose,
+                'new_purpose' => $newPurpose,
                 'old_number_of_passengers' => $oldPassengers,
                 'new_number_of_passengers' => $newPassengers,
                 'old_authorized_passengers' => $oldAuthorizedPassengers,
@@ -317,7 +312,7 @@ class VehicleRequestController extends Controller
 
         return response()->json([
             'message' => $wasApproved
-                ? 'Trip modification request submitted successfully.'
+                ? 'Date Change Request submitted successfully.'
                 : 'Vehicle request updated successfully.',
             'data' => new VehicleRequestResource($vehicleRequest->fresh(['requester', 'approver'])),
         ]);

@@ -46,7 +46,7 @@ async function load() {
     const data = unwrap(await api.get('/trip-modification-requests', { params: { status: 'pending' } }))
     requests.value = data
   } catch (error) {
-    loadError.value = errorMessage(error, 'Unable to load Trip Modification Requests.')
+    loadError.value = errorMessage(error, 'Unable to load Date Change Requests.')
   } finally {
     loading.value = false
   }
@@ -83,13 +83,13 @@ onMounted(load)
   <div class="flex flex-col gap-page">
     <div class="page-header">
       <div class="page-header-copy">
-        <h1 class="text-page-title">Trip Modification Requests</h1>
+        <h1 class="text-page-title">Date Change Requests</h1>
         <p class="mt-1 text-small text-ink-muted">
-          Review faculty requests to modify approved trips.
+          Review faculty requests to change approved trip dates.
         </p>
       </div>
       <div class="page-actions">
-        <RefreshButton :loading="loading" label="Refresh Trip Modification Requests" @click="load" />
+        <RefreshButton :loading="loading" label="Refresh Date Change Requests" @click="load" />
       </div>
     </div>
 
@@ -101,8 +101,8 @@ onMounted(load)
 
     <EmptyState
       v-else-if="!requests.length"
-      title="No pending Trip Modification Requests"
-      message="Faculty requests to modify approved trips will appear here."
+      title="No pending Date Change Requests"
+      message="Faculty date change requests for approved trips will appear here."
     />
 
     <template v-else>

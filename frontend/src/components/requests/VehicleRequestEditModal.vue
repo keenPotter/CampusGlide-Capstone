@@ -5,6 +5,7 @@ import { errorMessage, validationErrors } from '@/lib/api'
 import { todayIso, toTimeInput } from '@/lib/format'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import BaseTextarea from '@/components/ui/BaseTextarea.vue'
 import VehicleRequestFields from '@/components/requests/VehicleRequestFields.vue'
@@ -84,23 +85,25 @@ async function save() {
 
   submitting.value = true
   errors.value = {}
-  const payload = {
-    ...form,
-    number_of_passengers: Number(form.number_of_passengers),
-  }
-  delete payload.min_trip_date
+  const payload = needsReason.value
+    ? {
+        trip_date: form.trip_date,
+        departure_time: form.departure_time,
+        edit_reason: form.edit_reason.trim(),
+      }
+    : {
+        ...form,
+        number_of_passengers: Number(form.number_of_passengers),
+      }
 
-  if (needsReason.value) {
-    payload.edit_reason = form.edit_reason.trim()
-  } else {
-    delete payload.edit_reason
-  }
+  delete payload.min_trip_date
+  if (!needsReason.value) delete payload.edit_reason
 
   try {
     const updated = await store.update(props.request.id, payload)
     toast.success(
       needsReason.value
-        ? 'Trip Modification Request submitted for administrator review.'
+        ? 'Date Change Request submitted for administrator review.'
         : 'Request updated.',
     )
     confirmOpen.value = false
@@ -121,7 +124,7 @@ async function save() {
 <template>
   <BaseModal
     :open="Boolean(request)"
-    title="Edit vehicle request"
+    :title="needsReason ? 'Request Date Change' : 'Edit vehicle request'"
     :subtitle="request?.destination ?? ''"
     @close="!submitting && emit('close')"
   >
@@ -132,12 +135,54 @@ async function save() {
       >
         <p class="font-medium">This request is already approved.</p>
         <p class="mt-1">
-          Saving changes creates a Trip Modification Request. The approved trip stays unchanged
-          until an administrator approves it.
+          Only the travel date and departure time can be changed. The approved trip stays
+          unchanged until an administrator approves the request.
         </p>
       </div>
 
-      <VehicleRequestFields :form="form" :errors="errors" />
+      <template v-if="needsReason">
+        <div class="rounded-card border border-line bg-surface p-card text-small">
+          <p class="mb-3 font-medium text-ink">Not editable</p>
+          <dl class="grid gap-2 sm:grid-cols-2">
+            <div>
+              <dt class="text-ink-muted">Destination</dt>
+              <dd class="mt-1 text-ink">{{ form.destination || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-ink-muted">Purpose</dt>
+              <dd class="mt-1 text-ink">{{ form.purpose || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-ink-muted">Estimated return</dt>
+              <dd class="mt-1 text-ink">{{ form.estimated_return_time || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-ink-muted">Passengers</dt>
+              <dd class="mt-1 text-ink">{{ form.number_of_passengers || '—' }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <BaseInput
+            v-model="form.trip_date"
+            label="New travel date"
+            type="date"
+            :min="form.min_trip_date"
+            :error="errors.trip_date"
+            required
+          />
+          <BaseInput
+            v-model="form.departure_time"
+            label="New departure time"
+            type="time"
+            :error="errors.departure_time"
+            required
+          />
+        </div>
+      </template>
+
+      <VehicleRequestFields v-else :form="form" :errors="errors" />
 
       <BaseTextarea
         v-if="needsReason"
@@ -152,21 +197,24 @@ async function save() {
         <BaseButton type="button" variant="outline" :disabled="submitting" @click="emit('close')">
           Cancel
         </BaseButton>
-        <BaseButton type="submit" :loading="submitting">Save changes</BaseButton>
+        <BaseButton type="submit" :loading="submitting">
+          {{ needsReason ? 'Submit Date Change Request' : 'Save changes' }}
+        </BaseButton>
       </div>
     </form>
   </BaseModal>
 
   <BaseModal
     :open="confirmOpen"
-    title="Change an approved request?"
+    :title="needsReason ? 'Confirm Date Change Request?' : 'Change an approved request?'"
     subtitle="Please read before you continue"
     @close="!submitting && (confirmOpen = false)"
   >
     <p class="text-body">If you continue:</p>
     <ul class="mt-2 list-disc space-y-1 pl-5 text-body">
       <li>The original approved trip will remain unchanged.</li>
-      <li>A pending Trip Modification Request will be created.</li>
+      <li>Only the travel date and departure time are requested to change.</li>
+      <li>A pending Date Change Request will be created.</li>
       <li>The administrator must approve the requested changes.</li>
     </ul>
 

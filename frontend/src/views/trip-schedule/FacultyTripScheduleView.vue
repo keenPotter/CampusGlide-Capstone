@@ -250,7 +250,7 @@ async function onTripSaved(message) {
                 v-if="trip.modification_pending"
                 class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-small font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
               >
-                Modification Pending
+                Date Change Pending
               </span>
             </div>
           </div>
@@ -294,9 +294,9 @@ async function onTripSaved(message) {
             >
               {{
                 trip.modification_pending
-                  ? 'Modification Pending'
+                  ? 'Date Change Pending'
                   : trip.vehicle_request?.status === 'approved'
-                    ? 'Request Modification'
+                    ? 'Request Date Change'
                     : 'Edit Trip'
               }}
             </BaseButton>

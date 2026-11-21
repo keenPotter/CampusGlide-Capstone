@@ -44,7 +44,7 @@ const navigation = computed(() => {
         badge: notifications.pendingRequests,
       },
       { name: 'Allocations', to: { name: 'allocations' }, icon: 'car' },
-      { name: 'Trip Modification Requests', to: { name: 'tripModificationRequests' }, icon: 'calendar' },
+      { name: 'Date Change Requests', to: { name: 'tripModificationRequests' }, icon: 'calendar' },
       { name: 'Trip Schedule', to: { name: 'tripSchedule' }, icon: 'calendar' },
       {
         name: 'Maintenance',
@@ -71,7 +71,7 @@ const navigation = computed(() => {
         badge: notifications.needsAllocation,
       },
       {
-        name: 'Trip Modification Requests',
+        name: 'Date Change Requests',
         to: { name: 'tripModificationRequests' },
         icon: 'calendar',
         badge: notifications.pendingDateChanges,

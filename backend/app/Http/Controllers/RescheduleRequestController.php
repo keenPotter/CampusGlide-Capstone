@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Trip Modification Requests.
+ * Date Change Requests.
  *  - Faculty can only send a request (POST allocations/{id}/reschedule-requests).
  *  - Administrators and staff approve or disapprove a request, or reassign the date directly with a reason.
  */
@@ -73,7 +73,7 @@ class RescheduleRequestController extends Controller
         abort_unless(
             (int) $trip?->vehicleRequest?->requester_id === (int) $user->id,
             403,
-            'You may only request modifications for your own trips.'
+            'You may only request date changes for your own trips.'
         );
 
         $validated = $request->validate([
@@ -99,7 +99,7 @@ class RescheduleRequestController extends Controller
         abort_if(
             RescheduleRequest::where('trip_id', $trip->id)->where('status', 'pending')->exists(),
             422,
-            'This trip already has a pending Trip Modification Request.'
+            'This trip already has a pending Date Change Request.'
         );
 
         $vehicleRequest = $trip->vehicleRequest;

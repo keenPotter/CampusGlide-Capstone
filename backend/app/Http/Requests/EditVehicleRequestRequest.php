@@ -21,15 +21,15 @@ class EditVehicleRequestRequest extends FormRequest
         $isApproved = $this->route('vehicleRequest')?->status === 'approved';
 
         return [
-            'trip_date' => ['required', 'date'],
-            'trip_end_date' => ['required', 'date', 'after_or_equal:trip_date'],
-            'trip_type' => ['required', 'in:inclusive,exclusive'],
+            'trip_date' => [$isApproved ? 'required' : 'required', 'date'],
+            'trip_end_date' => [$isApproved ? 'nullable' : 'required', 'date', 'after_or_equal:trip_date'],
+            'trip_type' => [$isApproved ? 'nullable' : 'required', 'in:inclusive,exclusive'],
             'departure_time' => ['required', 'date_format:H:i'],
-            'destination' => ['required', 'string', 'max:255'],
-            'purpose' => ['required', 'string', 'max:255'],
-            'estimated_return_time' => ['required', 'date_format:H:i', 'after:departure_time'],
-            'passengers' => ['required', 'string', 'max:255'],
-            'number_of_passengers' => ['required', 'integer', 'min:1'],
+            'destination' => [$isApproved ? 'nullable' : 'required', 'string', 'max:255'],
+            'purpose' => [$isApproved ? 'nullable' : 'required', 'string', 'max:255'],
+            'estimated_return_time' => [$isApproved ? 'nullable' : 'required', 'date_format:H:i', 'after:departure_time'],
+            'passengers' => [$isApproved ? 'nullable' : 'required', 'string', 'max:255'],
+            'number_of_passengers' => [$isApproved ? 'nullable' : 'required', 'integer', 'min:1'],
             'edit_reason' => [$isApproved ? 'required' : 'nullable', 'string', 'max:500'],
         ];
     }
@@ -37,7 +37,7 @@ class EditVehicleRequestRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'edit_reason.required' => 'Please give a reason for editing this approved request.',
+            'edit_reason.required' => 'Please give a reason for this Date Change Request.',
         ];
     }
 }
