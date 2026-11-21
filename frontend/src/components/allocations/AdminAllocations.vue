@@ -493,7 +493,7 @@ function onQuickAdded({ kind, item }) {
           <div class="min-w-0 text-small">
             <p class="text-ink">{{ whenText(row.date, row.time) }}</p>
             <p v-if="row.allocation && pendingByAllocation[row.allocation.id]" class="text-secondary-700">
-              Date change requested: {{ formatDate(pendingByAllocation[row.allocation.id].new_date) }}
+              Trip modification requested
             </p>
             <p
               v-if="row.allocation"

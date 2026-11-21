@@ -66,12 +66,12 @@ const canReschedule = computed(() => props.allocation.status === 'scheduled' && 
       v-if="pendingChange"
       class="rounded-card border border-secondary-200 bg-secondary-50 p-3 text-small text-secondary-700"
     >
-      Date change requested: {{ formatDate(pendingChange.new_date) }} (waiting for the administrator)
+      Trip modification requested (waiting for the administrator)
     </p>
 
     <div v-if="canReschedule" class="flex justify-end">
       <BaseButton size="sm" variant="outline" @click="$emit('reschedule', allocation)">
-        Request date change
+        Request Modification
       </BaseButton>
     </div>
   </article>

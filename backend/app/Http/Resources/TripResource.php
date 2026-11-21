@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Models\RescheduleRequest;
 
 /**
  * The field names match what the frontend trip schedule pages read
@@ -15,9 +16,26 @@ class TripResource extends JsonResource
     {
         $vehicleRequest = $this->vehicleRequest;
         $requester = $vehicleRequest?->requester;
+        $pendingModification = RescheduleRequest::where('trip_id', $this->id)
+            ->where('status', 'pending')
+            ->latest('id')
+            ->first();
 
         return [
             'id' => $this->id,
+            'allocation_id' => $this->allocation?->id,
+            'modification_pending' => $pendingModification !== null,
+            'pending_modification_request' => $pendingModification ? [
+                'id' => $pendingModification->id,
+                'old_date' => $pendingModification->old_date?->toDateString(),
+                'new_date' => $pendingModification->new_date?->toDateString(),
+                'new_departure_time' => $pendingModification->new_departure_time,
+                'new_estimated_return_time' => $pendingModification->new_estimated_return_time,
+                'new_destination' => $pendingModification->new_destination,
+                'new_purpose' => $pendingModification->new_purpose,
+                'new_number_of_passengers' => $pendingModification->new_number_of_passengers,
+                'reason' => $pendingModification->reason,
+            ] : null,
             'vehicle_request_id' => $this->vehicle_request_id,
             'vehicle_id' => $this->vehicle_id,
             'driver_id' => $this->driver_id,

@@ -42,14 +42,15 @@ async function submit() {
 
   saving.value = true
   try {
-    await api.post(`/reschedule-requests/${props.item.id}/${props.action}`, {
+    const action = props.action === 'disapprove' ? 'reject' : props.action
+    await api.post(`/trip-modification-requests/${props.item.id}/${action}`, {
       admin_reason: note.value.trim() || undefined,
     })
     emit(
       'saved',
       isApprove.value
-        ? 'Request approved. The trip date was changed.'
-        : 'Request disapproved. The faculty member can see your reason.',
+        ? 'Request approved. The trip was updated.'
+        : 'Request rejected. The faculty member can see your reason.',
     )
   } catch (e) {
     // The vehicle or driver is already booked on the requested date.
@@ -69,7 +70,7 @@ async function submit() {
 <template>
   <BaseModal
     :open="Boolean(item && action)"
-    :title="isApprove ? 'Approve date change' : 'Disapprove date change'"
+    :title="isApprove ? 'Approve Trip Modification' : 'Reject Trip Modification'"
     :subtitle="item ? item.trip?.destination ?? '' : ''"
     @close="emit('close')"
   >

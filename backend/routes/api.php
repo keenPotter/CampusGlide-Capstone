@@ -37,11 +37,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vehicle-requests/{vehicleRequest}', [VehicleRequestController::class, 'show'])
         ->whereNumber('vehicleRequest');
 
-    // Allocations and date change requests: administrators and staff see all, faculty see only their own
+    // Allocations and Trip Modification Requests: administrators and staff see all, faculty see only their own
     Route::get('/allocations', [AllocationController::class, 'index']);
     Route::get('/allocations/{allocation}', [AllocationController::class, 'show'])
         ->whereNumber('allocation');
     Route::get('/reschedule-requests', [RescheduleRequestController::class, 'index']);
+    Route::get('/trip-modification-requests', [RescheduleRequestController::class, 'index']);
 
     // ---------- Fleet views for administrators and staff ----------
     // Staff may view the trip schedule and its related fleet details.
@@ -78,11 +79,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/vehicle-requests/{vehicleRequest}/edit', [VehicleRequestController::class, 'edit'])
             ->middleware('audit:EDIT_VEHICLE_REQUEST,vehicle_requests');
         Route::get('/my-trips', [TripController::class, 'myTrips']);
+        Route::put('/trips/{trip}/edit', [TripController::class, 'edit'])
+            ->whereNumber('trip')
+            ->middleware('audit:EDIT_PENDING_TRIP,trips');
+        Route::patch('/trips/{trip}/edit', [TripController::class, 'edit'])
+            ->whereNumber('trip')
+            ->middleware('audit:EDIT_PENDING_TRIP,trips');
 
-        // Faculty ask for a date change; the administrator decides.
+        // Faculty request a trip modification; the administrator decides.
         Route::post('/allocations/{allocation}/reschedule-requests', [RescheduleRequestController::class, 'store'])
             ->whereNumber('allocation')
             ->middleware('audit:CREATE_RESCHEDULE_REQUEST,reschedule_requests');
+        Route::post('/allocations/{allocation}/trip-modification-requests', [RescheduleRequestController::class, 'store'])
+            ->whereNumber('allocation')
+            ->middleware('audit:CREATE_TRIP_MODIFICATION_REQUEST,reschedule_requests');
     });
 
     // ---------- Administrators and staff ----------
@@ -110,16 +120,22 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/allocation-vehicles', [AllocationQuickAddController::class, 'storeVehicle'])
             ->middleware('audit:CREATE_VEHICLE,vehicles');
 
-        // Date changes: reassign the date directly, or approve / disapprove a faculty request.
+        // Trip modifications: direct reassignment or administrator review.
         Route::post('/allocations/{allocation}/reschedule', [RescheduleRequestController::class, 'reschedule'])
             ->whereNumber('allocation')
             ->middleware('audit:RESCHEDULE_ALLOCATION,allocations');
         Route::post('/reschedule-requests/{rescheduleRequest}/approve', [RescheduleRequestController::class, 'approve'])
             ->whereNumber('rescheduleRequest')
-            ->middleware('audit:APPROVE_RESCHEDULE_REQUEST,reschedule_requests');
+            ->middleware('audit:APPROVE_TRIP_MODIFICATION_REQUEST,reschedule_requests');
         Route::post('/reschedule-requests/{rescheduleRequest}/disapprove', [RescheduleRequestController::class, 'disapprove'])
             ->whereNumber('rescheduleRequest')
-            ->middleware('audit:DISAPPROVE_RESCHEDULE_REQUEST,reschedule_requests');
+            ->middleware('audit:REJECT_TRIP_MODIFICATION_REQUEST,reschedule_requests');
+        Route::post('/trip-modification-requests/{rescheduleRequest}/approve', [RescheduleRequestController::class, 'approve'])
+            ->whereNumber('rescheduleRequest')
+            ->middleware('audit:APPROVE_TRIP_MODIFICATION_REQUEST,reschedule_requests');
+        Route::post('/trip-modification-requests/{rescheduleRequest}/reject', [RescheduleRequestController::class, 'disapprove'])
+            ->whereNumber('rescheduleRequest')
+            ->middleware('audit:REJECT_TRIP_MODIFICATION_REQUEST,reschedule_requests');
 
         // Maintenance Monitoring
         Route::get('/maintenance-logs', [MaintenanceLogController::class, 'index']);

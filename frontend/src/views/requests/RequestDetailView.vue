@@ -26,7 +26,9 @@ const disapproveOpen = ref(false)
 const editingRequest = ref(null)
 
 const canEdit = computed(
-  () => auth.isFaculty && ['pending', 'approved'].includes(request.value?.status),
+  () => auth.isFaculty
+    && ['pending', 'approved'].includes(request.value?.status)
+    && !request.value?.modification_pending,
 )
 
 const rows = computed(() => {
@@ -101,7 +103,23 @@ function onRequestUpdated() {
         <p class="mt-0.5 break-words text-small text-ink-muted">{{ request.destination }}</p>
       </div>
 
-      <StatusBadge :status="request.status" class="shrink-0" />
+      <div class="flex flex-wrap items-center gap-2">
+        <span
+          class="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small font-medium ring-1 ring-inset"
+          :class="request.booking_source === 'on_site'
+            ? 'bg-secondary-50 text-secondary-700 ring-secondary-200'
+            : 'bg-neutral-100 text-ink-muted ring-line'"
+        >
+          {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
+        </span>
+        <StatusBadge :status="request.status" class="shrink-0" />
+        <span
+          v-if="request.modification_pending"
+          class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-small font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
+        >
+          Modification Pending
+        </span>
+      </div>
     </div>
 
     <div
@@ -148,6 +166,13 @@ function onRequestUpdated() {
         @click="editingRequest = request"
       >
         Edit
+      </BaseButton>
+      <BaseButton
+        v-else-if="auth.isFaculty && request.modification_pending"
+        variant="outline"
+        disabled
+      >
+        Modification Pending
       </BaseButton>
     </div>
 

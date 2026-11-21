@@ -6,6 +6,8 @@ use App\Http\Resources\TripResource;
 use App\Models\Trip;
 use App\Services\AllocationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Read-only access to trips.
@@ -14,7 +16,7 @@ use Illuminate\Http\Request;
  */
 class TripController extends Controller
 {
-    private const WITH = ['driver', 'vehicle', 'vehicleRequest.requester'];
+    private const WITH = ['allocation', 'driver', 'vehicle', 'vehicleRequest.requester', 'cancelledBy'];
 
     public function __construct(protected AllocationService $allocations)
     {
@@ -171,6 +173,78 @@ class TripController extends Controller
     /**
      * GET /api/trips/{trip}
      */
+    public function edit(Request $request, Trip $trip)
+    {
+        $user = $request->user();
+        $vehicleRequest = $trip->vehicleRequest;
+
+        abort_unless(
+            (int) $vehicleRequest?->requester_id === (int) $user->id,
+            403,
+            'You may only edit your own trips.'
+        );
+        abort_if(
+            in_array($trip->trip_status, ['in_progress', 'completed'], true)
+                || $vehicleRequest?->status === 'approved',
+            422,
+            'This trip can no longer be edited directly. Use Trip Modification Request instead.'
+        );
+
+        $validated = $request->validate([
+            'trip_date' => ['nullable', 'date_format:Y-m-d'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'departure_time' => ['nullable', 'date_format:H:i'],
+            'time' => ['nullable', 'date_format:H:i'],
+            'estimated_return_time' => ['nullable', 'date_format:H:i'],
+            'destination' => ['nullable', 'string', 'max:255'],
+            'purpose' => ['nullable', 'string', 'max:255'],
+            'number_of_passengers' => ['nullable', 'integer', 'min:1'],
+            'passengers' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        DB::transaction(function () use ($request, $trip, $vehicleRequest, $validated) {
+            $tripUpdates = array_filter([
+                'trip_date' => $validated['trip_date'] ?? $validated['date'] ?? null,
+                'departure_time' => $validated['departure_time'] ?? $validated['time'] ?? null,
+                'estimated_return_time' => $validated['estimated_return_time'] ?? null,
+                'destination' => $validated['destination'] ?? null,
+                'purpose' => $validated['purpose'] ?? null,
+            ], fn ($value) => $value !== null);
+
+            if ($tripUpdates) {
+                $trip->update($tripUpdates);
+                $vehicleRequestUpdates = [];
+                if (isset($tripUpdates['trip_date'])) {
+                    $vehicleRequestUpdates['trip_date'] = $tripUpdates['trip_date'];
+                }
+                if (isset($tripUpdates['departure_time'])) {
+                    $vehicleRequestUpdates['departure_time'] = $tripUpdates['departure_time'];
+                }
+                if (isset($tripUpdates['estimated_return_time'])) {
+                    $vehicleRequestUpdates['estimated_return_time'] = $tripUpdates['estimated_return_time'];
+                }
+                if (isset($tripUpdates['destination'])) {
+                    $vehicleRequestUpdates['destination'] = $tripUpdates['destination'];
+                }
+                if (isset($tripUpdates['purpose'])) {
+                    $vehicleRequestUpdates['purpose'] = $tripUpdates['purpose'];
+                }
+                if ($vehicleRequestUpdates) {
+                    $vehicleRequest->update($vehicleRequestUpdates);
+                }
+            }
+
+            $passengerCount = $validated['number_of_passengers'] ?? $validated['passengers'] ?? null;
+            if ($passengerCount !== null) {
+                $vehicleRequest->update([
+                    'number_of_passengers' => $passengerCount,
+                ]);
+            }
+        });
+
+        return new TripResource($trip->fresh(self::WITH));
+    }
+
     public function show(Trip $trip)
     {
         return new TripResource($trip->load(self::WITH));

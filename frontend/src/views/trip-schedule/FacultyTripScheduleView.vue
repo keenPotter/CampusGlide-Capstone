@@ -13,6 +13,8 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import RefreshButton from '@/components/ui/RefreshButton.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
 import LoadError from '@/components/ui/LoadError.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
+import TripModificationModal from '@/components/allocations/TripModificationModal.vue'
 
 const toast = useToast()
 const trips = ref([])
@@ -27,6 +29,7 @@ const year = ref('')
 const page = ref(1)
 const tripTypeCounts = ref({ all: 0, inclusive: 0, exclusive: 0 })
 const tripTypeCountsSequence = ref(0)
+const selectedTrip = ref(null)
 
 const statusOptions = ['scheduled', 'in_progress', 'completed'].map((value) => ({
   value,
@@ -144,6 +147,20 @@ function changePage(value) {
   page.value = value
   fetchTrips()
 }
+
+function canModifyTrip(trip) {
+  return !['in_progress', 'completed'].includes(trip.trip_status)
+}
+
+function openTripModification(trip) {
+  selectedTrip.value = trip
+}
+
+async function onTripSaved(message) {
+  selectedTrip.value = null
+  toast.success(message)
+  await fetchTrips()
+}
 </script>
 
 <template>
@@ -217,7 +234,25 @@ function changePage(value) {
                 {{ formatDate(getTripStartDate(trip)) }}
               </p>
             </div>
-            <StatusBadge :status="trip.trip_status || 'scheduled'" />
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <span
+                class="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small font-medium ring-1 ring-inset"
+                :class="trip.vehicle_request?.booking_source === 'on_site'
+                  ? 'bg-secondary-50 text-secondary-700 ring-secondary-200'
+                  : 'bg-neutral-100 text-ink-muted ring-line'"
+              >
+                {{ trip.vehicle_request?.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
+              </span>
+              <StatusBadge
+                :status="trip.vehicle_request?.status === 'approved' ? 'approved' : (trip.trip_status || 'scheduled')"
+              />
+              <span
+                v-if="trip.modification_pending"
+                class="inline-flex items-center whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-small font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
+              >
+                Modification Pending
+              </span>
+            </div>
           </div>
 
           <p v-if="trip.purpose" class="text-small text-ink-muted">
@@ -250,9 +285,30 @@ function changePage(value) {
               </p>
             </div>
           </div>
+          <div v-if="canModifyTrip(trip)" class="flex justify-end">
+            <BaseButton
+              size="sm"
+              variant="outline"
+              :disabled="Boolean(trip.modification_pending)"
+              @click="openTripModification(trip)"
+            >
+              {{
+                trip.modification_pending
+                  ? 'Modification Pending'
+                  : trip.vehicle_request?.status === 'approved'
+                    ? 'Request Modification'
+                    : 'Edit Trip'
+              }}
+            </BaseButton>
+          </div>
         </li>
       </ul>
       <PaginationBar v-if="!loading" :meta="paginationMeta" @change="changePage" />
     </BaseCard>
+    <TripModificationModal
+      :trip="selectedTrip"
+      @close="selectedTrip = null"
+      @saved="onTripSaved"
+    />
   </div>
 </template>
