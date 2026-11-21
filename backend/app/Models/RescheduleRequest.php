@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A request to modify an approved trip (from faculty),
+ * A date change request for an approved trip (from faculty),
  * or the record of a direct change by an administrator (status 'approved' right away).
  */
 class RescheduleRequest extends Model

@@ -242,7 +242,7 @@ class AllocationController extends Controller
 
         if ($dateChanged && $trip->vehicleRequest?->status === 'approved') {
             throw ValidationException::withMessages([
-                'new_date' => 'Approved trips cannot be updated directly. Submit a Trip Modification Request.',
+                'new_date' => 'Approved trips cannot be updated directly. Submit a Date Change Request.',
             ]);
         }
 

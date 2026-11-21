@@ -6,7 +6,7 @@ import { ACTIVE_STATUSES, findConflicts, resourceState } from '@/lib/allocations
 
 /**
  * Data for the allocation pages.
- * Faculty get their own allocations and Trip Modification Requests.
+ * Faculty get their own allocations and Date Change Requests.
  * Administrators and staff also get the vehicle and driver lists.
  */
 export function useAllocations() {
@@ -94,7 +94,7 @@ export function useAllocations() {
     dateChanges.value.filter((item) => item.status === 'pending'),
   )
 
-  // allocation id -> its pending Trip Modification Request
+  // allocation id -> its pending Date Change Request
   const pendingByAllocation = computed(() =>
     Object.fromEntries(pendingDateChanges.value.map((item) => [item.allocation_id, item])),
   )

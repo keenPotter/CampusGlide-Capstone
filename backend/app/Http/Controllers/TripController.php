@@ -187,7 +187,7 @@ class TripController extends Controller
             in_array($trip->trip_status, ['in_progress', 'completed'], true)
                 || $vehicleRequest?->status === 'approved',
             422,
-            'This trip can no longer be edited directly. Use Trip Modification Request instead.'
+            'This trip can no longer be edited directly. Use Date Change Request instead.'
         );
 
         $validated = $request->validate([

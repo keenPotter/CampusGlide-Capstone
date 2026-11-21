@@ -174,7 +174,7 @@ async function submit() {
 <template>
   <BaseModal
     :open="Boolean(item)"
-    title="Review Trip Modification"
+    title="Review Date Change"
     :subtitle="item?.trip?.destination ?? ''"
     @close="emit('close')"
   >
