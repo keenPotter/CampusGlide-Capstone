@@ -12,6 +12,7 @@ use App\Models\Driver;
 use App\Models\Trip;
 use App\Models\Vehicle;
 use App\Models\VehicleRequest;
+use App\Models\RescheduleRequest;
 use App\Services\AllocationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -213,6 +214,13 @@ class VehicleRequestController extends Controller
         $validated = $request->validated();
         $wasApproved = $vehicleRequest->status === 'approved';
         $trip = $vehicleRequest->trip;
+        $user = $request->user();
+
+        abort_unless(
+            (int) $vehicleRequest->requester_id === (int) $user->id,
+            403,
+            'You may only edit your own vehicle requests.'
+        );
 
         // A trip that already started or finished cannot be undone by editing the request.
         abort_if(
@@ -222,24 +230,72 @@ class VehicleRequestController extends Controller
         );
 
         if ($wasApproved) {
-            $validated = [
-                ...$validated,
+            abort_unless($trip, 422, 'An approved request with no trip cannot create a trip modification.');
+            abort_if(
+                in_array($trip->trip_status, ['in_progress', 'completed'], true),
+                422,
+                "This trip is already {$trip->trip_status} and cannot be modified."
+            );
+            abort_if(
+                RescheduleRequest::where('trip_id', $trip->id)->where('status', 'pending')->exists(),
+                422,
+                'This trip already has a pending Trip Modification Request.'
+            );
+
+            $oldDate = $trip->trip_date->toDateString();
+            $newDate = $validated['trip_date'] ?? $oldDate;
+            $oldDeparture = substr((string) $trip->departure_time, 0, 5);
+            $newDeparture = substr((string) ($validated['departure_time'] ?? $oldDeparture), 0, 5);
+            $oldReturn = $trip->estimated_return_time ? substr((string) $trip->estimated_return_time, 0, 5) : null;
+            $newReturn = array_key_exists('estimated_return_time', $validated)
+                ? substr((string) $validated['estimated_return_time'], 0, 5)
+                : $oldReturn;
+            $oldPassengers = $vehicleRequest->number_of_passengers;
+            $newPassengers = (int) ($validated['number_of_passengers'] ?? $oldPassengers);
+
+            abort_if(
+                $newDate === $oldDate
+                    && $newDeparture === $oldDeparture
+                    && $newReturn === $oldReturn
+                    && ($validated['destination'] ?? $trip->destination) === $trip->destination
+                    && ($validated['purpose'] ?? $trip->purpose) === $trip->purpose
+                    && $newPassengers === (int) $oldPassengers,
+                422,
+                'No trip details were changed.'
+            );
+
+            RescheduleRequest::create([
+                'trip_id' => $trip->id,
+                'requested_by' => $user->id,
+                'old_date' => $oldDate,
+                'new_date' => $newDate,
+                'old_departure_time' => $oldDeparture,
+                'new_departure_time' => $newDeparture,
+                'old_estimated_return_time' => $oldReturn,
+                'new_estimated_return_time' => $newReturn,
+                'old_destination' => $trip->destination,
+                'new_destination' => $validated['destination'] ?? $trip->destination,
+                'old_purpose' => $trip->purpose,
+                'new_purpose' => $validated['purpose'] ?? $trip->purpose,
+                'old_number_of_passengers' => $oldPassengers,
+                'new_number_of_passengers' => $newPassengers,
+                'reason' => $validated['edit_reason'],
                 'status' => 'pending',
-                'approved_by' => null,
-                'approved_date' => null,
-            ];
+            ]);
+        } else {
+            DB::transaction(function () use ($vehicleRequest, $trip, $validated) {
+                if ($trip) {
+                    $this->releaseTrip($trip);
+                }
+
+                $vehicleRequest->update($validated);
+            });
         }
 
-        DB::transaction(function () use ($vehicleRequest, $trip, $validated) {
-            if ($trip) {
-                $this->releaseTrip($trip);
-            }
-
-            $vehicleRequest->update($validated);
-        });
-
         return response()->json([
-            'message' => 'Vehicle request updated successfully.',
+            'message' => $wasApproved
+                ? 'Trip modification request submitted successfully.'
+                : 'Vehicle request updated successfully.',
             'data' => new VehicleRequestResource($vehicleRequest->fresh(['requester', 'approver'])),
         ]);
     }

@@ -79,7 +79,9 @@ const disapproving = ref(null)
 // The pending request that is being approved. The assign window is open while this is set.
 const approving = ref(null)
 function canEditRequest(request) {
-  return auth.isFaculty && ['pending', 'approved'].includes(request?.status)
+  return auth.isFaculty
+    && ['pending', 'approved'].includes(request?.status)
+    && !request?.modification_pending
 }
 const canEditSelectedRequest = computed(() => canEditRequest(detailRequest.value))
 const requestDetailRows = computed(() => {
@@ -386,6 +388,12 @@ function onDisapproved() {
               {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
             </span>
             <StatusBadge :status="request.status" />
+            <span
+              v-if="request.modification_pending"
+              class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
+            >
+              Modification Pending
+            </span>
           </div>
         </div>
 
@@ -432,6 +440,22 @@ function onDisapproved() {
             @click="openEditRequest(request)"
           >
             <Pencil :size="16" aria-hidden="true" /> Edit
+          </BaseButton>
+          <BaseButton
+            v-else-if="auth.isFaculty && request.modification_pending"
+            size="sm"
+            variant="outline"
+            disabled
+          >
+            Modification Pending
+          </BaseButton>
+          <BaseButton
+            v-else-if="auth.isFaculty && request.modification_pending"
+            size="sm"
+            variant="outline"
+            disabled
+          >
+            Modification Pending
           </BaseButton>
 
           <template v-if="auth.isAdministratorOrStaff && request.status === 'pending'">
@@ -505,6 +529,12 @@ function onDisapproved() {
                   {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
                 </span>
                 <StatusBadge :status="request.status" />
+                <span
+                  v-if="request.modification_pending"
+                  class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
+                >
+                  Modification Pending
+                </span>
               </div>
             </td>
             <!-- Reason for disapproval. Blank when there is none. -->
@@ -568,7 +598,23 @@ function onDisapproved() {
 
       <template v-else-if="detailRequest">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <StatusBadge :status="detailRequest.status" />
+          <div class="flex flex-wrap items-center gap-2">
+            <span
+              class="rounded-full px-2 py-1 text-xs font-medium"
+              :class="detailRequest.booking_source === 'on_site'
+                ? 'bg-secondary-50 text-secondary-700'
+                : 'bg-neutral-100 text-ink-muted'"
+            >
+              {{ detailRequest.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
+            </span>
+            <StatusBadge :status="detailRequest.status" />
+            <span
+              v-if="detailRequest.modification_pending"
+              class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
+            >
+              Modification Pending
+            </span>
+          </div>
         </div>
 
         <div
@@ -603,6 +649,13 @@ function onDisapproved() {
         <BaseButton variant="outline" @click="closeRequest">Close</BaseButton>
         <BaseButton v-if="canEditSelectedRequest" variant="outline" @click="editSelectedRequest">
           Edit
+        </BaseButton>
+        <BaseButton
+          v-else-if="auth.isFaculty && detailRequest?.modification_pending"
+          variant="outline"
+          disabled
+        >
+          Modification Pending
         </BaseButton>
         <template v-if="auth.isAdministratorOrStaff && detailRequest?.status === 'pending'">
           <BaseButton @click="openApprove(detailRequest)">Approve</BaseButton>

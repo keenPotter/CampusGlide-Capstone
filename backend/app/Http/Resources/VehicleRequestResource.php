@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\VehicleRequest;
+use App\Models\RescheduleRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,6 +11,14 @@ class VehicleRequestResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $pendingModification = null;
+        $trip = $this->trip;
+        if ($trip) {
+            $pendingModification = RescheduleRequest::where('trip_id', $trip->id)
+                ->where('status', 'pending')
+                ->latest('id')
+                ->first();
+        }
         return [
             'id' => $this->id,
             'status' => $this->status,
@@ -32,6 +41,17 @@ class VehicleRequestResource extends JsonResource
             'edit_reason' => $this->edit_reason,
             'approved_by' => $this->approved_by,
             'approved_date' => $this->approved_date?->toIso8601String(),
+            'modification_pending' => $pendingModification !== null,
+            'pending_modification_request' => $pendingModification ? [
+                'id' => $pendingModification->id,
+                'new_date' => $pendingModification->new_date?->toDateString(),
+                'new_departure_time' => $pendingModification->new_departure_time,
+                'new_estimated_return_time' => $pendingModification->new_estimated_return_time,
+                'new_destination' => $pendingModification->new_destination,
+                'new_purpose' => $pendingModification->new_purpose,
+                'new_number_of_passengers' => $pendingModification->new_number_of_passengers,
+                'reason' => $pendingModification->reason,
+            ] : null,
             'requested_by' => $this->requester ? [
                 'id' => $this->requester->id,
                 'first_name' => $this->requester->first_name,

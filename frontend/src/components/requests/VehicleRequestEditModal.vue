@@ -100,7 +100,7 @@ async function save() {
     const updated = await store.update(props.request.id, payload)
     toast.success(
       needsReason.value
-        ? 'Request updated and sent back to the administrator for approval.'
+        ? 'Trip Modification Request submitted for administrator review.'
         : 'Request updated.',
     )
     confirmOpen.value = false
@@ -132,8 +132,8 @@ async function save() {
       >
         <p class="font-medium">This request is already approved.</p>
         <p class="mt-1">
-          Saving changes will release the assigned vehicle and driver and send the request back for
-          approval.
+          Saving changes creates a Trip Modification Request. The approved trip stays unchanged
+          until an administrator approves it.
         </p>
       </div>
 
@@ -165,9 +165,9 @@ async function save() {
   >
     <p class="text-body">If you continue:</p>
     <ul class="mt-2 list-disc space-y-1 pl-5 text-body">
-      <li>The vehicle and driver assigned to this request will be released.</li>
-      <li>The request becomes a new pending request.</li>
-      <li>The administrator must approve it again before a vehicle and driver are assigned.</li>
+      <li>The original approved trip will remain unchanged.</li>
+      <li>A pending Trip Modification Request will be created.</li>
+      <li>The administrator must approve the requested changes.</li>
     </ul>
 
     <template #footer>

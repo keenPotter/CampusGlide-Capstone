@@ -53,8 +53,9 @@ const routes = [
     meta: { requiresAuth: true, roles: ['administrator', 'staff'] },
   },
   {
-    path: '/date-change-requests',
-    name: 'dateChangeRequests',
+    path: '/trip-modification-requests',
+    alias: '/date-change-requests',
+    name: 'tripModificationRequests',
     component: () => import('@/views/allocations/DateChangeRequestsView.vue'),
     meta: { requiresAuth: true, roles: ['administrator', 'staff'] },
   },

@@ -240,6 +240,12 @@ class AllocationController extends Controller
         $newDate = $request->input('new_date');
         $dateChanged = $newDate && $newDate !== Carbon::parse($trip->trip_date)->toDateString();
 
+        if ($dateChanged && $trip->vehicleRequest?->status === 'approved') {
+            throw ValidationException::withMessages([
+                'new_date' => 'Approved trips cannot be updated directly. Submit a Trip Modification Request.',
+            ]);
+        }
+
         if (! $wasActive && ($vehicleChanged || $driverChanged || $statusChanged || $dateChanged)) {
             throw ValidationException::withMessages([
                 'status' => "This trip is already {$trip->trip_status} and can no longer be changed. Create a new request instead.",

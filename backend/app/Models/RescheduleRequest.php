@@ -13,6 +13,11 @@ class RescheduleRequest extends Model
     protected $fillable = [
         'trip_id', 'requested_by', 'old_date', 'new_date', 'reason',
         'status', 'handled_by', 'admin_reason', 'handled_at',
+        'old_departure_time', 'new_departure_time',
+        'old_estimated_return_time', 'new_estimated_return_time',
+        'old_destination', 'new_destination',
+        'old_purpose', 'new_purpose',
+        'old_number_of_passengers', 'new_number_of_passengers',
     ];
 
     protected function casts(): array
