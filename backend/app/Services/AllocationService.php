@@ -185,8 +185,11 @@ class AllocationService
      *
      * @return array{0: string, 1: string} [start, end] as YYYY-MM-DD
      */
-    public function tripRange(VehicleRequest $vehicleRequest, ?string $newDate = null): array
-    {
+    public function tripRange(
+        VehicleRequest $vehicleRequest,
+        ?string $newDate = null,
+        ?string $newEndDate = null
+    ): array {
         $start = Carbon::parse($vehicleRequest->trip_date)->toDateString();
         $end = Carbon::parse($vehicleRequest->trip_end_date ?? $vehicleRequest->trip_date)->toDateString();
 
@@ -194,6 +197,10 @@ class AllocationService
             $shift = (int) Carbon::parse($start)->diffInDays(Carbon::parse($newDate), false);
             $end = Carbon::parse($end)->addDays($shift)->toDateString();
             $start = $newDate;
+        }
+
+        if ($newEndDate) {
+            $end = Carbon::parse($newEndDate)->toDateString();
         }
 
         return [$start, $end];
@@ -242,23 +249,28 @@ class AllocationService
      * Writes the new date on the trip and on its vehicle request. No checks here.
      * The caller must run the conflict checks first.
      *
-     * The end date moves by the same number of days, so a multi-day trip
-     * never ends before it starts.
+     * The end date moves by the same number of days unless an explicit end date is supplied.
      *
      * @return string the old date (YYYY-MM-DD)
      */
-    public function shiftTripDate(Trip $trip, string $newDate): string
+    public function shiftTripDate(Trip $trip, string $newDate, ?string $newEndDate = null): string
     {
         $old = Carbon::parse($trip->trip_date)->toDateString();
         $vehicleRequest = VehicleRequest::findOrFail($trip->vehicle_request_id);
         $shift = (int) Carbon::parse($old)->diffInDays(Carbon::parse($newDate), false);
+        $endDate = $newEndDate
+            ? Carbon::parse($newEndDate)->toDateString()
+            : ($vehicleRequest->trip_end_date ?? Carbon::parse($old))
+                ->copy()
+                ->addDays($shift)
+                ->toDateString();
 
-        DB::transaction(function () use ($trip, $newDate, $vehicleRequest, $shift) {
+        DB::transaction(function () use ($trip, $newDate, $vehicleRequest, $endDate) {
             Trip::where('id', $trip->id)->update(['trip_date' => $newDate]);
 
             $vehicleRequest->update([
                 'trip_date' => $newDate,
-                'trip_end_date' => $vehicleRequest->trip_end_date->copy()->addDays($shift)->toDateString(),
+                'trip_end_date' => $endDate,
             ]);
         });
 
@@ -270,6 +282,7 @@ class AllocationService
      * @param  string|null  $newDate  pass this (YYYY-MM-DD) when the trip is also moved to another date.
      *                              The checks then run against the new dates.
      * @param  bool  $allowPending  true when a pending request is approved together with its assignment
+     * @param  string|null  $newEndDate  pass this when the trip's duration is also changed
      */
     public function assertAssignable(
         VehicleRequest $vehicleRequest,
@@ -277,9 +290,10 @@ class AllocationService
         Driver $driver,
         ?Trip $currentTrip = null,
         ?string $newDate = null,
-        bool $allowPending = false
+        bool $allowPending = false,
+        ?string $newEndDate = null
     ): void {
-        [$startDate, $endDate] = $this->tripRange($vehicleRequest, $newDate);
+        [$startDate, $endDate] = $this->tripRange($vehicleRequest, $newDate, $newEndDate);
         $ignoreTripId = $currentTrip?->id;
 
         $this->assertRequestIsApproved($vehicleRequest, $allowPending);

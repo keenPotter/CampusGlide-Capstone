@@ -68,4 +68,60 @@ class TripCompletionTest extends TestCase
         $this->assertSame('available', $vehicle->fresh()->status);
         $this->assertTrue($driver->fresh()->is_available);
     }
+
+    public function test_faculty_request_list_marks_a_past_approved_trip_completed(): void
+    {
+        $requester = User::factory()->create(['role' => 'faculty']);
+        $vehicle = Vehicle::create([
+            'plate_number' => 'TEST-002',
+            'vehicle_model' => 'Test Van',
+            'vehicle_type' => 'van',
+            'status' => 'in_use',
+        ]);
+        $driver = Driver::create([
+            'first_name' => 'Past',
+            'last_name' => 'Trip Driver',
+            'license_number' => 'TEST-LICENSE-002',
+            'license_expiry_date' => '2030-12-31',
+            'assigned_vehicle_id' => $vehicle->id,
+            'is_available' => false,
+        ]);
+        $request = VehicleRequest::factory()->create([
+            'requester_id' => $requester->id,
+            'status' => 'approved',
+            'trip_date' => '2026-11-20',
+            'trip_end_date' => '2026-11-20',
+            'departure_time' => '08:00:00',
+            'estimated_return_time' => '17:00:00',
+        ]);
+        $trip = Trip::create([
+            'vehicle_request_id' => $request->id,
+            'vehicle_id' => $vehicle->id,
+            'driver_id' => $driver->id,
+            'trip_date' => '2026-11-20',
+            'departure_time' => '08:00:00',
+            'estimated_return_time' => '17:00:00',
+            'destination' => 'Past trip destination',
+            'purpose' => 'Past trip purpose',
+            'trip_status' => 'scheduled',
+        ]);
+
+        $this->travelTo(Carbon::parse('2026-11-21 10:00:00', 'Asia/Manila'));
+        $this->actingAs($requester, 'sanctum')
+            ->getJson('/api/vehicle-requests?status=approved')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'approved')
+            ->assertJsonPath('data.0.trip_status', 'completed');
+
+        $this->assertSame('completed', $trip->fresh()->trip_status);
+        $this->assertSame('available', $vehicle->fresh()->status);
+        $this->assertTrue($driver->fresh()->is_available);
+
+        $this->actingAs($requester, 'sanctum')
+            ->getJson('/api/vehicle-requests?status=completed')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $request->id)
+            ->assertJsonPath('data.0.trip_status', 'completed');
+    }
 }

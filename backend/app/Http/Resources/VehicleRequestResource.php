@@ -22,6 +22,7 @@ class VehicleRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'status' => $this->status,
+            'trip_status' => $trip?->trip_status,
             'booking_source' => $this->booking_source ?? VehicleRequest::SOURCE_ONLINE,
             'requester_name' => $this->requester_name ?: $this->requester?->full_name,
             'requester_department' => $this->requester_department,
