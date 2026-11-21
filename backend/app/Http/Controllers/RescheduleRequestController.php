@@ -4,19 +4,30 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\RescheduleRequestResource;
 use App\Models\Allocation;
+use App\Models\Driver;
 use App\Models\RescheduleRequest;
+use App\Models\Trip;
+use App\Models\Vehicle;
 use App\Services\AllocationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Trip Modification Requests.
  *  - Faculty can only send a request (POST allocations/{id}/reschedule-requests).
- *  - Administrators approve or disapprove a request, or reassign the date directly with a reason.
+ *  - Administrators and staff approve or disapprove a request, or reassign the date directly with a reason.
  */
 class RescheduleRequestController extends Controller
 {
-    private const WITH = ['trip.allocation', 'requester', 'handler'];
+    private const WITH = [
+        'trip.allocation',
+        'trip.vehicle',
+        'trip.driver',
+        'trip.vehicleRequest',
+        'requester',
+        'handler',
+    ];
 
     public function __construct(protected AllocationService $allocations)
     {
@@ -102,6 +113,8 @@ class RescheduleRequestController extends Controller
             ?? $validated['new_passengers']
             ?? $validated['passengers']
             ?? $vehicleRequest->number_of_passengers;
+        $oldEndDate = $vehicleRequest->trip_end_date?->toDateString() ?? $oldDate;
+        [, $newEndDate] = $this->allocations->tripRange($vehicleRequest, $newDate);
 
         abort_if(
             $newDate === $oldDate
@@ -119,6 +132,12 @@ class RescheduleRequestController extends Controller
             'requested_by' => $user->id,
             'old_date' => $oldDate,
             'new_date' => $newDate,
+            'old_trip_end_date' => $oldEndDate,
+            'new_trip_end_date' => $newEndDate,
+            'old_trip_type' => $vehicleRequest->trip_type,
+            'new_trip_type' => $vehicleRequest->trip_type,
+            'old_authorized_passengers' => $vehicleRequest->passengers,
+            'new_authorized_passengers' => $vehicleRequest->passengers,
             'old_departure_time' => substr((string) $trip->departure_time, 0, 5),
             'new_departure_time' => $newDeparture,
             'old_estimated_return_time' => $trip->estimated_return_time ? substr((string) $trip->estimated_return_time, 0, 5) : null,
@@ -140,51 +159,129 @@ class RescheduleRequestController extends Controller
 
     /**
      * POST /api/reschedule-requests/{rescheduleRequest}/approve
-     * Moves the trip to the requested date. The conflict check runs first.
-     * The administrator's note is optional.
+     * Applies the requested trip changes after checking the new schedule and assignment.
+     * The reviewer's note is optional.
      */
     public function approve(Request $request, RescheduleRequest $rescheduleRequest)
     {
-        $this->assertPending($rescheduleRequest);
+        $validated = $request->validate([
+            'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],
+            'driver_id' => ['nullable', 'integer', 'exists:drivers,id'],
+            'admin_reason' => ['nullable', 'string', 'max:500'],
+        ]);
 
-        $request->validate(['admin_reason' => ['nullable', 'string', 'max:500']]);
+        DB::transaction(function () use ($request, $rescheduleRequest, $validated) {
+            $rescheduleRequest = RescheduleRequest::whereKey($rescheduleRequest->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertPending($rescheduleRequest);
 
-        DB::transaction(function () use ($request, $rescheduleRequest) {
             $trip = $rescheduleRequest->trip()->lockForUpdate()->first();
             $vehicleRequest = $trip->vehicleRequest()->lockForUpdate()->first();
+            $allocation = $trip->allocation()->lockForUpdate()->first();
 
-            $oldDate = $trip->trip_date?->toDateString();
-            $newDate = $rescheduleRequest->new_date?->toDateString();
-            if ($newDate && $newDate !== $oldDate) {
-                $this->allocations->moveTrip($trip, $newDate);
-            }
-
-            $tripUpdates = [];
-            if ($rescheduleRequest->new_destination !== null
-                && $rescheduleRequest->new_destination !== $rescheduleRequest->old_destination) {
-                $tripUpdates['destination'] = $rescheduleRequest->new_destination;
-            }
-            if ($rescheduleRequest->new_purpose !== null
-                && $rescheduleRequest->new_purpose !== $rescheduleRequest->old_purpose) {
-                $tripUpdates['purpose'] = $rescheduleRequest->new_purpose;
-            }
-            if ($rescheduleRequest->new_departure_time !== null
-                && $rescheduleRequest->new_departure_time !== $rescheduleRequest->old_departure_time) {
-                $tripUpdates['departure_time'] = $rescheduleRequest->new_departure_time;
-            }
-            if ($rescheduleRequest->new_estimated_return_time !== null
-                && $rescheduleRequest->new_estimated_return_time !== $rescheduleRequest->old_estimated_return_time) {
-                $tripUpdates['estimated_return_time'] = $rescheduleRequest->new_estimated_return_time;
-            }
-            if ($tripUpdates) {
-                $trip->update($tripUpdates);
-            }
-
-            if ($rescheduleRequest->new_number_of_passengers !== null
-                && (int) $rescheduleRequest->new_number_of_passengers !== (int) $rescheduleRequest->old_number_of_passengers) {
-                $vehicleRequest->update([
-                    'number_of_passengers' => $rescheduleRequest->new_number_of_passengers,
+            if ($trip->trip_status !== 'scheduled') {
+                throw ValidationException::withMessages([
+                    'new_date' => "Only scheduled trips can be modified (this trip is {$trip->trip_status}).",
                 ]);
+            }
+
+            if (! $allocation) {
+                throw ValidationException::withMessages([
+                    'allocation' => 'This trip has no allocation to update.',
+                ]);
+            }
+
+            $oldDate = $trip->trip_date->toDateString();
+            $newDate = $rescheduleRequest->new_date?->toDateString() ?? $oldDate;
+            $oldEndDate = $vehicleRequest->trip_end_date?->toDateString() ?? $oldDate;
+            $newEndDate = $rescheduleRequest->new_trip_end_date?->toDateString()
+                ?? $this->allocations->tripRange($vehicleRequest, $newDate)[1];
+            $newDeparture = substr((string) ($rescheduleRequest->new_departure_time ?? $trip->departure_time), 0, 5);
+            $newReturn = $rescheduleRequest->new_estimated_return_time !== null
+                ? substr((string) $rescheduleRequest->new_estimated_return_time, 0, 5)
+                : ($trip->estimated_return_time ? substr((string) $trip->estimated_return_time, 0, 5) : null);
+            $newDestination = $rescheduleRequest->new_destination ?? $trip->destination;
+            $newPurpose = $rescheduleRequest->new_purpose ?? $trip->purpose;
+            $newPassengers = $rescheduleRequest->new_number_of_passengers ?? $vehicleRequest->number_of_passengers;
+            $newTripType = $rescheduleRequest->new_trip_type ?? $vehicleRequest->trip_type;
+            $newAuthorizedPassengers = $rescheduleRequest->new_authorized_passengers ?? $vehicleRequest->passengers;
+            $vehicle = Vehicle::findOrFail($validated['vehicle_id'] ?? $trip->vehicle_id);
+            $driver = Driver::findOrFail($validated['driver_id'] ?? $trip->driver_id);
+
+            $vehicleRequest->departure_time = $newDeparture;
+            $vehicleRequest->estimated_return_time = $newReturn;
+            $this->allocations->assertAssignable(
+                $vehicleRequest,
+                $vehicle,
+                $driver,
+                $trip,
+                $newDate,
+                false,
+                $newEndDate
+            );
+
+            if ($newDate !== $oldDate || $newEndDate !== $oldEndDate) {
+                $this->allocations->shiftTripDate($trip, $newDate, $newEndDate);
+            }
+
+            $oldVehicleId = (int) $trip->vehicle_id;
+            $oldDriverId = (int) $trip->driver_id;
+            $vehicleChanged = $oldVehicleId !== (int) $vehicle->id;
+            $driverChanged = $oldDriverId !== (int) $driver->id;
+
+            $trip->update([
+                'vehicle_id' => $vehicle->id,
+                'driver_id' => $driver->id,
+                'departure_time' => $newDeparture,
+                'estimated_return_time' => $newReturn,
+                'destination' => $newDestination,
+                'purpose' => $newPurpose,
+            ]);
+            $vehicleRequest->update([
+                'departure_time' => $newDeparture,
+                'estimated_return_time' => $newReturn,
+                'destination' => $newDestination,
+                'purpose' => $newPurpose,
+                'trip_type' => $newTripType,
+                'passengers' => $newAuthorizedPassengers,
+                'number_of_passengers' => $newPassengers,
+            ]);
+            $allocation->update([
+                'vehicle_id' => $vehicle->id,
+                'driver_id' => $driver->id,
+            ]);
+
+            if ($vehicleChanged) {
+                $oldVehicleStillAssigned = Trip::where('vehicle_id', $oldVehicleId)
+                    ->whereIn('trip_status', AllocationService::ACTIVE)
+                    ->where('id', '!=', $trip->id)
+                    ->exists();
+                if (! $oldVehicleStillAssigned) {
+                    Vehicle::whereKey($oldVehicleId)
+                        ->where('status', 'in_use')
+                        ->update(['status' => 'available']);
+                }
+                Vehicle::whereKey($vehicle->id)->update(['status' => 'in_use']);
+            }
+
+            if ($driverChanged) {
+                $oldDriverStillAssigned = Trip::where('driver_id', $oldDriverId)
+                    ->whereIn('trip_status', AllocationService::ACTIVE)
+                    ->where('id', '!=', $trip->id)
+                    ->exists();
+                if (! $oldDriverStillAssigned) {
+                    Driver::whereKey($oldDriverId)->update([
+                        'is_available' => true,
+                        'assigned_vehicle_id' => null,
+                    ]);
+                }
+                Driver::whereKey($driver->id)->update([
+                    'is_available' => false,
+                    'assigned_vehicle_id' => $vehicle->id,
+                ]);
+            } elseif ($vehicleChanged) {
+                Driver::whereKey($driver->id)->update(['assigned_vehicle_id' => $vehicle->id]);
             }
 
             $rescheduleRequest->update([
@@ -195,7 +292,7 @@ class RescheduleRequestController extends Controller
             ]);
         });
 
-        return new RescheduleRequestResource($rescheduleRequest->load(self::WITH));
+        return new RescheduleRequestResource($rescheduleRequest->fresh()->load(self::WITH));
     }
 
     /**

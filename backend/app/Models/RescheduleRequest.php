@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A request to change the date of a trip (from faculty),
+ * A request to modify an approved trip (from faculty),
  * or the record of a direct change by an administrator (status 'approved' right away).
  */
 class RescheduleRequest extends Model
@@ -18,6 +18,9 @@ class RescheduleRequest extends Model
         'old_destination', 'new_destination',
         'old_purpose', 'new_purpose',
         'old_number_of_passengers', 'new_number_of_passengers',
+        'old_trip_end_date', 'new_trip_end_date',
+        'old_trip_type', 'new_trip_type',
+        'old_authorized_passengers', 'new_authorized_passengers',
     ];
 
     protected function casts(): array
@@ -25,6 +28,8 @@ class RescheduleRequest extends Model
         return [
             'old_date' => 'date:Y-m-d',
             'new_date' => 'date:Y-m-d',
+            'old_trip_end_date' => 'date:Y-m-d',
+            'new_trip_end_date' => 'date:Y-m-d',
             'handled_at' => 'datetime',
         ];
     }

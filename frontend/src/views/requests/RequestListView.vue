@@ -56,7 +56,7 @@ watch(
 )
 
 // Same style of filter as the Maintenance page: dropdowns with an "All" choice.
-const statusOptions = ['pending', 'approved', 'disapproved'].map((value) => ({
+const statusOptions = ['pending', 'approved', 'disapproved', 'completed'].map((value) => ({
   value,
   label: STATUS_LABELS[value],
 }))
@@ -81,7 +81,13 @@ const approving = ref(null)
 function canEditRequest(request) {
   return auth.isFaculty
     && ['pending', 'approved'].includes(request?.status)
+    && (request?.status !== 'approved' || request?.trip_status === 'scheduled')
     && !request?.modification_pending
+}
+function requestDisplayStatus(request) {
+  return request?.status === 'approved' && request?.trip_status === 'completed'
+    ? 'completed'
+    : request?.status
 }
 const canEditSelectedRequest = computed(() => canEditRequest(detailRequest.value))
 const requestDetailRows = computed(() => {
@@ -387,7 +393,7 @@ function onDisapproved() {
             >
               {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
             </span>
-            <StatusBadge :status="request.status" />
+            <StatusBadge :status="requestDisplayStatus(request)" />
             <span
               v-if="request.modification_pending"
               class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
@@ -528,7 +534,7 @@ function onDisapproved() {
                 >
                   {{ request.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
                 </span>
-                <StatusBadge :status="request.status" />
+                <StatusBadge :status="requestDisplayStatus(request)" />
                 <span
                   v-if="request.modification_pending"
                   class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
@@ -607,7 +613,7 @@ function onDisapproved() {
             >
               {{ detailRequest.booking_source === 'on_site' ? 'On-Site' : 'Online' }}
             </span>
-            <StatusBadge :status="detailRequest.status" />
+            <StatusBadge :status="requestDisplayStatus(detailRequest)" />
             <span
               v-if="detailRequest.modification_pending"
               class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-300"
@@ -657,7 +663,7 @@ function onDisapproved() {
         >
           Modification Pending
         </BaseButton>
-        <template v-if="auth.isAdministratorOrStaff && detailRequest?.status === 'pending'">
+        <template v-if="auth.isAdministrator && detailRequest?.status === 'pending'">
           <BaseButton @click="openApprove(detailRequest)">Approve</BaseButton>
           <BaseButton variant="outline" @click="openDisapprove(detailRequest)">
             Disapprove

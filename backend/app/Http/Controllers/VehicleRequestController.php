@@ -39,11 +39,12 @@ class VehicleRequestController extends Controller
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ]);
 
+        $this->allocations->completeFinishedTrips();
         $user = $request->user();
 
         $query = VehicleRequest::query()
             ->select('vehicle_requests.*')
-            ->with('requester')
+            ->with(['requester', 'trip'])
             ->orderByRaw("CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 WHEN 'disapproved' THEN 2 ELSE 3 END")
             ->orderBy('trip_date')
             ->orderBy('departure_time')
@@ -54,7 +55,12 @@ class VehicleRequestController extends Controller
         }
 
         if ($status = $request->query('status')) {
-            $query->where('status', $status);
+            if ($status === 'completed') {
+                $query->where('status', 'approved')
+                    ->whereHas('trip', fn ($tripQuery) => $tripQuery->where('trip_status', 'completed'));
+            } else {
+                $query->where('status', $status);
+            }
         }
 
         // The frontend sends trip_type, so the backend must filter by it too.
@@ -186,7 +192,9 @@ class VehicleRequestController extends Controller
             abort(403, 'You are not authorized to view this request.');
         }
 
-        return new VehicleRequestResource($vehicleRequest->load('requester'));
+        $this->allocations->completeFinishedTrips();
+
+        return new VehicleRequestResource($vehicleRequest->load(['requester', 'trip']));
     }
 
     public function updateStatus(UpdateVehicleRequestStatusRequest $request, VehicleRequest $vehicleRequest)
@@ -206,8 +214,8 @@ class VehicleRequestController extends Controller
     /**
      * PUT /api/vehicle-requests/{id}/edit
      * Faculty edit their own request.
-     * Editing an approved request (a reason is required) makes it a new pending request:
-     * its trip is deleted, the vehicle and driver are freed, and the administrator must approve it again.
+     * Editing an approved request (a reason is required) creates a pending Trip Modification Request.
+     * The existing trip and its assignment stay in place until the modification is approved.
      */
     public function edit(EditVehicleRequestRequest $request, VehicleRequest $vehicleRequest)
     {
@@ -244,6 +252,10 @@ class VehicleRequestController extends Controller
 
             $oldDate = $trip->trip_date->toDateString();
             $newDate = $validated['trip_date'] ?? $oldDate;
+            $oldEndDate = $vehicleRequest->trip_end_date?->toDateString() ?? $oldDate;
+            $newEndDate = $validated['trip_end_date'] ?? $oldEndDate;
+            $oldTripType = $vehicleRequest->trip_type;
+            $newTripType = $validated['trip_type'] ?? $oldTripType;
             $oldDeparture = substr((string) $trip->departure_time, 0, 5);
             $newDeparture = substr((string) ($validated['departure_time'] ?? $oldDeparture), 0, 5);
             $oldReturn = $trip->estimated_return_time ? substr((string) $trip->estimated_return_time, 0, 5) : null;
@@ -252,13 +264,18 @@ class VehicleRequestController extends Controller
                 : $oldReturn;
             $oldPassengers = $vehicleRequest->number_of_passengers;
             $newPassengers = (int) ($validated['number_of_passengers'] ?? $oldPassengers);
+            $oldAuthorizedPassengers = $vehicleRequest->passengers;
+            $newAuthorizedPassengers = $validated['passengers'] ?? $oldAuthorizedPassengers;
 
             abort_if(
                 $newDate === $oldDate
+                    && $newEndDate === $oldEndDate
+                    && $newTripType === $oldTripType
                     && $newDeparture === $oldDeparture
                     && $newReturn === $oldReturn
                     && ($validated['destination'] ?? $trip->destination) === $trip->destination
                     && ($validated['purpose'] ?? $trip->purpose) === $trip->purpose
+                    && $newAuthorizedPassengers === $oldAuthorizedPassengers
                     && $newPassengers === (int) $oldPassengers,
                 422,
                 'No trip details were changed.'
@@ -269,6 +286,10 @@ class VehicleRequestController extends Controller
                 'requested_by' => $user->id,
                 'old_date' => $oldDate,
                 'new_date' => $newDate,
+                'old_trip_end_date' => $oldEndDate,
+                'new_trip_end_date' => $newEndDate,
+                'old_trip_type' => $oldTripType,
+                'new_trip_type' => $newTripType,
                 'old_departure_time' => $oldDeparture,
                 'new_departure_time' => $newDeparture,
                 'old_estimated_return_time' => $oldReturn,
@@ -279,6 +300,8 @@ class VehicleRequestController extends Controller
                 'new_purpose' => $validated['purpose'] ?? $trip->purpose,
                 'old_number_of_passengers' => $oldPassengers,
                 'new_number_of_passengers' => $newPassengers,
+                'old_authorized_passengers' => $oldAuthorizedPassengers,
+                'new_authorized_passengers' => $newAuthorizedPassengers,
                 'reason' => $validated['edit_reason'],
                 'status' => 'pending',
             ]);

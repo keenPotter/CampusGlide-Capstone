@@ -22,7 +22,6 @@ const loading = ref(true)
 const loadError = ref('')
 const page = ref(1)
 const decisionItem = ref(null)
-const decisionAction = ref('')
 const conflicts = ref([])
 
 const pageCount = computed(() => Math.max(1, Math.ceil(requests.value.length / PAGE_SIZE)))
@@ -57,14 +56,12 @@ function changePage(value) {
   page.value = value
 }
 
-function decide(item, action) {
+function review(item) {
   decisionItem.value = item
-  decisionAction.value = action
 }
 
 function closeDecision() {
   decisionItem.value = null
-  decisionAction.value = ''
 }
 
 async function onDecided(message) {
@@ -122,8 +119,7 @@ onMounted(load)
           :key="item.id"
           :item="item"
           :is-admin="auth.isAdministratorOrStaff"
-          @approve="decide($event, 'approve')"
-          @disapprove="decide($event, 'disapprove')"
+          @review="review"
         />
       </div>
       <PaginationBar :meta="paginationMeta" @change="changePage" />
@@ -132,14 +128,13 @@ onMounted(load)
     <DateChangeDecisionModal
       v-if="auth.isAdministratorOrStaff"
       :item="decisionItem"
-      :action="decisionAction"
       @close="closeDecision"
       @saved="onDecided"
       @conflict="onDecisionConflict"
     />
     <ConflictModal
       :conflicts="conflicts"
-      hint="Please choose another date."
+      hint="Choose an available vehicle or driver, or disapprove the request if none are available."
       @close="conflicts = []"
     />
   </div>

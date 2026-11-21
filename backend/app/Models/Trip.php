@@ -53,4 +53,9 @@ class Trip extends Model
     {
         return $this->hasOne(Allocation::class);
     }
+
+    public function cancelledBy()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
 }
