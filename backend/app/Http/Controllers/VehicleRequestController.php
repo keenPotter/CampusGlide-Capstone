@@ -60,6 +60,9 @@ class VehicleRequestController extends Controller
                     ->whereHas('trip', fn ($tripQuery) => $tripQuery->where('trip_status', 'completed'));
             } else {
                 $query->where('status', $status);
+                if ($status === 'approved') {
+                    $query->whereDoesntHave('trip', fn ($tripQuery) => $tripQuery->where('trip_status', 'completed'));
+                }
             }
         }
 

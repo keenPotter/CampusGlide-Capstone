@@ -315,6 +315,8 @@ class RescheduleRequestController extends Controller
             'admin_reason' => $validated['admin_reason'],
         ]);
 
+        $this->allocations->completeFinishedTrips();
+
         return new RescheduleRequestResource($rescheduleRequest->load(self::WITH));
     }
 
