@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
     <div class="page-header">
       <div class="page-header-copy">
         <h1 class="text-page-title">Trip Schedule</h1>
-        <p class="mt-1 text-small text-ink-muted">View scheduled trips and allocation details</p>
+        <p class="mt-1 text-small text-ink-muted">View trips and allocations.</p>
       </div>
       <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh trip schedule" @click="fetchTrips" />

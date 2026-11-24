@@ -299,7 +299,7 @@ function onDisapproved() {
         <h1 class="text-page-title">
           {{ auth.isFaculty ? 'My vehicle requests' : 'Vehicle requests' }}
         </h1>
-        <p class="mt-1 text-small text-ink-muted">Request for Use of Vehicle (NVSU-FR-PPS-13-02)</p>
+        <p class="mt-1 text-small text-ink-muted">View and manage vehicle requests</p>
       </div>
 
       <div class="page-actions">

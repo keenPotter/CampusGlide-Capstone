@@ -85,7 +85,7 @@ onMounted(load)
       <div class="page-header-copy">
         <h1 class="text-page-title">Date Change Requests</h1>
         <p class="mt-1 text-small text-ink-muted">
-          Review faculty requests to change approved trip dates.
+          Review requests to change trip dates.
         </p>
       </div>
       <div class="page-actions">

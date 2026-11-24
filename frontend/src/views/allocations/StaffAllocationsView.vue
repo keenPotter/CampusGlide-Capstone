@@ -61,7 +61,7 @@ watch(paginationMeta, (meta) => {
     <div class="page-header">
       <div class="page-header-copy">
         <h1 class="text-page-title">Allocations</h1>
-        <p class="mt-1 text-small text-ink-muted">Manage assigned vehicles, drivers, and scheduled trips.</p>
+        <p class="mt-1 text-small text-ink-muted">Manage vehicles, drivers, and trips.</p>
       </div>
       <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh allocations" @click="load" />

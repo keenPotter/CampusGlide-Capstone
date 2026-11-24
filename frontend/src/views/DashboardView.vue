@@ -178,7 +178,7 @@ async function onRequestSubmitted() {
       <div class="page-header-copy">
         <h1 class="text-page-title">Hello, {{ auth.user?.first_name }}</h1>
         <p class="mt-1 text-small text-ink-muted">
-          Signed in as {{ ROLE_LABELS[auth.role] ?? auth.role }}
+          {{ ROLE_LABELS[auth.role] ?? auth.role }}
         </p>
       </div>
       <div class="page-actions">
@@ -205,7 +205,7 @@ async function onRequestSubmitted() {
     </div>
 
     <!-- Upcoming Trips Card -->
-    <BaseCard title="Upcoming vehicle requests" subtitle="Vehicle requests ordered by requested trip date. Approval does not mean a trip has been scheduled." :padded="false">
+    <BaseCard title="Upcoming vehicle requests" subtitle="View requests by trip date." :padded="false">
       <template #actions>
         <RouterLink
           :to="{ name: 'requests.index' }"

@@ -32,7 +32,7 @@ onMounted(loadVehicles)
     <div>
       <h1 class="text-page-title">Preventive Maintenance</h1>
       <p class="mt-1 text-small text-ink-muted">
-        Choose a vehicle to assess, then print its monthly preventive maintenance checklist.
+        Choose a vehicle and print its checklist.
       </p>
     </div>
 

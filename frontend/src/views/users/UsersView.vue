@@ -184,7 +184,7 @@ onMounted(loadUsers)
     <div class="page-header">
       <div class="page-header-copy">
         <h1 class="text-page-title">User accounts</h1>
-        <p class="mt-1 text-small text-ink-muted">View and manage CampusGlide accounts. Administrator accounts cannot be deactivated here.</p>
+        <p class="mt-1 text-small text-ink-muted">View and manage user accounts.</p>
       </div>
       <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh users" @click="loadUsers" />

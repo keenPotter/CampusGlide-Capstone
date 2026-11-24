@@ -98,7 +98,7 @@ onMounted(loadLogs)
     <div class="page-header">
       <div class="page-header-copy">
         <h1 class="text-page-title">Audit log</h1>
-        <p class="mt-1 text-small text-ink-muted">Append-only history of important account and fleet changes.</p>
+        <p class="mt-1 text-small text-ink-muted">View account and fleet activity.</p>
       </div>
       <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh audit log" @click="loadLogs" />
