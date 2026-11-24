@@ -16,7 +16,7 @@ class DefaultListSortingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_vehicle_requests_are_grouped_by_status_and_ordered_by_trip_date(): void
+    public function test_vehicle_requests_are_ordered_by_most_recent_submission_first(): void
     {
         $administrator = User::factory()->create(['role' => 'administrator']);
         $staff = User::factory()->create(['role' => 'staff']);
@@ -26,16 +26,19 @@ class DefaultListSortingTest extends TestCase
             'requester_id' => $faculty->id,
             'status' => 'pending',
             'trip_date' => now()->addDays(20)->toDateString(),
+            'created_at' => now()->subDays(3),
         ]);
         $pendingSooner = VehicleRequest::factory()->create([
             'requester_id' => $faculty->id,
             'status' => 'pending',
             'trip_date' => now()->addDays(10)->toDateString(),
+            'created_at' => now()->subDay(),
         ]);
         $approvedRequest = VehicleRequest::factory()->create([
             'requester_id' => $faculty->id,
             'status' => 'approved',
             'trip_date' => now()->addDays(2)->toDateString(),
+            'created_at' => now()->subDays(2),
         ]);
         $disapprovedRequest = VehicleRequest::factory()->create([
             'requester_id' => null,
@@ -45,16 +48,17 @@ class DefaultListSortingTest extends TestCase
             'requester_contact' => '09123456789',
             'status' => 'disapproved',
             'trip_date' => now()->addDay()->toDateString(),
+            'created_at' => now(),
         ]);
 
         foreach ([$administrator, $staff] as $user) {
             $this->actingAs($user, 'sanctum')
                 ->getJson('/api/vehicle-requests')
                 ->assertOk()
-                ->assertJsonPath('data.0.id', $pendingSooner->id)
-                ->assertJsonPath('data.1.id', $pendingLater->id)
+                ->assertJsonPath('data.0.id', $disapprovedRequest->id)
+                ->assertJsonPath('data.1.id', $pendingSooner->id)
                 ->assertJsonPath('data.2.id', $approvedRequest->id)
-                ->assertJsonPath('data.3.id', $disapprovedRequest->id);
+                ->assertJsonPath('data.3.id', $pendingLater->id);
         }
 
         $this->actingAs($faculty, 'sanctum')
@@ -62,8 +66,8 @@ class DefaultListSortingTest extends TestCase
             ->assertOk()
             ->assertJsonCount(3, 'data')
             ->assertJsonPath('data.0.id', $pendingSooner->id)
-            ->assertJsonPath('data.1.id', $pendingLater->id)
-            ->assertJsonPath('data.2.id', $approvedRequest->id)
+            ->assertJsonPath('data.1.id', $approvedRequest->id)
+            ->assertJsonPath('data.2.id', $pendingLater->id)
             ->assertJsonPath('data.0.booking_source', VehicleRequest::SOURCE_ONLINE)
             ->assertJsonPath('data.1.booking_source', VehicleRequest::SOURCE_ONLINE);
     }
