@@ -135,7 +135,7 @@ async function save() {
     <div>
       <h1 class="text-page-title">{{ isEdit ? 'Edit request' : 'Request for use of vehicle' }}</h1>
       <p class="mt-0.5 text-small text-ink-muted">
-        Please accomplish this form three (3) days before travel.
+        Submit at least three days before travel.
       </p>
     </div>
 

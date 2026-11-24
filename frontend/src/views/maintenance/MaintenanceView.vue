@@ -411,7 +411,7 @@ function confirmEarlyCompletion() {
     <div class="page-header">
       <div class="page-header-copy">
         <h1 class="text-page-title">Vehicle Maintenance</h1>
-        <p class="mt-1 text-small text-ink-muted">Schedule, start, and track vehicle maintenance work</p>
+        <p class="mt-1 text-small text-ink-muted">Manage vehicle maintenance.</p>
       </div>
       <div class="page-actions">
         <RefreshButton :loading="loading" label="Refresh maintenance records" @click="loadAll" />

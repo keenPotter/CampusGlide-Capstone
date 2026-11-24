@@ -67,7 +67,7 @@ async function submit() {
     <div>
       <h1 class="text-page-title">Create user</h1>
       <p class="mt-0.5 text-small text-ink-muted">
-        Add an administrator, user, or staff account.
+        Add a new account.
       </p>
     </div>
 

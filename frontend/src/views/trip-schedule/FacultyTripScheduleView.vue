@@ -169,7 +169,7 @@ async function onTripSaved(message) {
       <div class="page-header-copy">
         <h1 class="text-page-title">My Trip Schedule</h1>
         <p class="mt-1 text-small text-ink-muted">
-          View the trips associated with your vehicle requests.
+          View trips from your requests.
         </p>
       </div>
       <div class="page-actions">
