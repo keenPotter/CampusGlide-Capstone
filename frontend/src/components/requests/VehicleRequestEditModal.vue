@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useVehicleRequestStore } from '@/stores/vehicleRequests'
 import { errorMessage, validationErrors } from '@/lib/api'
-import { todayIso, toTimeInput } from '@/lib/format'
+import { formatDate, formatTime, todayIso, toTimeInput } from '@/lib/format'
 import { useToast } from '@/composables/useToast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
@@ -135,30 +135,38 @@ async function save() {
       >
         <p class="font-medium">This request is already approved.</p>
         <p class="mt-1">
-          Only the travel date and departure time can be changed. The approved trip stays
-          unchanged until an administrator approves the request.
+          Travel dates and times can be requested to change. The approved trip stays unchanged
+          until an administrator approves the request.
         </p>
       </div>
 
       <template v-if="needsReason">
         <div class="rounded-card border border-line bg-surface p-card text-small">
-          <p class="mb-3 font-medium text-ink">Not editable</p>
+          <p class="mb-3 font-medium text-ink">Current trip details</p>
           <dl class="grid gap-2 sm:grid-cols-2">
             <div>
               <dt class="text-ink-muted">Destination</dt>
-              <dd class="mt-1 text-ink">{{ form.destination || '—' }}</dd>
+              <dd class="mt-1 text-ink">{{ request?.destination || '—' }}</dd>
             </div>
             <div>
               <dt class="text-ink-muted">Purpose</dt>
-              <dd class="mt-1 text-ink">{{ form.purpose || '—' }}</dd>
+              <dd class="mt-1 text-ink">{{ request?.purpose || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-ink-muted">Date of travel</dt>
+              <dd class="mt-1 text-ink">{{ formatDate(request?.trip_date) }}</dd>
+            </div>
+            <div>
+              <dt class="text-ink-muted">End of travel</dt>
+              <dd class="mt-1 text-ink">{{ formatDate(request?.trip_end_date) }}</dd>
+            </div>
+            <div>
+              <dt class="text-ink-muted">Time of departure</dt>
+              <dd class="mt-1 text-ink">{{ formatTime(request?.departure_time) }}</dd>
             </div>
             <div>
               <dt class="text-ink-muted">Estimated return</dt>
-              <dd class="mt-1 text-ink">{{ form.estimated_return_time || '—' }}</dd>
-            </div>
-            <div>
-              <dt class="text-ink-muted">Passengers</dt>
-              <dd class="mt-1 text-ink">{{ form.number_of_passengers || '—' }}</dd>
+              <dd class="mt-1 text-ink">{{ formatTime(request?.return_time) }}</dd>
             </div>
           </dl>
         </div>
@@ -173,10 +181,26 @@ async function save() {
             required
           />
           <BaseInput
+            v-model="form.trip_end_date"
+            label="New end of travel"
+            type="date"
+            :min="form.trip_date"
+            :error="errors.trip_end_date"
+            required
+          />
+          <BaseInput
             v-model="form.departure_time"
             label="New departure time"
             type="time"
             :error="errors.departure_time"
+            required
+          />
+          <BaseInput
+            v-model="form.estimated_return_time"
+            label="New estimated return"
+            type="time"
+            :min="form.departure_time"
+            :error="errors.estimated_return_time"
             required
           />
         </div>
@@ -213,7 +237,7 @@ async function save() {
     <p class="text-body">If you continue:</p>
     <ul class="mt-2 list-disc space-y-1 pl-5 text-body">
       <li>The original approved trip will remain unchanged.</li>
-      <li>Only the travel date and departure time are requested to change.</li>
+      <li>The new travel dates and times will be requested for administrator review.</li>
       <li>A pending Date Change Request will be created.</li>
       <li>The administrator must approve the requested changes.</li>
     </ul>

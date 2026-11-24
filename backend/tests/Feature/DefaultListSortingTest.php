@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Allocation;
 use App\Models\Driver;
+use App\Models\RescheduleRequest;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -97,6 +98,40 @@ class DefaultListSortingTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.id', $newlyAllocated->trip_id)
             ->assertJsonPath('data.1.id', $recentlyUpdated->trip_id);
+    }
+
+    public function test_pending_date_change_requests_are_ordered_by_newest_submission_first(): void
+    {
+        $administrator = User::factory()->create(['role' => 'administrator']);
+        $olderAllocation = $this->createAllocation($administrator, 'OLDER-CHANGE', now()->addDays(5));
+        $newerAllocation = $this->createAllocation($administrator, 'NEWER-CHANGE', now()->addDays(20));
+
+        $olderRequest = RescheduleRequest::create([
+            'trip_id' => $olderAllocation->trip_id,
+            'requested_by' => $administrator->id,
+            'old_date' => now()->addDays(5)->toDateString(),
+            'new_date' => now()->addDays(6)->toDateString(),
+            'reason' => 'Older submission',
+            'status' => 'pending',
+        ]);
+        $newerRequest = RescheduleRequest::create([
+            'trip_id' => $newerAllocation->trip_id,
+            'requested_by' => $administrator->id,
+            'old_date' => now()->addDays(20)->toDateString(),
+            'new_date' => now()->addDays(25)->toDateString(),
+            'reason' => 'Newer submission',
+            'status' => 'pending',
+        ]);
+        DB::table('reschedule_requests')->where('id', $olderRequest->id)
+            ->update(['created_at' => now()->subDays(2)]);
+        DB::table('reschedule_requests')->where('id', $newerRequest->id)
+            ->update(['created_at' => now()->subDay()]);
+
+        $this->actingAs($administrator, 'sanctum')
+            ->getJson('/api/trip-modification-requests?status=pending')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $newerRequest->id)
+            ->assertJsonPath('data.1.id', $olderRequest->id);
     }
 
     private function createAllocation(User $administrator, string $suffix, $tripDate): Allocation

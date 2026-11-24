@@ -16,6 +16,73 @@ class TripModificationReviewTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_faculty_can_submit_date_change_request_with_trip_type_and_authorized_passengers(): void
+    {
+        $administrator = User::factory()->create(['role' => 'administrator']);
+        $faculty = User::factory()->create(['role' => 'faculty']);
+        $oldDate = now()->addDays(5)->toDateString();
+        $newDate = now()->addDays(15)->toDateString();
+
+        $vehicle = Vehicle::create([
+            'plate_number' => 'DATE-001',
+            'vehicle_model' => 'Date change vehicle',
+            'vehicle_type' => 'Van',
+            'capacity' => 12,
+            'status' => 'in_use',
+            'is_active' => true,
+        ]);
+        $driver = Driver::create([
+            'first_name' => 'Date',
+            'last_name' => 'Change',
+            'license_number' => 'DATE-LICENSE',
+            'license_expiry_date' => now()->addYear()->toDateString(),
+            'assigned_vehicle_id' => $vehicle->id,
+            'is_available' => false,
+        ]);
+        $vehicleRequest = VehicleRequest::factory()->create([
+            'requester_id' => $faculty->id,
+            'status' => 'approved',
+            'trip_date' => $oldDate,
+            'trip_end_date' => $oldDate,
+            'departure_time' => '08:00:00',
+            'estimated_return_time' => '17:00:00',
+            'destination' => 'Original destination',
+            'purpose' => 'Original purpose',
+            'trip_type' => 'inclusive',
+            'passengers' => 'Faculty group',
+            'number_of_passengers' => 3,
+        ]);
+        $trip = Trip::create([
+            'vehicle_request_id' => $vehicleRequest->id,
+            'vehicle_id' => $vehicle->id,
+            'driver_id' => $driver->id,
+            'trip_date' => $oldDate,
+            'departure_time' => '08:00:00',
+            'estimated_return_time' => '17:00:00',
+            'destination' => 'Original destination',
+            'purpose' => 'Original purpose',
+            'trip_status' => 'scheduled',
+        ]);
+        $allocation = Allocation::create([
+            'trip_id' => $trip->id,
+            'vehicle_id' => $vehicle->id,
+            'driver_id' => $driver->id,
+            'allocated_by' => $administrator->id,
+            'allocation_date' => now(),
+        ]);
+
+        $this->actingAs($faculty, 'sanctum')
+            ->postJson("/api/allocations/{$allocation->id}/reschedule-requests", [
+                'new_date' => $newDate,
+                'reason' => 'The meeting was moved.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.old_trip_type', 'inclusive')
+            ->assertJsonPath('data.new_trip_type', 'inclusive')
+            ->assertJsonPath('data.old_authorized_passengers', 'Faculty group')
+            ->assertJsonPath('data.new_authorized_passengers', 'Faculty group');
+    }
+
     public function test_admin_can_review_all_requested_fields_and_reassign_resources_on_approval(): void
     {
         $administrator = User::factory()->create(['role' => 'administrator']);
@@ -23,7 +90,7 @@ class TripModificationReviewTest extends TestCase
         $oldDate = now()->addDays(5)->toDateString();
         $newDate = now()->addDays(15)->toDateString();
         $endDate = now()->addDays(7)->toDateString();
-        $newEndDate = now()->addDays(17)->toDateString();
+        $newEndDate = now()->addDays(18)->toDateString();
 
         $oldVehicle = Vehicle::create([
             'plate_number' => 'OLD-001',
@@ -111,6 +178,7 @@ class TripModificationReviewTest extends TestCase
             ->assertJsonPath('data.0.new_purpose', 'Updated purpose')
             ->assertJsonPath('data.0.new_number_of_passengers', 5)
             ->assertJsonPath('data.0.new_trip_end_date', $newEndDate)
+            ->assertJsonPath('data.0.new_estimated_return_time', '18:00:00')
             ->assertJsonPath('data.0.new_trip_type', 'exclusive')
             ->assertJsonPath('data.0.new_authorized_passengers', 'Marife Aliaga and 4 faculty members')
             ->assertJsonPath('data.0.trip.vehicle.id', $oldVehicle->id)
@@ -120,9 +188,17 @@ class TripModificationReviewTest extends TestCase
             ->postJson("/api/trip-modification-requests/{$modification->id}/approve", [
                 'vehicle_id' => $newVehicle->id,
                 'driver_id' => $newDriver->id,
+                'admin_reason' => 'The updated schedule is approved.',
             ])
             ->assertOk()
-            ->assertJsonPath('data.status', 'approved');
+            ->assertJsonPath('data.status', 'approved')
+            ->assertJsonPath('data.admin_reason', 'The updated schedule is approved.');
+
+        $this->actingAs($faculty, 'sanctum')
+            ->getJson('/api/reschedule-requests')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'approved')
+            ->assertJsonPath('data.0.admin_reason', 'The updated schedule is approved.');
 
         $trip->refresh();
         $vehicleRequest->refresh();

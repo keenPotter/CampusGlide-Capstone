@@ -9,21 +9,29 @@ const props = defineProps({
   isAdmin: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['review'])
+const emit = defineEmits(['review', 'view'])
 
 const changes = computed(() => tripModificationChanges(props.item).filter((change) => change.changed))
 const canReview = computed(() => props.isAdmin && props.item.status === 'pending')
+const canOpenCard = computed(() => canReview.value || !props.isAdmin)
 
-function openReview() {
-  if (canReview.value) emit('review', props.item)
+function openCard() {
+  if (canReview.value) {
+    emit('review', props.item)
+  } else {
+    emit('view', props.item)
+  }
 }
 </script>
 
 <template>
   <article
     class="rounded-card border border-line bg-white p-card transition-colors hover:bg-neutral-50"
-    :class="{ 'cursor-pointer': canReview }"
-    @click="openReview"
+    :class="{ 'cursor-pointer': canOpenCard }"
+    :tabindex="canOpenCard ? 0 : undefined"
+    @click="openCard"
+    @keydown.enter.prevent="openCard"
+    @keydown.space.prevent="openCard"
   >
     <div class="flex flex-wrap items-start justify-between gap-2">
       <div class="min-w-0">
@@ -37,7 +45,7 @@ function openReview() {
 
     <p class="mt-2 text-small text-ink-muted">Reason: {{ item.reason }}</p>
     <p v-if="item.admin_reason" class="mt-1 text-small text-ink-muted">
-      Reviewer's note: {{ item.admin_reason }}
+      Decision note: {{ item.admin_reason }}
     </p>
 
     <dl v-if="changes.length" class="mt-2 grid gap-1 text-small">
@@ -47,9 +55,9 @@ function openReview() {
       </div>
     </dl>
 
-    <div v-if="isAdmin && item.status === 'pending'" class="mt-3 flex justify-end">
-      <BaseButton size="sm" variant="outline" @click.stop="openReview">
-        Review changes
+    <div class="mt-3 flex justify-end">
+      <BaseButton size="sm" variant="outline" @click.stop="openCard">
+        {{ canReview ? 'Review changes' : 'View details' }}
       </BaseButton>
     </div>
   </article>

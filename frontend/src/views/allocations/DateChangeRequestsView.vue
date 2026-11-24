@@ -10,6 +10,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import PaginationBar from '@/components/ui/PaginationBar.vue'
 import ConflictModal from '@/components/allocations/ConflictModal.vue'
 import DateChangeDecisionModal from '@/components/allocations/DateChangeDecisionModal.vue'
+import RescheduleRequestDetailsModal from '@/components/allocations/RescheduleRequestDetailsModal.vue'
 import RescheduleRequestCard from '@/components/allocations/RescheduleRequestCard.vue'
 
 const auth = useAuthStore()
@@ -22,6 +23,7 @@ const loading = ref(true)
 const loadError = ref('')
 const page = ref(1)
 const decisionItem = ref(null)
+const detailItem = ref(null)
 const conflicts = ref([])
 
 const pageCount = computed(() => Math.max(1, Math.ceil(requests.value.length / PAGE_SIZE)))
@@ -43,7 +45,8 @@ async function load() {
   loadError.value = ''
 
   try {
-    const data = unwrap(await api.get('/trip-modification-requests', { params: { status: 'pending' } }))
+    const params = auth.isAdministratorOrStaff ? { status: 'pending' } : {}
+    const data = unwrap(await api.get('/trip-modification-requests', { params }))
     requests.value = data
   } catch (error) {
     loadError.value = errorMessage(error, 'Unable to load Date Change Requests.')
@@ -58,6 +61,10 @@ function changePage(value) {
 
 function review(item) {
   decisionItem.value = item
+}
+
+function viewDetails(item) {
+  detailItem.value = item
 }
 
 function closeDecision() {
@@ -85,7 +92,11 @@ onMounted(load)
       <div class="page-header-copy">
         <h1 class="text-page-title">Date Change Requests</h1>
         <p class="mt-1 text-small text-ink-muted">
-          Review requests to change trip dates.
+          {{
+            auth.isAdministratorOrStaff
+              ? 'Review requests to change trip dates.'
+              : "Track your requests and read the administrator's decision notes."
+          }}
         </p>
       </div>
       <div class="page-actions">
@@ -101,8 +112,10 @@ onMounted(load)
 
     <EmptyState
       v-else-if="!requests.length"
-      title="No pending Date Change Requests"
-      message="Faculty date change requests for approved trips will appear here."
+      :title="auth.isAdministratorOrStaff ? 'No pending Date Change Requests' : 'No Date Change Requests'"
+      :message="auth.isAdministratorOrStaff
+        ? 'Faculty date change requests for approved trips will appear here.'
+        : 'Date change requests you submit will appear here with their decision notes.'"
     />
 
     <template v-else>
@@ -120,6 +133,7 @@ onMounted(load)
           :item="item"
           :is-admin="auth.isAdministratorOrStaff"
           @review="review"
+          @view="viewDetails"
         />
       </div>
       <PaginationBar :meta="paginationMeta" @change="changePage" />
@@ -131,6 +145,10 @@ onMounted(load)
       @close="closeDecision"
       @saved="onDecided"
       @conflict="onDecisionConflict"
+    />
+    <RescheduleRequestDetailsModal
+      :item="detailItem"
+      @close="detailItem = null"
     />
     <ConflictModal
       :conflicts="conflicts"

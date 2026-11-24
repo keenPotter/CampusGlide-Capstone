@@ -21,9 +21,22 @@ export function tripModificationChanges(item) {
       format: formatDate,
     },
     {
+      label: 'End of travel',
+      oldValue: item.old_trip_end_date,
+      newValue: item.new_trip_end_date,
+      format: formatDate,
+    },
+    {
       label: 'Time of departure',
       oldValue: item.old_departure_time,
       newValue: item.new_departure_time,
+      compare: timeValue,
+      format: formatTime,
+    },
+    {
+      label: 'Estimated return',
+      oldValue: item.old_estimated_return_time,
+      newValue: item.new_estimated_return_time,
       compare: timeValue,
       format: formatTime,
     },
