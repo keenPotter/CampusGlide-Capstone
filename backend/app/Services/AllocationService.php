@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Allocation;
 use App\Models\Driver;
+use App\Models\RescheduleRequest;
 use App\Models\Trip;
 use App\Models\Vehicle;
 use App\Models\VehicleRequest;
@@ -119,6 +120,7 @@ class AllocationService
 
     /**
      * Marks every trip whose return time has passed as completed, and frees its vehicle and driver.
+     * A pending date-change request pauses completion until it is reviewed.
      *
      * The end of a trip is the END date of its request plus the estimated return time,
      * so a multi-day trip is not completed on its first day.
@@ -135,6 +137,7 @@ class AllocationService
 
         $finished = Trip::with('vehicleRequest')
             ->whereIn('trip_status', self::ACTIVE)
+            ->whereNotIn('id', RescheduleRequest::select('trip_id')->where('status', 'pending'))
             ->whereNotNull('estimated_return_time')
             ->whereDate('trip_date', '<=', $now->toDateString())
             ->get()

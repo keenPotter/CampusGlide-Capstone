@@ -107,7 +107,7 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
     // Numbers and upcoming trips for the dashboard.
     // Counts come from meta.total, so they include every page.
     // This does not touch `items` or `filters`, which belong to the list page.
-    async fetchSummary(search = '', includeAllUpcoming = false) {
+    async fetchSummary(search = '') {
       const [pending, approved, disapproved] = await Promise.all(
         ['pending', 'approved', 'disapproved'].map((status) =>
           api.get('/vehicle-requests', { params: { status, per_page: 20 } }),
@@ -116,32 +116,13 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
 
       const total = (response) => response.data?.meta?.total ?? response.data?.data?.length ?? 0
       const today = todayIso()
+      const allPending = await fetchAllByStatus('pending', search)
+      const submittedAt = (request) => Date.parse(request.created_at ?? '') || 0
 
-      let upcomingPending = pending.data?.data ?? []
-      let upcomingApproved = approved.data?.data ?? []
-      if (includeAllUpcoming) {
-        const [allPending, allApproved] = await Promise.all([
-          fetchAllByStatus('pending', search),
-          fetchAllByStatus('approved', search),
-        ])
-        upcomingPending = allPending
-        upcomingApproved = allApproved
-      } else if (search.trim()) {
-        const searchedUpcoming = await Promise.all(
-          ['pending', 'approved'].map((status) =>
-            api.get('/vehicle-requests', {
-              params: { status, search: search.trim(), per_page: 100 },
-            }),
-          ),
-        )
-        upcomingPending = searchedUpcoming[0].data?.data ?? []
-        upcomingApproved = searchedUpcoming[1].data?.data ?? []
-      }
-
-      // Upcoming = pending or approved requests whose trip has not ended yet, soonest first.
-      const upcoming = [...upcomingPending, ...upcomingApproved]
+      // The dashboard preview shows only upcoming pending requests, newest submission first.
+      const upcoming = allPending
         .filter((item) => (item.trip_end_date || item.trip_date) >= today)
-        .sort((a, b) => String(a.trip_date).localeCompare(String(b.trip_date)))
+        .sort((a, b) => submittedAt(b) - submittedAt(a) || Number(b.id) - Number(a.id))
 
       return {
         counts: {
@@ -149,7 +130,7 @@ export const useVehicleRequestStore = defineStore('vehicleRequests', {
           approved: total(approved),
           disapproved: total(disapproved),
         },
-        upcoming: includeAllUpcoming ? upcoming : upcoming.slice(0, 5),
+        upcoming: upcoming.slice(0, 5),
       }
     },
   },
