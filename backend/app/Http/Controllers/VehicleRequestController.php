@@ -254,13 +254,19 @@ class VehicleRequestController extends Controller
             $oldDate = $trip->trip_date->toDateString();
             $newDate = $validated['trip_date'] ?? $oldDate;
             $oldEndDate = $vehicleRequest->trip_end_date?->toDateString() ?? $oldDate;
-            [, $newEndDate] = $this->allocations->tripRange($vehicleRequest, $newDate);
+            [, $newEndDate] = $this->allocations->tripRange(
+                $vehicleRequest,
+                $newDate,
+                $validated['trip_end_date'] ?? null
+            );
             $oldTripType = $vehicleRequest->trip_type;
             $newTripType = $oldTripType;
             $oldDeparture = substr((string) $trip->departure_time, 0, 5);
             $newDeparture = substr((string) ($validated['departure_time'] ?? $oldDeparture), 0, 5);
             $oldReturn = $trip->estimated_return_time ? substr((string) $trip->estimated_return_time, 0, 5) : null;
-            $newReturn = $oldReturn;
+            $newReturn = isset($validated['estimated_return_time'])
+                ? substr((string) $validated['estimated_return_time'], 0, 5)
+                : $oldReturn;
             $oldPassengers = $vehicleRequest->number_of_passengers;
             $newPassengers = (int) ($validated['number_of_passengers'] ?? $oldPassengers);
             $oldAuthorizedPassengers = $vehicleRequest->passengers;
@@ -272,9 +278,11 @@ class VehicleRequestController extends Controller
 
             abort_if(
                 $newDate === $oldDate
-                    && $newDeparture === $oldDeparture,
+                    && $newEndDate === $oldEndDate
+                    && $newDeparture === $oldDeparture
+                    && $newReturn === $oldReturn,
                 422,
-                'No date or departure time was changed.'
+                'No trip dates or times were changed.'
             );
 
             RescheduleRequest::create([

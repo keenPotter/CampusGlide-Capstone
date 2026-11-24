@@ -50,11 +50,7 @@ class RescheduleRequestController extends Controller
             $query->where('status', $status);
         }
 
-        if ($status === 'pending') {
-            $query->orderBy('new_date')->orderBy('old_date')->orderBy('id');
-        } else {
-            $query->latest();
-        }
+        $query->orderByDesc('created_at')->orderByDesc('id');
 
         return RescheduleRequestResource::collection($query->limit(100)->get());
     }

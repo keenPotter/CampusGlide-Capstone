@@ -57,7 +57,7 @@ const routes = [
     alias: '/date-change-requests',
     name: 'tripModificationRequests',
     component: () => import('@/views/allocations/DateChangeRequestsView.vue'),
-    meta: { requiresAuth: true, roles: ['administrator', 'staff'] },
+    meta: { requiresAuth: true, roles: ['administrator', 'staff', 'faculty'] },
   },
   {
     path: '/trip-schedule',

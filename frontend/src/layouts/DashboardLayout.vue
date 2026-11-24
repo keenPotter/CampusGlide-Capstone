@@ -32,6 +32,11 @@ const navigation = computed(() => {
         to: { name: 'facultyTripSchedule' },
         icon: 'calendar',
       },
+      {
+        name: 'My Date Change Requests',
+        to: { name: 'tripModificationRequests' },
+        icon: 'calendar',
+      },
     )
   }
   if (auth.isStaff) {
