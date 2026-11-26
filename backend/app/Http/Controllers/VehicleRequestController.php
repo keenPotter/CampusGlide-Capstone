@@ -117,8 +117,8 @@ class VehicleRequestController extends Controller
         $requests = VehicleRequest::with('requester')
             ->where('status', 'approved')
             ->whereDoesntHave('trip')
-            ->orderBy('trip_date')
-            ->orderBy('departure_time')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         return VehicleRequestResource::collection($requests);

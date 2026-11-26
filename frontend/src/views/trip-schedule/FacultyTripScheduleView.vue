@@ -51,11 +51,8 @@ const tripTypeOptions = computed(() => [
 ])
 
 const sortedTrips = computed(() =>
-  [...trips.value].sort((a, b) => {
-    const dateCompare = getTripStartDate(a).localeCompare(getTripStartDate(b))
-    if (dateCompare !== 0) return dateCompare
-    return String(a.departure_time ?? '').localeCompare(String(b.departure_time ?? ''))
-  }),
+  // Newest first (higher id = created later).
+  [...trips.value].sort((a, b) => Number(b.id) - Number(a.id)),
 )
 
 const filteredTrips = computed(() => sortedTrips.value)

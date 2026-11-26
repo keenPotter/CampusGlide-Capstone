@@ -89,16 +89,16 @@ class TripController extends Controller
 
         if ($request->filled('per_page')) {
             return TripResource::collection(
-                $query->orderBy('trip_date')
-                    ->orderBy('departure_time')
+                $query->orderByDesc('created_at')
+                    ->orderByDesc('id')
                     ->paginate((int) $request->query('per_page'))
                     ->appends($request->query())
             );
         }
 
         $trips = $query
-            ->orderBy('trip_date')
-            ->orderBy('departure_time')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         return TripResource::collection($trips);
@@ -163,8 +163,8 @@ class TripController extends Controller
 
         return TripResource::collection(
             $query
-            ->orderBy('trip_date')
-            ->orderBy('departure_time')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
                 ->paginate(10)
                 ->appends($request->query())
         );

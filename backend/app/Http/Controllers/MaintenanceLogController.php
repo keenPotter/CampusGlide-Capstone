@@ -89,9 +89,8 @@ class MaintenanceLogController extends Controller
 
         $perPage = min(max((int) $request->query('per_page', 10), 1), 100);
         $page = $query
-            ->orderByRaw("CASE WHEN status = 'in_progress' THEN 0 WHEN status = 'scheduled' AND maintenance_date >= ? THEN 1 WHEN status = 'scheduled' THEN 2 WHEN status = 'cancelled' THEN 3 WHEN status = 'completed' THEN 4 ELSE 5 END", [$today])
-            ->orderByRaw("CASE WHEN status IN ('cancelled', 'completed') THEN maintenance_date END DESC")
-            ->orderBy('maintenance_date')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate($perPage)
             ->appends($request->query());
 

@@ -28,7 +28,7 @@ class FuelUsageRecordController extends Controller
             $query->where('trip_id', $request->integer('trip_id'));
         }
 
-        return FuelUsageRecordResource::collection($query->orderByDesc('record_date')->get());
+        return FuelUsageRecordResource::collection($query->orderByDesc('created_at')->orderByDesc('id')->get());
     }
 
     /**

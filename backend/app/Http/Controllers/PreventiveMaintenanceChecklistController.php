@@ -24,7 +24,7 @@ class PreventiveMaintenanceChecklistController extends Controller
             $query->where('vehicle_id', $request->integer('vehicle_id'));
         }
 
-        return PreventiveMaintenanceChecklistResource::collection($query->orderByDesc('inspection_date')->get());
+        return PreventiveMaintenanceChecklistResource::collection($query->orderByDesc('created_at')->orderByDesc('id')->get());
     }
 
     /**

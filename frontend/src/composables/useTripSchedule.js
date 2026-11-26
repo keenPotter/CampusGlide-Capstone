@@ -123,9 +123,8 @@ export function useTripSchedule() {
   )
 
   const scheduledTripList = computed(() =>
-    [...filteredTrips.value].sort(
-      (a, b) => parseDate(getTripStartDate(a)) - parseDate(getTripStartDate(b)),
-    ),
+    // Newest first (higher id = created later).
+    [...filteredTrips.value].sort((a, b) => Number(b.id) - Number(a.id)),
   )
 
   async function fetchTripList() {

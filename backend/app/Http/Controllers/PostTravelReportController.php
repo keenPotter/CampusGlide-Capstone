@@ -24,7 +24,7 @@ class PostTravelReportController extends Controller
             $query->where('vehicle_id', $request->integer('vehicle_id'));
         }
 
-        return PostTravelReportResource::collection($query->orderByDesc('travel_date_from')->get());
+        return PostTravelReportResource::collection($query->orderByDesc('created_at')->orderByDesc('id')->get());
     }
 
     /**

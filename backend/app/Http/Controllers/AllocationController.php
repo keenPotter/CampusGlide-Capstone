@@ -95,8 +95,6 @@ class AllocationController extends Controller
 
         return AllocationResource::collection(
             $query
-                ->orderByRaw('COALESCE(allocations.updated_at, allocations.allocation_date, allocations.created_at) DESC')
-                ->orderByDesc('allocations.allocation_date')
                 ->orderByDesc('allocations.created_at')
                 ->orderByDesc('allocations.id')
                 ->paginate($perPage)

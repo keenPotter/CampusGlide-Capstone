@@ -73,31 +73,30 @@ class DefaultListSortingTest extends TestCase
             ->assertJsonPath('data.1.booking_source', VehicleRequest::SOURCE_ONLINE);
     }
 
-    public function test_allocations_default_to_most_recently_updated_and_trips_remain_chronological(): void
+    public function test_allocations_and_trips_are_ordered_by_newest_created_first(): void
     {
         $administrator = User::factory()->create(['role' => 'administrator']);
-        $recentlyUpdated = $this->createAllocation($administrator, 'OLD', now()->addDays(10));
-        $newlyAllocated = $this->createAllocation($administrator, 'NEW', now()->addDays(3));
+        // Older record has the later trip date, so date ordering would put it last.
+        $older = $this->createAllocation($administrator, 'OLD', now()->addDays(3));
+        $newer = $this->createAllocation($administrator, 'NEW', now()->addDays(10));
 
-        DB::table('allocations')->where('id', $recentlyUpdated->id)->update([
-            'allocation_date' => now()->subDay(),
+        // An edit to the older allocation must not move it to the top.
+        DB::table('allocations')->where('id', $older->id)->update([
+            'created_at' => now()->subDay(),
             'updated_at' => now()->addMinutes(2),
         ]);
-        DB::table('allocations')->where('id', $newlyAllocated->id)->update([
-            'allocation_date' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::table('trips')->where('id', $older->trip_id)->update(['created_at' => now()->subDay()]);
 
         $this->actingAs($administrator, 'sanctum')
             ->getJson('/api/allocations?per_page=100')
             ->assertOk()
-            ->assertJsonPath('data.0.id', $recentlyUpdated->id)
-            ->assertJsonPath('data.1.id', $newlyAllocated->id);
+            ->assertJsonPath('data.0.id', $newer->id)
+            ->assertJsonPath('data.1.id', $older->id);
 
         $this->getJson('/api/trips?per_page=10')
             ->assertOk()
-            ->assertJsonPath('data.0.id', $newlyAllocated->trip_id)
-            ->assertJsonPath('data.1.id', $recentlyUpdated->trip_id);
+            ->assertJsonPath('data.0.id', $newer->trip_id)
+            ->assertJsonPath('data.1.id', $older->trip_id);
     }
 
     public function test_pending_date_change_requests_are_ordered_by_newest_submission_first(): void
