@@ -163,7 +163,7 @@ async function requestDelete() {
       page.value -= 1
       await loadUsers()
     }
-  } catch (error) { toast.error(errorMessage(error, 'Unable to schedule account deletion.')) }
+  } catch (error) { toast.error(errorMessage(error, 'Unable to schedule account deactivation.')) }
   finally { saving.value = false }
 }
 async function cancelDeletion(user) {
@@ -172,8 +172,8 @@ async function cancelDeletion(user) {
     const response = await api.post(`/users/${user.id}/cancel-deletion`)
     const restored = response.data?.data ?? response.data
     users.value = users.value.map((item) => item.id === user.id ? restored : item)
-    toast.success('Account deletion cancelled. The account is active again.')
-  } catch (error) { toast.error(errorMessage(error, 'Unable to cancel deletion.')) }
+    toast.success('Account deactivation cancelled. The account is active again.')
+  } catch (error) { toast.error(errorMessage(error, 'Unable to cancel deactivation.')) }
   finally { saving.value = false }
 }
 onMounted(loadUsers)
@@ -223,15 +223,15 @@ onMounted(loadUsers)
               <div class="flex flex-wrap items-center gap-2">
                 <h2 class="text-base font-semibold">{{ fullName(user) }}</h2>
                 <span class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700">{{ ROLE_LABELS[user.role] ?? user.role }}</span>
-                <span v-if="user.deletion_requested_at" class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">Pending deletion</span>
+                <span v-if="user.deletion_requested_at" class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">Pending deactivation</span>
                 <span v-else-if="!user.is_active" class="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-semibold text-neutral-600">Inactive</span>
               </div>
               <p class="mt-1 break-all text-small text-ink-muted">{{ user.email }}</p>
               <p v-if="user.position || user.phone_number" class="mt-1 text-small text-ink-muted">{{ [user.position, user.phone_number].filter(Boolean).join(' · ') }}</p>
-              <p v-if="user.deletion_requested_at" class="mt-2 text-small text-red-700">Requested {{ formatDateTime(user.deletion_requested_at) }}. Deletion processing after {{ formatDateTime(user.deletion_due_at) }}. Historical requests, allocations, and trips will be retained.</p>
+              <p v-if="user.deletion_requested_at" class="mt-2 text-small text-red-700">Requested {{ formatDateTime(user.deletion_requested_at) }}. Deactivation processing after {{ formatDateTime(user.deletion_due_at) }}. Historical requests, allocations, and trips will be retained.</p>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
-              <BaseButton v-if="user.deletion_requested_at" variant="outline" size="sm" :loading="saving" @click="cancelDeletion(user)">Cancel deletion</BaseButton>
+              <BaseButton v-if="user.deletion_requested_at" variant="outline" size="sm" :loading="saving" @click="cancelDeletion(user)">Cancel deactivation</BaseButton>
               <template v-else-if="user.role !== 'administrator'">
                 <BaseButton variant="outline" size="sm" @click="startEdit(user)">Edit</BaseButton>
                 <BaseButton variant="danger" size="sm" @click="confirmDeleteUser = user">Deactivate account</BaseButton>
