@@ -234,7 +234,7 @@ onMounted(loadUsers)
               <BaseButton v-if="user.deletion_requested_at" variant="outline" size="sm" :loading="saving" @click="cancelDeletion(user)">Cancel deletion</BaseButton>
               <template v-else-if="user.role !== 'administrator'">
                 <BaseButton variant="outline" size="sm" @click="startEdit(user)">Edit</BaseButton>
-                <BaseButton variant="danger" size="sm" @click="confirmDeleteUser = user">Delete account</BaseButton>
+                <BaseButton variant="danger" size="sm" @click="confirmDeleteUser = user">Deactivate account</BaseButton>
               </template>
               <BaseButton v-else variant="outline" size="sm" @click="startEdit(user)">Edit</BaseButton>
             </div>

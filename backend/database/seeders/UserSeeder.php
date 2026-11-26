@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Hash;
  *      11-13 inactive administrator test accounts (only 2 active administrators)
  *      14-17 extra staff for testers (5 staff in total)
  *      18-22 extra faculty for testers. Each one has its own requests (see UatTesterSeeder)
- *      23-27 practice accounts for TC-AD-19 (Delete account), one for each administrator tester
+ *      23-27 practice accounts for TC-AD-19 (Deactivate account), one for each administrator tester
  * The administrators 1-2 are the Chief, Motorpool and the Unit Head-GSU printed on the request form.
  * All passwords = "password"
  */
@@ -61,7 +61,7 @@ class UserSeeder extends Seeder
             [21, 'faculty.tester4@nvsu.edu.ph', 'Test Faculty', 'Four',  'Instructor I', '09201234534', 'faculty', true, null],
             [22, 'faculty.tester5@nvsu.edu.ph', 'Test Faculty', 'Five',  'Instructor I', '09201234535', 'faculty', true, null],
 
-            // ---------- Practice accounts for "Delete account" (TC-AD-19). Do not sign in with these. ----------
+            // ---------- Practice accounts for "Deactivate account" (TC-AD-19). Do not sign in with these. ----------
             [23, 'delete.practice1@nvsu.edu.ph', 'Practice', 'Delete One',   'Instructor I', '09201234541', 'faculty', true, null],
             [24, 'delete.practice2@nvsu.edu.ph', 'Practice', 'Delete Two',   'Instructor I', '09201234542', 'faculty', true, null],
             [25, 'delete.practice3@nvsu.edu.ph', 'Practice', 'Delete Three', 'Instructor I', '09201234543', 'faculty', true, null],
